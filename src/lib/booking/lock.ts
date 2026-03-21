@@ -1,5 +1,5 @@
 import { Lock } from "@upstash/lock";
-import { redis } from "@/lib/redis";
+import { getRedis } from "@/lib/redis";
 import { BOOKING_LOCK_TTL_MS } from "@/lib/utils/constants";
 
 /**
@@ -17,7 +17,7 @@ export async function acquireBookingLock(params: {
   const lock = new Lock({
     id: lockId,
     lease: BOOKING_LOCK_TTL_MS,
-    redis,
+    redis: getRedis(),
   });
 
   const acquired = await lock.acquire();
