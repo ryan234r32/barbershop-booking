@@ -1,0 +1,340 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// MULTI-TENANT CORE
+// ============================================
+
+model Tenant {
+  id                String     @id @default(uuid())
+  name              String
+  slug              String     @unique
+  lineChannelId     String     @unique @map("line_channel_id")
+  lineChannelSecret String     @map("line_channel_secret")
+  lineAccessToken   String     @map("line_access_token")
+  liffId            String     @map("liff_id")
+
+  businessName      String     @map("business_name")
+  phone             String?
+  address           String?
+  bankInfo          String?    @map("bank_info")
+  bankAccountName   String?    @map("bank_account_name")
+  bankAccountNumber String?    @map("bank_account_number")
+
+  plan              TenantPlan @default(TRIAL)
+  trialEndsAt       DateTime?  @map("trial_ends_at")
+  subscriptionEndsAt DateTime? @map("subscription_ends_at")
+
+  isActive          Boolean    @default(true) @map("is_active")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+
+  users             User[]
+  services          Service[]
+  bookings          Booking[]
+  businessHours     BusinessHours[]
+  holidays          Holiday[]
+  adminUsers        AdminUser[]
+  notifications     Notification[]
+
+  @@map("tenants")
+}
+
+enum TenantPlan {
+  TRIAL
+  BASIC
+  STANDARD
+  PREMIUM
+}
+
+// ============================================
+// ADMIN USERS
+// ============================================
+
+model AdminUser {
+  id        String    @id @default(uuid())
+  tenantId  String    @map("tenant_id")
+  email     String
+  password  String
+  name      String
+  role      AdminRole @default(OWNER)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, email])
+  @@map("admin_users")
+}
+
+enum AdminRole {
+  OWNER
+  STAFF
+}
+
+// ============================================
+// CUSTOMERS (LINE USERS)
+// ============================================
+
+model User {
+  id                String          @id @default(uuid())
+  tenantId          String          @map("tenant_id")
+  lineUserId        String          @map("line_user_id")
+
+  displayName       String?         @map("display_name")
+  pictureUrl        String?         @map("picture_url")
+
+  phone             String?
+  realName          String?         @map("real_name")
+  email             String?
+
+  segment           CustomerSegment @default(NEW)
+  isVip             Boolean         @default(false) @map("is_vip")
+
+  violationCount    Int             @default(0) @map("violation_count")
+  violationResetAt  DateTime?       @map("violation_reset_at")
+  bookingRestricted Boolean         @default(false) @map("booking_restricted")
+  restrictedUntil   DateTime?       @map("restricted_until")
+
+  totalVisits       Int             @default(0) @map("total_visits")
+  lastVisitAt       DateTime?       @map("last_visit_at")
+  firstVisitAt      DateTime?       @map("first_visit_at")
+
+  notes             String?
+  tags              String[]        @default([])
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  tenant            Tenant          @relation(fields: [tenantId], references: [id])
+  bookings          Booking[]
+  cancellationRecords CancellationRecord[]
+
+  @@unique([tenantId, lineUserId])
+  @@index([tenantId, segment])
+  @@index([tenantId, lastVisitAt])
+  @@map("users")
+}
+
+enum CustomerSegment {
+  NEW
+  REGULAR
+  VIP
+  AT_RISK
+  LAPSED
+  BLACKLISTED
+}
+
+// ============================================
+// SERVICES
+// ============================================
+
+model Service {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  duration    Int
+  slotsNeeded Int      @map("slots_needed")
+  price       Int
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  bookings    Booking[]
+
+  @@unique([tenantId, name], name: "tenantId_name")
+  @@index([tenantId, isActive])
+  @@map("services")
+}
+
+// ============================================
+// BUSINESS HOURS & HOLIDAYS
+// ============================================
+
+model BusinessHours {
+  id        String  @id @default(uuid())
+  tenantId  String  @map("tenant_id")
+  dayOfWeek Int
+  startTime String  @map("start_time")
+  endTime   String  @map("end_time")
+  isOpen    Boolean @default(true) @map("is_open")
+
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, dayOfWeek])
+  @@map("business_hours")
+}
+
+model Holiday {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  date      DateTime @db.Date
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, date])
+  @@index([tenantId, date])
+  @@map("holidays")
+}
+
+// ============================================
+// BOOKINGS
+// ============================================
+
+model Booking {
+  id            String        @id @default(uuid())
+  tenantId      String        @map("tenant_id")
+  userId        String        @map("user_id")
+  serviceId     String        @map("service_id")
+
+  date          DateTime      @db.Date
+  startTime     String        @map("start_time")
+  endTime       String        @map("end_time")
+  slotsOccupied Int           @map("slots_occupied")
+
+  status        BookingStatus @default(CONFIRMED)
+  source        BookingSource @default(LIFF)
+  notes         String?
+
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+  service       Service       @relation(fields: [serviceId], references: [id])
+  payment       Payment?
+  cancellation  CancellationRecord?
+  notifications Notification[]
+
+  @@index([tenantId, date, status])
+  @@index([tenantId, userId])
+  @@index([tenantId, date, startTime])
+  @@map("bookings")
+}
+
+enum BookingStatus {
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  CANCELLED_BY_ADMIN
+}
+
+enum BookingSource {
+  LIFF
+  PHONE
+  WALK_IN
+  ADMIN
+}
+
+// ============================================
+// CANCELLATION RECORDS
+// ============================================
+
+model CancellationRecord {
+  id          String   @id @default(uuid())
+  bookingId   String   @unique @map("booking_id")
+  userId      String   @map("user_id")
+
+  cancelledAt DateTime @default(now()) @map("cancelled_at")
+  isViolation Boolean  @default(false) @map("is_violation")
+  reason      String?
+
+  bookingDate DateTime @db.Date @map("booking_date")
+  bookingTime String   @map("booking_time")
+
+  booking     Booking  @relation(fields: [bookingId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, isViolation])
+  @@map("cancellation_records")
+}
+
+// ============================================
+// PAYMENTS
+// ============================================
+
+model Payment {
+  id            String        @id @default(uuid())
+  bookingId     String        @unique @map("booking_id")
+
+  amount        Int
+  method        PaymentMethod @default(CASH)
+  status        PaymentStatus @default(PENDING)
+
+  screenshotUrl String?       @map("screenshot_url")
+  receivedAt    DateTime?     @map("received_at")
+  notes         String?
+
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  booking       Booking       @relation(fields: [bookingId], references: [id])
+
+  @@map("payments")
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  RECEIVED
+  WAIVED
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id             String             @id @default(uuid())
+  tenantId       String             @map("tenant_id")
+  bookingId      String?            @map("booking_id")
+
+  type           NotificationType
+  scheduledAt    DateTime           @map("scheduled_at")
+  sentAt         DateTime?          @map("sent_at")
+  status         NotificationStatus @default(PENDING)
+
+  lineUserId     String             @map("line_user_id")
+  messagePayload Json?              @map("message_payload")
+  errorMessage   String?            @map("error_message")
+
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  tenant         Tenant             @relation(fields: [tenantId], references: [id])
+  booking        Booking?           @relation(fields: [bookingId], references: [id])
+
+  @@index([status, scheduledAt])
+  @@index([tenantId, type])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  BOOKING_CONFIRMATION
+  REMINDER_24H
+  REMINDER_1H
+  CANCELLATION_CONFIRMATION
+  WELCOME
+  CUSTOM
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
