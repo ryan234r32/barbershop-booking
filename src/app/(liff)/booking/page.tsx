@@ -55,7 +55,13 @@ export default function BookingPage() {
     try {
       const res = await fetch(`/api/slots?date=${date}&serviceId=${serviceId}`);
       const data = await res.json();
-      setAvailableSlots(data.slots || []);
+      setAvailableSlots(
+        (data.slots || []).map((s: { startTime: string; isRecommended: boolean }) => ({
+          time: s.startTime,
+          available: true,
+          recommended: s.isRecommended,
+        }))
+      );
     } catch {
       setAvailableSlots([]);
     } finally {
