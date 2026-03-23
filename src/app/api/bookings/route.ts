@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const input = createBookingSchema.parse(body);
+    const tenantId = input.tenantId || process.env.DEFAULT_TENANT_ID!;
 
     // 1. Get service details
     const service = await prisma.service.findUnique({
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
     let user = await prisma.user.findUnique({
       where: {
         tenantId_lineUserId: {
-          tenantId: input.tenantId,
+          tenantId,
           lineUserId: input.lineUserId,
         },
       },
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
     if (!user) {
       user = await prisma.user.create({
         data: {
-          tenantId: input.tenantId,
+          tenantId,
           lineUserId: input.lineUserId,
         },
       });
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     // 4. Acquire distributed lock
     const lock = await acquireBookingLock({
-      tenantId: input.tenantId,
+      tenantId,
       date: input.date,
       startTime: input.startTime,
     });
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
       // 5. Double-check availability inside the lock
       const dateObj = new Date(input.date + "T00:00:00+08:00");
       const available = await isSlotAvailable({
-        tenantId: input.tenantId,
+        tenantId,
         date: dateObj,
         startTime: input.startTime,
         slotsNeeded: service.slotsNeeded,
@@ -125,7 +126,7 @@ export async function POST(request: NextRequest) {
       // 7. Create booking
       const booking = await prisma.booking.create({
         data: {
-          tenantId: input.tenantId,
+          tenantId,
           userId: user.id,
           serviceId: input.serviceId,
           date: dateObj,
@@ -143,7 +144,7 @@ export async function POST(request: NextRequest) {
 
       // 8. Schedule reminders (async, don't block response)
       scheduleReminders({
-        tenantId: input.tenantId,
+        tenantId,
         bookingId: booking.id,
         lineUserId: input.lineUserId,
         bookingDate: dateObj,

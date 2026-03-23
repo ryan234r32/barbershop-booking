@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const createBookingSchema = z.object({
-  tenantId: z.string().uuid(),
+  tenantId: z.string().uuid().optional(),
   serviceId: z.string().uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   startTime: z.string().regex(/^\d{2}:00$/),

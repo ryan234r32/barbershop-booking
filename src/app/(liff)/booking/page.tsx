@@ -87,7 +87,6 @@ export default function BookingPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          tenantId: process.env.NEXT_PUBLIC_TENANT_ID || undefined,
           serviceId: selectedService.id,
           date: selectedDate,
           startTime: selectedTime,
