@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePageTitle } from "@/lib/hooks/use-page-title";
 
 const WEEKDAY_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -18,6 +19,7 @@ interface Holiday {
 }
 
 export default function SettingsPage() {
+  usePageTitle("店家設定");
   const [tenant, setTenant] = useState({
     businessName: "",
     phone: "",

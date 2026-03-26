@@ -41,6 +41,8 @@ export async function GET(request: NextRequest) {
       segmentCounts,
       popularServices,
       dailyBookings,
+      heatmapData,
+      dailyRevenueData,
     ] = await Promise.all([
       // Total bookings in period
       prisma.booking.count({
@@ -102,6 +104,35 @@ export async function GET(request: NextRequest) {
         GROUP BY DATE(date)
         ORDER BY day
       `,
+
+      // Heatmap: booking density by day of week and hour
+      prisma.$queryRaw`
+        SELECT
+          EXTRACT(DOW FROM date)::int as "dayOfWeek",
+          CAST(SPLIT_PART(start_time, ':', 1) AS int) as hour,
+          COUNT(*)::int as count
+        FROM bookings
+        WHERE tenant_id = ${tenantId}
+          AND date >= ${startDate}
+          AND status != 'CANCELLED'
+        GROUP BY EXTRACT(DOW FROM date), SPLIT_PART(start_time, ':', 1)
+        ORDER BY "dayOfWeek", hour
+      ` as Promise<Array<{ dayOfWeek: number; hour: number; count: number }>>,
+
+      // Daily revenue with booking counts
+      prisma.$queryRaw`
+        SELECT
+          DATE(b.date) as date,
+          COALESCE(SUM(CASE WHEN p.status = 'RECEIVED' THEN p.amount ELSE 0 END), 0)::int as revenue,
+          COUNT(DISTINCT b.id)::int as bookings
+        FROM bookings b
+        LEFT JOIN payments p ON p.booking_id = b.id
+        WHERE b.tenant_id = ${tenantId}
+          AND b.date >= ${startDate}
+          AND b.status != 'CANCELLED'
+        GROUP BY DATE(b.date)
+        ORDER BY date
+      ` as Promise<Array<{ date: string; revenue: number; bookings: number }>>,
     ]);
 
     // Fetch service names for popular services
@@ -140,6 +171,8 @@ export async function GET(request: NextRequest) {
       segments: segmentCounts,
       popularServices: popularServicesWithNames,
       dailyBookings,
+      heatmap: heatmapData,
+      dailyRevenue: dailyRevenueData,
     });
   } catch (error) {
     return errorResponse(error);

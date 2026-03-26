@@ -12,12 +12,17 @@
  */
 import { describe, it, expect } from "vitest";
 
-const BASE_URL = "https://barbershop-booking-swart.vercel.app";
+const RUN_LIVE = process.env.LIVE_API_TESTS === "true";
+const describeIf = RUN_LIVE ? describe : describe.skip;
+
+const BASE_URL =
+  process.env.LIVE_API_BASE_URL ||
+  "https://barbershop-booking-swart.vercel.app";
 
 // Known IDs from seed data
 const TENANT_ID = "39662028-4caf-4149-9b2a-bc37087c0272";
 
-describe("Live API — Customer: View Services", () => {
+describeIf("Live API — Customer: View Services", () => {
   it("returns services list without tenantId (uses DEFAULT_TENANT_ID)", async () => {
     const res = await fetch(`${BASE_URL}/api/services`);
     const data = await res.json();
@@ -76,7 +81,7 @@ describe("Live API — Customer: View Services", () => {
   });
 });
 
-describe("Live API — Customer: Check Available Slots", () => {
+describeIf("Live API — Customer: Check Available Slots", () => {
   let serviceId: string;
 
   it("fetches a service ID for slot queries", async () => {
@@ -152,7 +157,7 @@ describe("Live API — Customer: Check Available Slots", () => {
   });
 });
 
-describe("Live API — Customer: Booking Validation", () => {
+describeIf("Live API — Customer: Booking Validation", () => {
   it("rejects booking with missing required fields", async () => {
     const res = await fetch(`${BASE_URL}/api/bookings`, {
       method: "POST",
@@ -193,7 +198,7 @@ describe("Live API — Customer: Booking Validation", () => {
   });
 });
 
-describe("Live API — Admin: Authentication", () => {
+describeIf("Live API — Admin: Authentication", () => {
   it("rejects login with wrong credentials", async () => {
     const res = await fetch(`${BASE_URL}/api/auth/login`, {
       method: "POST",
@@ -239,7 +244,7 @@ describe("Live API — Admin: Authentication", () => {
   });
 });
 
-describe("Live API — Security: Cron Jobs", () => {
+describeIf("Live API — Security: Cron Jobs", () => {
   it("blocks reminders cron without auth", async () => {
     const res = await fetch(`${BASE_URL}/api/cron/reminders`);
     expect(res.status).toBe(401);
@@ -263,7 +268,7 @@ describe("Live API — Security: Cron Jobs", () => {
   });
 });
 
-describe("Live API — Security: Admin-Only Endpoints", () => {
+describeIf("Live API — Security: Admin-Only Endpoints", () => {
   it("blocks service creation without admin auth", async () => {
     const res = await fetch(`${BASE_URL}/api/services`, {
       method: "POST",
@@ -293,7 +298,7 @@ describe("Live API — Security: Admin-Only Endpoints", () => {
   });
 });
 
-describe("Live API — LINE: Webhook", () => {
+describeIf("Live API — LINE: Webhook", () => {
   it("rejects GET requests (only POST allowed)", async () => {
     const res = await fetch(`${BASE_URL}/api/webhook`);
     expect(res.status).toBe(405);
@@ -321,7 +326,7 @@ describe("Live API — LINE: Webhook", () => {
   });
 });
 
-describe("Live API — LIFF: Session Init", () => {
+describeIf("Live API — LIFF: Session Init", () => {
   it("rejects init without lineUserId", async () => {
     const res = await fetch(`${BASE_URL}/api/liff/init`, {
       method: "POST",

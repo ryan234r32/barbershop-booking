@@ -1,6 +1,7 @@
 "use client";
 
 import { LiffProvider } from "@/lib/liff/provider";
+import { ToastProvider } from "@/components/ui/toast";
 
 export default function LiffLayout({
   children,
@@ -9,9 +10,11 @@ export default function LiffLayout({
 }) {
   return (
     <LiffProvider>
-      <div className="min-h-screen bg-gray-50">
-        {children}
-      </div>
+      <ToastProvider>
+        <div className="min-h-screen bg-gray-50">
+          {children}
+        </div>
+      </ToastProvider>
     </LiffProvider>
   );
 }

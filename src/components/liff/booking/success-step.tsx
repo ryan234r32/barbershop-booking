@@ -2,6 +2,27 @@
 
 import { useLiff } from "@/lib/liff/provider";
 
+/** Build Google Calendar event URL */
+function buildGoogleCalendarUrl(
+  serviceName: string,
+  date: string,
+  startTime: string,
+  endTime: string
+): string {
+  // date format: "YYYY-MM-DD", time format: "HH:00"
+  const startDT = `${date.replace(/-/g, "")}T${startTime.replace(":", "")}00`;
+  const endDT = `${date.replace(/-/g, "")}T${endTime.replace(":", "")}00`;
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: `${serviceName} — 1008 Hair Studio`,
+    dates: `${startDT}/${endDT}`,
+    location: "台北市中正區新生南路一段144-10號",
+    details: "1008 Hair Studio 預約",
+    ctz: "Asia/Taipei",
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
 interface Service {
   name: string;
   slotsNeeded: number;
@@ -74,8 +95,16 @@ export function SuccessStep({
 
       <div className="space-y-3">
         <a
+          href={buildGoogleCalendarUrl(service.name, date, time, endTime)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block w-full py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors text-center"
+        >
+          加入行事曆
+        </a>
+        <a
           href="/my-bookings"
-          className="block w-full py-3 bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition-colors"
+          className="block w-full py-3 bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition-colors text-center"
         >
           查看我的預約
         </a>

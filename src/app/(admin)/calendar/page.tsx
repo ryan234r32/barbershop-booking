@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useTransition } from "react";
+import { usePageTitle } from "@/lib/hooks/use-page-title";
 
 interface Booking {
   id: string;
@@ -24,10 +25,11 @@ const STATUS_BG: Record<string, string> = {
 };
 
 export default function CalendarPage() {
+  usePageTitle("行事曆");
   const [view, setView] = useState<"day" | "week">("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isPending, startTransition] = useTransition();
 
   // Get week range
   const weekDates = useMemo(() => {
@@ -52,21 +54,21 @@ export default function CalendarPage() {
       };
 
   useEffect(() => {
-    setLoading(true);
-    // Fetch all bookings in range
-    const dates = view === "week" ? weekDates : [currentDate];
-    const fetches = dates.map((d) =>
-      fetch(`/api/bookings?date=${d.toISOString().split("T")[0]}`).then((r) => r.json())
-    );
-
-    Promise.all(fetches)
-      .then((results) => {
+    startTransition(async () => {
+      try {
+        // Fetch all bookings in range
+        const dates = view === "week" ? weekDates : [currentDate];
+        const fetches = dates.map((d) =>
+          fetch(`/api/bookings?date=${d.toISOString().split("T")[0]}`).then((r) => r.json())
+        );
+        const results = await Promise.all(fetches);
         const all = results.flatMap((r) => r.bookings || []);
         setBookings(all);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [dateRange.start, dateRange.end, view]);
+      } catch (err) {
+        console.error(err);
+      }
+    });
+  }, [dateRange.start, dateRange.end, view, weekDates, currentDate]);
 
   const getBookingAt = (date: Date, hour: string) => {
     const dateStr = date.toISOString().split("T")[0];
@@ -92,7 +94,12 @@ export default function CalendarPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">行事曆</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          行事曆
+          {isPending && (
+            <span className="ml-2 inline-block w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin align-middle" />
+          )}
+        </h1>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setView("day")}

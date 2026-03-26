@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { usePageTitle } from "@/lib/hooks/use-page-title";
 
 interface BookingDetail {
   id: string;
@@ -66,6 +67,7 @@ const SEGMENT_LABELS: Record<string, string> = {
 };
 
 export default function BookingDetailPage() {
+  usePageTitle("預約詳情");
   const params = useParams();
   const router = useRouter();
   const bookingId = params.id as string;

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rich Menu Image Generator - 理髮廳</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Noto Sans TC', 'PingFang TC', sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      font-size: 14px;
+      color: #888;
+      margin-bottom: 32px;
+    }
+    .canvas-wrapper {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      margin-bottom: 24px;
+    }
+    canvas {
+      display: block;
+      width: 750px;
+      height: 253px;
+      border-radius: 8px;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+    button {
+      padding: 12px 28px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    .btn-primary {
+      background: #1DB446;
+      color: white;
+    }
+    .btn-primary:hover { background: #18993c; }
+    .btn-secondary {
+      background: #e0e0e0;
+      color: #333;
+    }
+    .btn-secondary:hover { background: #d0d0d0; }
+    .info {
+      max-width: 750px;
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      font-size: 14px;
+      line-height: 1.8;
+    }
+    .info h3 {
+      font-size: 16px;
+      margin-bottom: 12px;
+      color: #1DB446;
+    }
+    .info code {
+      background: #f0f0f0;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .color-options {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      justify-content: center;
+    }
+    .color-swatch {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .color-swatch:hover { transform: scale(1.1); }
+    .color-swatch.active { border-color: #333; }
+  </style>
+</head>
+<body>
+  <h1>Rich Menu Image Generator</h1>
+  <p class="subtitle">2500 x 843 px | Compact Layout | 3 Columns</p>
+
+  <div class="color-options">
+    <div class="color-swatch active" style="background: #1DB446" data-color="#1DB446" title="LINE Green"></div>
+    <div class="color-swatch" style="background: #2C2C2C" data-color="#2C2C2C" title="Dark"></div>
+    <div class="color-swatch" style="background: #4A90D9" data-color="#4A90D9" title="Blue"></div>
+    <div class="color-swatch" style="background: #8B5E3C" data-color="#8B5E3C" title="Brown"></div>
+    <div class="color-swatch" style="background: #E8B849" data-color="#E8B849" title="Gold"></div>
+  </div>
+
+  <div class="canvas-wrapper">
+    <canvas id="canvas" width="2500" height="843"></canvas>
+  </div>
+
+  <div class="controls">
+    <button class="btn-primary" onclick="savePNG()">Save as PNG</button>
+    <button class="btn-secondary" onclick="saveJPEG()">Save as JPEG</button>
+  </div>
+
+  <div class="info">
+    <h3>Usage Instructions</h3>
+    <p>1. Choose a color theme above, then click <strong>"Save as PNG"</strong>.</p>
+    <p>2. Run the setup script:</p>
+    <p><code>npx tsx scripts/setup-rich-menu.ts --image path/to/downloaded/rich-menu.png</code></p>
+    <p>3. Or place the image at <code>scripts/rich-menu.png</code> and run without arguments:</p>
+    <p><code>npx tsx scripts/setup-rich-menu.ts</code></p>
+    <br>
+    <h3>Button Mapping</h3>
+    <p><strong>Left (0-833px):</strong> "立即預約" → Opens LIFF booking page (uri action)</p>
+    <p><strong>Center (833-1667px):</strong> "我的預約" → Opens LIFF my-bookings page (uri action)</p>
+    <p><strong>Right (1667-2500px):</strong> "服務價目" → Sends text "服務" (message action)</p>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let currentColor = '#1DB446';
+
+    // Color swatch selection
+    document.querySelectorAll('.color-swatch').forEach(swatch => {
+      swatch.addEventListener('click', () => {
+        document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+        swatch.classList.add('active');
+        currentColor = swatch.dataset.color;
+        draw();
+      });
+    });
+
+    function hexToRgb(hex) {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return { r, g, b };
+    }
+
+    function darken(hex, amount) {
+      const { r, g, b } = hexToRgb(hex);
+      const f = 1 - amount;
+      return `rgb(${Math.round(r * f)}, ${Math.round(g * f)}, ${Math.round(b * f)})`;
+    }
+
+    function draw() {
+      const W = 2500;
+      const H = 843;
+      const COL_W = W / 3;
+
+      // Background gradient
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, currentColor);
+      grad.addColorStop(1, darken(currentColor, 0.15));
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      // Subtle pattern overlay (diagonal lines)
+      ctx.save();
+      ctx.globalAlpha = 0.04;
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2;
+      for (let i = -H; i < W + H; i += 40) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i + H, H);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Column dividers
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 2;
+      for (let i = 1; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(COL_W * i, 80);
+        ctx.lineTo(COL_W * i, H - 80);
+        ctx.stroke();
+      }
+
+      // Icons and labels for each column
+      const items = [
+        { label: '立即預約', sub: 'Book Now', icon: drawCalendarIcon },
+        { label: '我的預約', sub: 'My Bookings', icon: drawListIcon },
+        { label: '服務價目', sub: 'Services & Prices', icon: drawPriceIcon },
+      ];
+
+      items.forEach((item, i) => {
+        const cx = COL_W * i + COL_W / 2;
+        const iconY = 250;
+        const labelY = 520;
+        const subY = 590;
+
+        // Icon circle background
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, iconY, 110, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.fill();
+        ctx.restore();
+
+        // Draw the icon
+        item.icon(ctx, cx, iconY);
+
+        // Main label
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 72px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(item.label, cx, labelY);
+
+        // Sub label
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.font = '36px "Noto Sans TC", "PingFang TC", sans-serif';
+        ctx.fillText(item.sub, cx, subY);
+      });
+
+      // Bottom accent line
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.fillRect(0, H - 6, W, 6);
+    }
+
+    function drawCalendarIcon(ctx, cx, cy) {
+      ctx.save();
+      ctx.strokeStyle = 'white';
+      ctx.fillStyle = 'white';
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      const s = 65; // size
+      const x = cx - s / 2;
+      const y = cy - s / 2;
+
+      // Calendar body
+      roundRect(ctx, x, y + 12, s, s - 12, 8);
+      ctx.stroke();
+
+      // Top bar
+      ctx.beginPath();
+      ctx.moveTo(x, y + 32);
+      ctx.lineTo(x + s, y + 32);
+      ctx.stroke();
+
+      // Hooks
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(x + s * 0.25, y);
+      ctx.lineTo(x + s * 0.25, y + 18);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x + s * 0.75, y);
+      ctx.lineTo(x + s * 0.75, y + 18);
+      ctx.stroke();
+
+      // Date dots (grid)
+      const dotR = 5;
+      for (let row = 0; row < 2; row++) {
+        for (let col = 0; col < 3; col++) {
+          ctx.beginPath();
+          ctx.arc(
+            x + s * 0.22 + col * s * 0.28,
+            y + 46 + row * 18,
+            dotR, 0, Math.PI * 2
+          );
+          ctx.fill();
+        }
+      }
+
+      ctx.restore();
+    }
+
+    function drawListIcon(ctx, cx, cy) {
+      ctx.save();
+      ctx.strokeStyle = 'white';
+      ctx.fillStyle = 'white';
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      const s = 65;
+      const x = cx - s / 2;
+      const y = cy - s / 2;
+
+      // Clipboard body
+      roundRect(ctx, x, y + 8, s, s - 8, 8);
+      ctx.stroke();
+
+      // Clipboard clip
+      roundRect(ctx, cx - 16, y, 32, 16, 4);
+      ctx.stroke();
+
+      // Checklist lines
+      const lineX = x + 28;
+      const lineEndX = x + s - 10;
+      for (let i = 0; i < 3; i++) {
+        const ly = y + 34 + i * 16;
+        // Checkbox
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(x + 16, ly, 4, 0, Math.PI * 2);
+        ctx.fill();
+        // Line
+        ctx.beginPath();
+        ctx.moveTo(lineX, ly);
+        ctx.lineTo(lineEndX, ly);
+        ctx.lineWidth = 4;
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    function drawPriceIcon(ctx, cx, cy) {
+      ctx.save();
+      ctx.strokeStyle = 'white';
+      ctx.fillStyle = 'white';
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      // Price tag shape
+      const s = 60;
+
+      // Circle
+      ctx.beginPath();
+      ctx.arc(cx, cy, s * 0.55, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Dollar sign
+      ctx.font = 'bold 56px "Noto Sans TC", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('$', cx, cy + 2);
+
+      ctx.restore();
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function savePNG() {
+      const link = document.createElement('a');
+      link.download = 'rich-menu.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function saveJPEG() {
+      const link = document.createElement('a');
+      link.download = 'rich-menu.jpg';
+      link.href = canvas.toDataURL('image/jpeg', 0.95);
+      link.click();
+    }
+
+    // Initial draw
+    draw();
+  </script>
+</body>
+</html>

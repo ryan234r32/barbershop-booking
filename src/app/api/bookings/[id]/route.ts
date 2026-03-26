@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCancellationPolicy } from "@/lib/booking/cancellation";
-import { cancelBookingNotifications } from "@/lib/notifications/scheduler";
+import { cancelBookingNotifications, scheduleThankYou } from "@/lib/notifications/scheduler";
 import { getLineClient } from "@/lib/line/client";
 import { cancellationMessage } from "@/lib/line/messages";
+import { notifyAdminCancellation } from "@/lib/notifications/admin-notify";
 import { cancelBookingSchema } from "@/lib/utils/validation";
 import { errorResponse, CancellationNotAllowedError } from "@/lib/utils/errors";
 import { MAX_VIOLATIONS } from "@/lib/utils/constants";
@@ -134,6 +135,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         console.error("Failed to send cancellation LINE message:", lineError);
       }
 
+      // Notify admin of cancellation (fire-and-forget)
+      notifyAdminCancellation({
+        displayName: booking.user.displayName || "未知顧客",
+        serviceName: booking.service.name,
+        date: booking.date.toISOString().split("T")[0],
+        startTime: booking.startTime,
+        isViolation: policy.isViolation,
+        cancelledBy: "customer",
+      }).catch((err) => console.error("Failed to notify admin (cancellation):", err));
+
       return Response.json({
         booking: result,
         cancellation: {
@@ -163,6 +174,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
         return b;
       });
+
+      // Schedule thank-you notification (30 min after completion)
+      try {
+        await scheduleThankYou({
+          tenantId: booking.tenantId,
+          bookingId: id,
+          lineUserId: booking.user.lineUserId,
+        });
+      } catch (err) {
+        console.error("Failed to schedule thank-you:", err);
+      }
 
       return Response.json({ booking: updated });
     }
@@ -217,6 +239,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       });
 
       cancelBookingNotifications(id).catch(console.error);
+
+      // Notify admin of admin-initiated cancellation (fire-and-forget)
+      notifyAdminCancellation({
+        displayName: booking.user.displayName || "未知顧客",
+        serviceName: booking.service.name,
+        date: booking.date.toISOString().split("T")[0],
+        startTime: booking.startTime,
+        isViolation: false,
+        cancelledBy: "admin",
+      }).catch((err) => console.error("Failed to notify admin (admin cancel):", err));
 
       return Response.json({ booking: updated });
     }

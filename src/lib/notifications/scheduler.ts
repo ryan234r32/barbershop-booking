@@ -57,6 +57,31 @@ export async function scheduleReminders(params: {
 }
 
 /**
+ * Schedule a thank-you notification for a completed booking.
+ * Sends 30 minutes after the booking is marked COMPLETED.
+ */
+export async function scheduleThankYou(params: {
+  tenantId: string;
+  bookingId: string;
+  lineUserId: string;
+}) {
+  const { tenantId, bookingId, lineUserId } = params;
+
+  const scheduledAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes from now
+
+  await prisma.notification.create({
+    data: {
+      tenantId,
+      bookingId,
+      type: "THANK_YOU",
+      scheduledAt,
+      lineUserId,
+      status: "PENDING",
+    },
+  });
+}
+
+/**
  * Cancel all pending notifications for a booking.
  */
 export async function cancelBookingNotifications(bookingId: string) {

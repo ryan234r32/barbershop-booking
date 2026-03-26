@@ -1,12 +1,13 @@
 "use client";
 
 export default function LiffError({
-  error,
+  error: _error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  void _error; // Required by Next.js error boundary signature
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="text-center">

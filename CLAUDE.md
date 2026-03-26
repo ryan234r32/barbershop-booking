@@ -43,13 +43,29 @@ npm run db:migrate       # Create migration
 - `src/lib/utils/validation.ts` — Zod schemas for all inputs
 - `src/lib/utils/constants.ts` — Business constants (`MAX_VIOLATIONS=3`, `BOOKING_LOCK_TTL_MS=10000`, etc.)
 
-### Booking Creation Flow (critical path)
-1. Validate input with Zod → 2. Fetch service → 3. Upsert user → 4. Check `user.bookingRestricted` → 5. **Acquire Redis lock** → 6. **Double-check slot availability** inside lock → 7. Create booking in DB → 8. Schedule reminders (async) → 9. Send LINE confirmation (async) → 10. **Release lock in finally block**
+### V1.1 New Libraries
+- `src/lib/notifications/admin-notify.ts` — Fire-and-forget LINE push to admin for new bookings/cancellations
+- `src/lib/utils/logger.ts` — Structured logging (JSON in prod, readable in dev)
+- `src/lib/utils/cron-auth.ts` — Shared cron secret verification
+- `src/lib/hooks/use-page-title.ts` — Admin page title hook
+- `src/components/ui/toast.tsx` — Toast notification system (ToastProvider + useToast)
 
-### Cron Jobs (vercel.json)
-- `/api/cron/reminders` — every 15 min, sends pending notification records via LINE
-- `/api/cron/cleanup` — daily 3AM, maintenance tasks
-- `/api/cron/at-risk` — weekly Monday 4AM, CRM segmentation updates
+### V1.1 New Pages
+- `src/app/(admin)/campaigns/page.tsx` — Marketing push campaigns by customer segment
+- `src/app/api/admin/campaigns/route.ts` — Campaign API (POST send, GET segment counts)
+- `src/app/api/admin/export/route.ts` — Booking CSV export
+- `src/app/api/admin/weekly-report/route.ts` — Weekly business report generation
+- `src/app/api/health/route.ts` — Health check (DB + Redis, no auth)
+- `src/app/api/cron/weekly-report/route.ts` — Auto-send weekly report to admin via LINE
+
+### Booking Creation Flow (critical path)
+1. Validate input with Zod → 2. Fetch service → 3. Upsert user → 4. Check `user.bookingRestricted` → 5. **Acquire Redis lock** → 6. **Double-check slot availability** inside lock → 7. Create booking in DB → 8. Schedule reminders (async) → 9. Send LINE confirmation (async) → 10. **Notify admin via LINE** (async) → 11. **Release lock in finally block**
+
+### Cron Jobs (vercel.json, times in UTC → +8 for Taipei)
+- `/api/cron/reminders` — hourly, sends pending notification records via LINE
+- `/api/cron/cleanup` — 19:00 UTC (3AM Taipei), maintenance tasks
+- `/api/cron/at-risk` — Sunday 20:00 UTC (Monday 4AM Taipei), CRM segmentation
+- `/api/cron/weekly-report` — Sunday 22:00 UTC (Monday 6AM Taipei), push weekly report to admin
 
 ## Key Conventions
 - All dates use **Asia/Taipei** timezone — always use `nowTaipei()` for current time
@@ -57,8 +73,12 @@ npm run db:migrate       # Create migration
 - `tenantId` is on every table and every DB query (multi-tenant)
 - Use `getAdminFromCookie(request)` for admin auth — takes `NextRequest` param
 - Use `errorResponse(error)` for all API error responses — handles custom error classes + generic 500
+- Use `verifyCronSecret(request)` for cron auth — from `src/lib/utils/cron-auth.ts`
+- Use `logger.info/warn/error()` for structured logging — from `src/lib/utils/logger.ts`
+- Use `useToast()` for user-facing notifications — NOT `alert()` — from `src/components/ui/toast.tsx`
 - Prisma 7: datasource URL goes in `prisma.config.ts`, NOT in `schema.prisma`
 - LINE Bot SDK v10: use `Client` from legacy API, `pushMessage(userId, message)`
+- LINE messages: all builders in `src/lib/line/messages.ts`, include `quickReply: defaultQuickReply()` on all responses
 - Zod for all request body validation — parse before use
 - Singletons: `prisma` client (`src/lib/prisma.ts`), LINE client (`getLineClient()`)
 - Path alias: `@` → `./src`
@@ -75,3 +95,4 @@ npm run db:migrate       # Create migration
 Required: `DATABASE_URL`, `JWT_SECRET`, `DEFAULT_TENANT_ID`
 LINE: `LINE_CHANNEL_ID`, `LINE_CHANNEL_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN`, `NEXT_PUBLIC_LIFF_ID`
 Redis: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+Optional: `ADMIN_LINE_USER_ID` — LINE user ID of the shop owner; enables push notifications for new bookings and cancellations

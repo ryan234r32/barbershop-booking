@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePageTitle } from "@/lib/hooks/use-page-title";
 
 interface Service {
   id: string;
@@ -14,6 +15,7 @@ interface Service {
 }
 
 export default function ServicesPage() {
+  usePageTitle("服務項目管理");
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);

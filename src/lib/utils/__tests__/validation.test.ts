@@ -22,7 +22,8 @@ describe("createBookingSchema", () => {
   });
 
   it("accepts booking without tenantId (optional, uses DEFAULT_TENANT_ID)", () => {
-    const { tenantId: _, ...withoutTenant } = validBooking;
+    const { tenantId: _tenantId, ...withoutTenant } = validBooking;
+    void _tenantId;
     const result = createBookingSchema.safeParse(withoutTenant);
     expect(result.success).toBe(true);
   });

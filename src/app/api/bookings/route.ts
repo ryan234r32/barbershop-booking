@@ -5,10 +5,11 @@ import { acquireBookingLock, releaseBookingLock } from "@/lib/booking/lock";
 import { scheduleReminders } from "@/lib/notifications/scheduler";
 import { getLineClient } from "@/lib/line/client";
 import { bookingConfirmationMessage } from "@/lib/line/messages";
+import { notifyAdminNewBooking } from "@/lib/notifications/admin-notify";
 import { createBookingSchema } from "@/lib/utils/validation";
 import { errorResponse, SlotUnavailableError, BookingRestrictedError } from "@/lib/utils/errors";
 import { addHours } from "@/lib/utils/time";
-import { getAdminFromCookie } from "@/lib/auth/jwt";
+import { logger } from "@/lib/utils/logger";
 
 /** GET /api/bookings — list bookings */
 export async function GET(request: NextRequest) {
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest) {
         lineUserId: input.lineUserId,
         bookingDate: dateObj,
         startTime: input.startTime,
-      }).catch(console.error);
+      }).catch((err) => logger.error("Failed to schedule reminders", err, "bookings", { bookingId: booking.id }));
 
       // 9. Send LINE confirmation (async)
       try {
@@ -164,8 +165,18 @@ export async function POST(request: NextRequest) {
         });
         await lineClient.pushMessage(input.lineUserId, message);
       } catch (lineError) {
-        console.error("Failed to send LINE confirmation:", lineError);
+        logger.error("Failed to send LINE confirmation", lineError, "bookings", { lineUserId: input.lineUserId });
       }
+
+      // 10. Notify admin (fire-and-forget)
+      notifyAdminNewBooking({
+        displayName: user.displayName || "未知顧客",
+        serviceName: service.name,
+        date: input.date,
+        startTime: input.startTime,
+        endTime,
+        price: service.price,
+      }).catch((err) => logger.error("Failed to notify admin (new booking)", err, "bookings"));
 
       return Response.json({ booking }, { status: 201 });
     } finally {

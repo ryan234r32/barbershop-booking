@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useLiff } from "@/lib/liff/provider";
+import { useToast } from "@/components/ui/toast";
 import { ServiceStep } from "@/components/liff/booking/service-step";
 import { CalendarStep } from "@/components/liff/booking/calendar-step";
 import { TimeStep } from "@/components/liff/booking/time-step";
@@ -28,6 +29,7 @@ type BookingStep = "service" | "date" | "time" | "confirm" | "success";
 
 export default function BookingPage() {
   const { isReady, error, userId } = useLiff();
+  const { toast } = useToast();
   const [step, setStep] = useState<BookingStep>("service");
   const [services, setServices] = useState<Service[]>([]);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -98,14 +100,14 @@ export default function BookingPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || "預約失敗，請稍後再試");
+        toast({ type: "error", message: data.error || "預約失敗，請稍後再試" });
         return;
       }
 
       setBookingResult(data.booking);
       setStep("success");
     } catch {
-      alert("網路錯誤，請稍後再試");
+      toast({ type: "error", message: "網路錯誤，請稍後再試" });
     } finally {
       setSubmitting(false);
     }
@@ -158,57 +160,59 @@ export default function BookingPage() {
 
       {/* Steps */}
       <div className="p-4">
-        {step === "service" && (
-          <ServiceStep
-            services={services}
-            onSelect={(service) => {
-              setSelectedService(service);
-              setStep("date");
-            }}
-          />
-        )}
+        <div key={step} className="animate-fadeIn">
+          {step === "service" && (
+            <ServiceStep
+              services={services}
+              onSelect={(service) => {
+                setSelectedService(service);
+                setStep("date");
+              }}
+            />
+          )}
 
-        {step === "date" && selectedService && (
-          <CalendarStep
-            onSelect={handleDateSelect}
-            onBack={() => setStep("service")}
-          />
-        )}
+          {step === "date" && selectedService && (
+            <CalendarStep
+              onSelect={handleDateSelect}
+              onBack={() => setStep("service")}
+            />
+          )}
 
-        {step === "time" && (
-          <TimeStep
-            slots={availableSlots}
-            loading={loading}
-            selectedTime={selectedTime}
-            onSelect={(time) => {
-              setSelectedTime(time);
-              setStep("confirm");
-            }}
-            onBack={() => setStep("date")}
-          />
-        )}
+          {step === "time" && (
+            <TimeStep
+              slots={availableSlots}
+              loading={loading}
+              selectedTime={selectedTime}
+              onSelect={(time) => {
+                setSelectedTime(time);
+                setStep("confirm");
+              }}
+              onBack={() => setStep("date")}
+            />
+          )}
 
-        {step === "confirm" && selectedService && (
-          <ConfirmStep
-            service={selectedService}
-            date={selectedDate}
-            time={selectedTime}
-            notes={notes}
-            onNotesChange={setNotes}
-            onConfirm={handleSubmit}
-            onBack={() => setStep("time")}
-            submitting={submitting}
-          />
-        )}
+          {step === "confirm" && selectedService && (
+            <ConfirmStep
+              service={selectedService}
+              date={selectedDate}
+              time={selectedTime}
+              notes={notes}
+              onNotesChange={setNotes}
+              onConfirm={handleSubmit}
+              onBack={() => setStep("time")}
+              submitting={submitting}
+            />
+          )}
 
-        {step === "success" && bookingResult && selectedService && (
-          <SuccessStep
-            bookingId={bookingResult.id}
-            service={selectedService}
-            date={selectedDate}
-            time={selectedTime}
-          />
-        )}
+          {step === "success" && bookingResult && selectedService && (
+            <SuccessStep
+              bookingId={bookingResult.id}
+              service={selectedService}
+              date={selectedDate}
+              time={selectedTime}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

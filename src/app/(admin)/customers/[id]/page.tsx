@@ -2,6 +2,8 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { usePageTitle } from "@/lib/hooks/use-page-title";
 
 interface CustomerDetail {
   id: string;
@@ -38,6 +40,7 @@ export default function CustomerDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  usePageTitle("顧客詳情");
   const [customer, setCustomer] = useState<CustomerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -124,7 +127,7 @@ export default function CustomerDetailPage({
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-4">
         <div className="flex items-start gap-4">
           {customer.pictureUrl ? (
-            <img src={customer.pictureUrl} alt="" className="w-16 h-16 rounded-full" />
+            <Image src={customer.pictureUrl} alt="" width={64} height={64} className="w-16 h-16 rounded-full" />
           ) : (
             <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-xl text-gray-500">
               {(customer.displayName || "?")[0]}

@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { usePageTitle } from "@/lib/hooks/use-page-title";
 
 interface Customer {
   id: string;
@@ -30,28 +32,30 @@ const SEGMENT_MAP: Record<string, { label: string; color: string }> = {
 };
 
 export default function CustomersPage() {
+  usePageTitle("顧客管理");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
   const [segment, setSegment] = useState("");
   const [page, setPage] = useState(1);
 
   useEffect(() => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    if (segment) params.set("segment", segment);
-    params.set("page", page.toString());
+    startTransition(async () => {
+      try {
+        const params = new URLSearchParams();
+        if (search) params.set("search", search);
+        if (segment) params.set("segment", segment);
+        params.set("page", page.toString());
 
-    fetch(`/api/customers?${params}`)
-      .then((r) => r.json())
-      .then((data) => {
+        const res = await fetch(`/api/customers?${params}`);
+        const data = await res.json();
         setCustomers(data.customers || []);
         setTotal(data.total || 0);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      } catch (err) {
+        console.error(err);
+      }
+    });
   }, [search, segment, page]);
 
   const totalPages = Math.ceil(total / 20);
@@ -90,7 +94,7 @@ export default function CustomersPage() {
 
       {/* Customer list */}
       <div className="bg-white rounded-xl border border-gray-200">
-        {loading ? (
+        {isPending ? (
           <div className="p-8 text-center text-gray-400">載入中...</div>
         ) : customers.length === 0 ? (
           <div className="p-8 text-center text-gray-400">沒有找到顧客</div>
@@ -114,9 +118,11 @@ export default function CustomersPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {c.pictureUrl ? (
-                          <img
+                          <Image
                             src={c.pictureUrl}
                             alt=""
+                            width={32}
+                            height={32}
                             className="w-8 h-8 rounded-full"
                           />
                         ) : (

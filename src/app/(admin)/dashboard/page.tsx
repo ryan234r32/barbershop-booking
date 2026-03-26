@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePageTitle } from "@/lib/hooks/use-page-title";
 
 interface Booking {
   id: string;
@@ -40,9 +41,11 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function DashboardPage() {
+  usePageTitle("儀表板");
   const [todayBookings, setTodayBookings] = useState<Booking[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [exportingCSV, setExportingCSV] = useState(false);
 
   useEffect(() => {
     const today = new Date().toISOString().split("T")[0];
@@ -77,6 +80,30 @@ export default function DashboardPage() {
     }
   };
 
+  const exportBookingsCSV = async () => {
+    setExportingCSV(true);
+    try {
+      const now = new Date();
+      const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const to = now.toISOString().split("T")[0];
+      const res = await fetch(`/api/admin/export?from=${from}&to=${to}`);
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `bookings_${from}_${to}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("CSV export error:", err);
+    } finally {
+      setExportingCSV(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -89,7 +116,16 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">儀表板</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">儀表板</h1>
+        <button
+          onClick={exportBookingsCSV}
+          disabled={exportingCSV}
+          className="px-3 py-1.5 text-sm rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+        >
+          {exportingCSV ? "匯出中..." : "匯出預約 CSV"}
+        </button>
+      </div>
 
       {/* Stats cards */}
       {stats && (

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { usePageTitle } from "@/lib/hooks/use-page-title";
 
 interface Service {
   id: string;
@@ -18,6 +19,7 @@ interface AvailableSlot {
 }
 
 export default function NewBookingPage() {
+  usePageTitle("新增預約");
   const router = useRouter();
   const [services, setServices] = useState<Service[]>([]);
   const [selectedService, setSelectedService] = useState("");

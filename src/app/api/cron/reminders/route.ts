@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
 import { processPendingNotifications } from "@/lib/notifications/sender";
+import { verifyCronSecret } from "@/lib/utils/cron-auth";
+import { logger } from "@/lib/utils/logger";
 
 /** GET /api/cron/reminders — Vercel Cron Job to send pending notifications */
 export async function GET(request: NextRequest) {
-  // Verify cron secret
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronSecret(request)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       failed: result.failed,
     });
   } catch (error) {
-    console.error("Cron reminders error:", error);
+    logger.error("Cron reminders failed", error, "cron/reminders");
     return Response.json({ error: "Internal error" }, { status: 500 });
   }
 }

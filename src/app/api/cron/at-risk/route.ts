@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 import { recalculateSegments } from "@/lib/crm/segmentation";
+import { verifyCronSecret } from "@/lib/utils/cron-auth";
+import { logger } from "@/lib/utils/logger";
 
 /** GET /api/cron/at-risk — weekly CRM segmentation recalculation */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronSecret(request)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
     const result = await recalculateSegments();
     return Response.json({ success: true, ...result });
   } catch (error) {
-    console.error("Cron at-risk error:", error);
+    logger.error("Cron at-risk segmentation failed", error, "cron/at-risk");
     return Response.json({ error: "Internal error" }, { status: 500 });
   }
 }

@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/customers", label: "顧客管理", icon: "👥" },
   { href: "/services", label: "服務項目", icon: "💇" },
   { href: "/analytics", label: "數據分析", icon: "📈" },
+  { href: "/campaigns", label: "行銷推播", icon: "📣" },
   { href: "/settings", label: "設定", icon: "⚙️" },
 ];
 
@@ -21,6 +22,8 @@ export function AdminSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
+    // Reset mobile menu on navigation — intentional setState in effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMobileOpen(false);
   }, [pathname]);
 

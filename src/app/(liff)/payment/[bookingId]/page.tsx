@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import Image from "next/image";
 import { useLiff } from "@/lib/liff/provider";
 import { LoadingSpinner } from "@/components/liff/loading-spinner";
 
@@ -145,11 +146,14 @@ export default function PaymentPage({
                   <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-700">
                     {uploaded ? "截圖已上傳，等待店家確認" : "已上傳轉帳截圖，等待確認中"}
                   </div>
-                  <img
-                    src={booking.payment.screenshotUrl}
-                    alt="轉帳截圖"
-                    className="w-full rounded-lg border"
-                  />
+                  <div className="relative w-full aspect-[3/4]">
+                    <Image
+                      src={booking.payment.screenshotUrl}
+                      alt="轉帳截圖"
+                      fill
+                      className="rounded-lg border object-contain"
+                    />
+                  </div>
                 </div>
               ) : (
                 <label className="block">

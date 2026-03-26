@@ -33,7 +33,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Admin routes protection (redirect to login if no token)
-  const adminPaths = ["/dashboard", "/calendar", "/bookings", "/customers", "/services", "/analytics", "/settings"];
+  const adminPaths = ["/dashboard", "/calendar", "/bookings", "/customers", "/services", "/analytics", "/campaigns", "/settings"];
   if (adminPaths.some((p) => pathname.startsWith(p))) {
     const token = request.cookies.get("admin_token");
     if (!token) {
@@ -53,6 +53,7 @@ export const config = {
     "/customers/:path*",
     "/services/:path*",
     "/analytics/:path*",
+    "/campaigns/:path*",
     "/settings/:path*",
   ],
 };

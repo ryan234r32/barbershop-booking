@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getLineClient } from "@/lib/line/client";
-import { reminderMessage } from "@/lib/line/messages";
+import { reminderMessage, thankYouMessage } from "@/lib/line/messages";
 
 /**
  * Process and send all pending notifications that are due.
@@ -30,8 +30,25 @@ export async function processPendingNotifications() {
 
   for (const notification of pendingNotifications) {
     try {
-      if (notification.booking && notification.booking.status === "CONFIRMED") {
-        const { booking } = notification;
+      const { booking } = notification;
+
+      // Handle THANK_YOU notifications (for completed bookings)
+      if (notification.type === "THANK_YOU" && booking) {
+        const liffUrl = `https://liff.line.me/${booking.tenant.liffId || process.env.NEXT_PUBLIC_LIFF_ID}`;
+        const message = thankYouMessage({
+          shopName: booking.tenant.businessName,
+          serviceName: booking.service.name,
+          liffUrl,
+        });
+
+        await lineClient.pushMessage(notification.lineUserId, message);
+        await prisma.notification.update({
+          where: { id: notification.id },
+          data: { status: "SENT", sentAt: now },
+        });
+        results.sent++;
+      } else if (booking && booking.status === "CONFIRMED") {
+        // Handle REMINDER notifications
         const hoursUntil = notification.type === "REMINDER_24H" ? 24 : 1;
 
         const message = reminderMessage({
@@ -51,7 +68,7 @@ export async function processPendingNotifications() {
 
         results.sent++;
       } else {
-        // Booking was cancelled — skip notification
+        // Booking was cancelled or missing — skip notification
         await prisma.notification.update({
           where: { id: notification.id },
           data: { status: "CANCELLED" },
