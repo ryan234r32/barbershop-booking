@@ -14,21 +14,28 @@ export default async function Home() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-green-50 to-white px-4">
       <div className="w-full max-w-sm text-center">
         <div className="mb-8">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-green-500 text-3xl text-white shadow-lg">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-emerald-500 text-3xl text-white shadow-lg">
             ✂️
           </div>
           <h1 className="mt-4 text-2xl font-bold text-gray-900">
-            理髮廳預約系統
+            1008 Hair Studio
           </h1>
           <p className="mt-2 text-sm text-gray-500">
-            LINE 智能預約管理平台
+            線上預約，輕鬆搞定
           </p>
+        </div>
+
+        {/* Business Info */}
+        <div className="mb-8 space-y-2 text-sm text-gray-600">
+          <p>📍 台北市中正區新生南路一段144-10號</p>
+          <p>🕐 週二至週日 11:00-20:00（週一公休）</p>
+          <p>📞 02-2396-2306</p>
         </div>
 
         <div className="space-y-3">
           <a
             href="/booking"
-            className="block w-full rounded-xl bg-green-500 px-6 py-3 text-center font-medium text-white shadow-sm transition hover:bg-green-600"
+            className="block w-full rounded-xl bg-emerald-500 px-6 py-3 text-center font-medium text-white shadow-sm transition hover:bg-emerald-600"
           >
             立即預約
           </a>
@@ -48,6 +55,11 @@ export default async function Home() {
           </div>
         </div>
       </div>
+
+      {/* Footer */}
+      <p className="mt-12 text-xs text-gray-300">
+        Powered by LINE 預約系統
+      </p>
     </div>
   );
 }

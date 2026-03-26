@@ -4,7 +4,7 @@
  * Creates a Rich Menu with 3 buttons:
  *   Left   — "立即預約" → opens LIFF booking page
  *   Center — "我的預約" → opens LIFF my-bookings page
- *   Right  — "服務價目" → sends text "服務" to trigger keyword reply
+ *   Right  — "聯絡店家" → sends text "服務" to trigger keyword reply
  *
  * Usage:
  *   npx tsx scripts/setup-rich-menu.ts
@@ -69,12 +69,12 @@ const richMenuBody = {
       },
     },
     {
-      // Right column — 服務價目
+      // Right column — 聯絡店家
       bounds: { x: 1667, y: 0, width: 833, height: 843 },
       action: {
-        type: "message" as const,
-        label: "服務價目",
-        text: "服務",
+        type: "uri" as const,
+        label: "聯絡店家",
+        uri: "tel:02-2396-2306",
       },
     },
   ],
@@ -266,7 +266,7 @@ function generateFallbackSvg(): string {
 
   <text x="${COL * 2 + COL / 2}" y="370" text-anchor="middle"
         font-family="'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif"
-        font-size="56" font-weight="700" fill="white">服務價目</text>
+        font-size="56" font-weight="700" fill="white">聯絡店家</text>
 
   <!-- Sub-labels -->
   <text x="${COL * 0 + COL / 2}" y="420" text-anchor="middle"
@@ -393,7 +393,7 @@ async function main() {
   console.log("Layout: 2500x843 (compact), 3 columns");
   console.log(`  [立即預約] → ${LIFF_BASE}/booking`);
   console.log(`  [我的預約] → ${LIFF_BASE}/my-bookings`);
-  console.log('  [服務價目] → sends "服務" (triggers pricing carousel)');
+  console.log('  [聯絡店家] → tel:02-2396-2306 (直撥電話)');
   console.log("");
 }
 
