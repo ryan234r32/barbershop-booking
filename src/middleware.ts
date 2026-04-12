@@ -21,25 +21,14 @@ function isRateLimited(ip: string): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // LINE WebView landing on root → redirect through LIFF URL to properly
-  // initialize the native bridge. Without this, navigating from "/" to
-  // "/booking" via a regular <a> link causes "Unable to load client features."
-  // because the LIFF bridge was never established for this WebView session.
+  // LINE WebView landing on root "/" → redirect to /booking internally.
+  // This handles the case where LIFF opens the Endpoint URL root instead of
+  // the /booking path (e.g. during Endpoint URL cache propagation).
   if (pathname === "/") {
     const ua = request.headers.get("user-agent") || "";
     const isLine = /Line\//i.test(ua);
-    const alreadyRedirected = request.cookies.has("liff_root_redirect");
-
-    if (isLine && !alreadyRedirected) {
-      const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
-      if (liffId) {
-        const res = NextResponse.redirect(
-          `https://liff.line.me/${liffId}/booking`
-        );
-        // Prevent infinite redirect loop (cookie expires in 60s)
-        res.cookies.set("liff_root_redirect", "1", { maxAge: 60 });
-        return res;
-      }
+    if (isLine) {
+      return NextResponse.redirect(new URL("/booking", request.url));
     }
   }
 

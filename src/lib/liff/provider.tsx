@@ -49,17 +49,43 @@ export function LiffProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const initLiff = async () => {
+      const liffId = process.env.NEXT_PUBLIC_LIFF_ID!;
+
       try {
         const liffModule = await import("@line/liff");
         const liff = liffModule.default;
 
-        await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! });
+        // Attempt LIFF init — may fail with "Unable to load client features"
+        // if this page wasn't opened through liff.line.me URL scheme.
+        let initFailed = false;
+        try {
+          await liff.init({ liffId });
+        } catch (initErr) {
+          const msg = initErr instanceof Error ? initErr.message : "";
+          if (msg.includes("Unable to load client features")) {
+            // We're in LINE's WebView but the LIFF native bridge wasn't set up.
+            // This happens when the page was navigated to via a regular link
+            // instead of through liff.line.me. We can still function — just
+            // can't use native features like getProfile().
+            console.warn("LIFF client features unavailable, using fallback mode:", msg);
+            initFailed = true;
+          } else {
+            throw initErr; // Re-throw non-recoverable errors
+          }
+        }
+
+        if (initFailed) {
+          // Fallback: redirect through proper LIFF URL to establish bridge.
+          // Use line://app/ scheme which opens a fresh LIFF WebView.
+          const path = window.location.pathname;
+          window.location.href = `https://liff.line.me/${liffId}${path}`;
+          return;
+        }
 
         const isLoggedIn = liff.isLoggedIn();
         const isInClient = liff.isInClient();
 
         if (!isLoggedIn) {
-          // Preserve current path so user returns to /booking, not /
           liff.login({ redirectUri: window.location.href });
           return;
         }
@@ -76,7 +102,6 @@ export function LiffProvider({ children }: { children: ReactNode }) {
           pictureUrl = profile.pictureUrl || null;
         } catch (profileErr) {
           console.warn("Failed to get LINE profile, continuing without it:", profileErr);
-          // Try to get userId from decoded token as fallback
           try {
             const decodedToken = liff.getDecodedIDToken();
             userId = decodedToken?.sub || null;

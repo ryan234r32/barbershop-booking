@@ -1,7 +1,5 @@
 import { redirect } from "next/navigation";
-import { cookies, headers } from "next/headers";
-
-const LIFF_ID = process.env.NEXT_PUBLIC_LIFF_ID;
+import { cookies } from "next/headers";
 
 export default async function Home() {
   // If admin is logged in, redirect to dashboard
@@ -10,18 +8,6 @@ export default async function Home() {
   if (token) {
     redirect("/dashboard");
   }
-
-  // Detect LINE WebView — use LIFF URLs so the native bridge initializes properly
-  const headersList = await headers();
-  const ua = headersList.get("user-agent") || "";
-  const isLine = /Line\//i.test(ua);
-
-  const bookingUrl = isLine && LIFF_ID
-    ? `https://liff.line.me/${LIFF_ID}/booking`
-    : "/booking";
-  const myBookingsUrl = isLine && LIFF_ID
-    ? `https://liff.line.me/${LIFF_ID}/my-bookings`
-    : "/my-bookings";
 
   // Default: show a landing page that directs to booking (LIFF) or admin login
   return (
@@ -45,13 +31,13 @@ export default async function Home() {
 
         <div className="space-y-3">
           <a
-            href={bookingUrl}
+            href="/booking"
             className="block w-full rounded-lg bg-[var(--color-brand)] px-6 py-3 text-center font-semibold text-[var(--color-bg)] transition hover:opacity-90"
           >
             立即預約
           </a>
           <a
-            href={myBookingsUrl}
+            href="/my-bookings"
             className="block w-full rounded-lg border border-[var(--color-brand)] px-6 py-3 text-center font-medium text-[var(--color-brand)] transition hover:bg-secondary"
           >
             我的預約
