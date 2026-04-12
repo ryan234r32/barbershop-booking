@@ -21,6 +21,28 @@ function isRateLimited(ip: string): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // LINE WebView landing on root → redirect through LIFF URL to properly
+  // initialize the native bridge. Without this, navigating from "/" to
+  // "/booking" via a regular <a> link causes "Unable to load client features."
+  // because the LIFF bridge was never established for this WebView session.
+  if (pathname === "/") {
+    const ua = request.headers.get("user-agent") || "";
+    const isLine = /Line\//i.test(ua);
+    const alreadyRedirected = request.cookies.has("liff_root_redirect");
+
+    if (isLine && !alreadyRedirected) {
+      const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+      if (liffId) {
+        const res = NextResponse.redirect(
+          `https://liff.line.me/${liffId}/booking`
+        );
+        // Prevent infinite redirect loop (cookie expires in 60s)
+        res.cookies.set("liff_root_redirect", "1", { maxAge: 60 });
+        return res;
+      }
+    }
+  }
+
   // Rate limiting for API routes
   if (pathname.startsWith("/api/")) {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
@@ -46,6 +68,7 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/",
     "/api/:path*",
     "/dashboard/:path*",
     "/calendar/:path*",
