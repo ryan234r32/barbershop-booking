@@ -6,10 +6,10 @@ import { useLiff } from "@/lib/liff/provider";
 import { useToast } from "@/components/ui/toast";
 import { ServiceStep } from "@/components/liff/booking/service-step";
 import { CalendarStep } from "@/components/liff/booking/calendar-step";
-import { TimeStep } from "@/components/liff/booking/time-step";
 import { ConfirmStep } from "@/components/liff/booking/confirm-step";
 import { SuccessStep } from "@/components/liff/booking/success-step";
-import { LoadingSpinner } from "@/components/liff/loading-spinner";
+import { CancelPolicySheet } from "@/components/liff/booking/cancel-policy-sheet";
+import { LoadingScreen } from "@/components/liff/loading-screen";
 
 interface Service {
   id: string;
@@ -26,7 +26,7 @@ interface AvailableSlot {
   recommended: boolean;
 }
 
-type BookingStep = "service" | "date" | "time" | "confirm" | "success";
+type BookingStep = "service" | "calendar" | "confirm" | "success";
 
 export default function BookingPage() {
   const { isReady, error, userId } = useLiff();
@@ -37,10 +37,12 @@ export default function BookingPage() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [bookingResult, setBookingResult] = useState<{ id: string } | null>(null);
   const [notes, setNotes] = useState("");
+  const [showCancelPolicy, setShowCancelPolicy] = useState(false);
 
   // Load services
   useEffect(() => {
@@ -54,7 +56,7 @@ export default function BookingPage() {
 
   // Load available slots when date + service selected
   const loadSlots = useCallback(async (date: string, serviceId: string) => {
-    setLoading(true);
+    setSlotsLoading(true);
     try {
       const res = await fetch(`/api/slots?date=${date}&serviceId=${serviceId}`);
       const data = await res.json();
@@ -68,7 +70,7 @@ export default function BookingPage() {
     } catch {
       setAvailableSlots([]);
     } finally {
-      setLoading(false);
+      setSlotsLoading(false);
     }
   }, []);
 
@@ -78,7 +80,20 @@ export default function BookingPage() {
     if (selectedService) {
       loadSlots(date, selectedService.id);
     }
-    setStep("time");
+  };
+
+  const handleTimeSelect = (time: string) => {
+    setSelectedTime(time);
+  };
+
+  const handleServiceSelect = (service: Service) => {
+    setSelectedService(service);
+    // If re-selecting same service, stay on step; otherwise reset date/time
+    if (selectedService?.id !== service.id) {
+      setSelectedDate("");
+      setSelectedTime("");
+      setAvailableSlots([]);
+    }
   };
 
   const handleSubmit = async () => {
@@ -114,8 +129,61 @@ export default function BookingPage() {
     }
   };
 
+  // Determine if the "Next" button should be enabled
+  const canProceed = (() => {
+    switch (step) {
+      case "service":
+        return !!selectedService;
+      case "calendar":
+        return !!selectedDate && !!selectedTime;
+      case "confirm":
+        return !submitting;
+      default:
+        return false;
+    }
+  })();
+
+  const handleNext = () => {
+    switch (step) {
+      case "service":
+        if (selectedService) setStep("calendar");
+        break;
+      case "calendar":
+        if (selectedDate && selectedTime) setStep("confirm");
+        break;
+      case "confirm":
+        handleSubmit();
+        break;
+    }
+  };
+
+  const handleBack = () => {
+    switch (step) {
+      case "calendar":
+        setStep("service");
+        break;
+      case "confirm":
+        setStep("calendar");
+        break;
+    }
+  };
+
+  // Step number for the bottom bar label
+  const stepLabel = (() => {
+    switch (step) {
+      case "service":
+        return "下一步：選擇日期與時段";
+      case "calendar":
+        return "下一步：備註與確認";
+      case "confirm":
+        return submitting ? "預約中..." : "確認預約";
+      default:
+        return "";
+    }
+  })();
+
   if (!isReady) {
-    return <LoadingSpinner message="正在連接 LINE..." />;
+    return <LoadingScreen />;
   }
 
   if (error) {
@@ -132,18 +200,18 @@ export default function BookingPage() {
           <p className="text-gray-400 text-xs mb-4 break-all">({error})</p>
           <button
             onClick={() => window.location.reload()}
-            className="block w-full rounded-xl bg-emerald-500 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-600 mb-2"
+            className="block w-full rounded-xl bg-[#003D2B] px-6 py-2.5 text-sm font-medium text-[#FFF8F1] transition hover:opacity-90 mb-2"
           >
             重新載入
           </button>
           <Link
             href="/"
-            className="block rounded-xl border border-gray-200 px-6 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            className="block rounded-xl border border-[#003D2B]/20 px-6 py-2.5 text-sm font-medium text-[#003D2B] transition hover:bg-[#003D2B]/5"
           >
             回到首頁
           </Link>
-          <p className="mt-6 text-sm text-gray-400">
-            或致電預約：<a href="tel:02-2396-2306" className="text-emerald-600 underline">02-2396-2306</a>
+          <p className="mt-6 text-sm text-[#003D2B]/50">
+            或致電預約：<a href="tel:02-2396-2306" className="text-[#003D2B] underline">02-2396-2306</a>
           </p>
         </div>
       </div>
@@ -151,65 +219,63 @@ export default function BookingPage() {
   }
 
   if (loading && step === "service") {
-    return <LoadingSpinner message="載入服務項目..." />;
+    return <LoadingScreen message="載入服務項目..." />;
+  }
+
+  // Success step — full page, no bottom bar
+  if (step === "success" && bookingResult && selectedService) {
+    return (
+      <div className="max-w-md mx-auto px-6">
+        <SuccessStep
+          bookingId={bookingResult.id}
+          service={selectedService}
+          date={selectedDate}
+          time={selectedTime}
+        />
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-md mx-auto">
-      {/* Progress bar */}
-      <div className="sticky top-0 bg-white z-10 px-4 pt-4 pb-2 border-b">
-        <div className="flex items-center gap-2 mb-2">
-          {["service", "date", "time", "confirm"].map((s, i) => (
-            <div key={s} className="flex items-center gap-2 flex-1">
+    <div className="max-w-md mx-auto min-h-screen flex flex-col bg-[#FFF8F1]">
+      {/* Progress indicator */}
+      <div className="px-6 pt-6 pb-2">
+        <div className="flex items-center gap-2">
+          {(["service", "calendar", "confirm"] as const).map((s, i) => (
+            <div key={s} className="flex-1">
               <div
-                className={`h-1 flex-1 rounded ${
-                  ["service", "date", "time", "confirm"].indexOf(step) >= i
-                    ? "bg-emerald-500"
-                    : "bg-gray-200"
+                className={`h-[2px] rounded-full transition-all duration-300 ${
+                  (["service", "calendar", "confirm"] as const).indexOf(step as "service" | "calendar" | "confirm") >= i
+                    ? "bg-[#003D2B]"
+                    : "bg-[#003D2B]/10"
                 }`}
               />
             </div>
           ))}
         </div>
-        <p className="text-sm text-gray-500 text-center">
-          {step === "service" && "選擇服務"}
-          {step === "date" && "選擇日期"}
-          {step === "time" && "選擇時段"}
-          {step === "confirm" && "確認預約"}
-          {step === "success" && "預約成功"}
-        </p>
       </div>
 
-      {/* Steps */}
-      <div className="p-4">
+      {/* Step content */}
+      <div className="flex-1 px-6 pt-6 pb-32">
         <div key={step} className="animate-fadeIn">
           {step === "service" && (
             <ServiceStep
               services={services}
-              onSelect={(service) => {
-                setSelectedService(service);
-                setStep("date");
-              }}
+              selectedService={selectedService}
+              onSelect={handleServiceSelect}
             />
           )}
 
-          {step === "date" && selectedService && (
+          {step === "calendar" && selectedService && (
             <CalendarStep
-              onSelect={handleDateSelect}
-              onBack={() => setStep("service")}
-            />
-          )}
-
-          {step === "time" && (
-            <TimeStep
-              slots={availableSlots}
-              loading={loading}
+              selectedDate={selectedDate}
               selectedTime={selectedTime}
-              onSelect={(time) => {
-                setSelectedTime(time);
-                setStep("confirm");
-              }}
-              onBack={() => setStep("date")}
+              availableSlots={availableSlots}
+              slotsLoading={slotsLoading}
+              serviceDuration={selectedService.duration}
+              serviceSlotsNeeded={selectedService.slotsNeeded}
+              onDateSelect={handleDateSelect}
+              onTimeSelect={handleTimeSelect}
             />
           )}
 
@@ -221,21 +287,49 @@ export default function BookingPage() {
               notes={notes}
               onNotesChange={setNotes}
               onConfirm={handleSubmit}
-              onBack={() => setStep("time")}
+              onBack={handleBack}
               submitting={submitting}
-            />
-          )}
-
-          {step === "success" && bookingResult && selectedService && (
-            <SuccessStep
-              bookingId={bookingResult.id}
-              service={selectedService}
-              date={selectedDate}
-              time={selectedTime}
+              onShowCancelPolicy={() => setShowCancelPolicy(true)}
             />
           )}
         </div>
       </div>
+
+      {/* Sticky bottom bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-[#FFF8F1] border-t border-[#003D2B]/5 px-6 py-4 z-50">
+        <div className="max-w-md mx-auto flex items-center gap-3">
+          {step !== "service" && (
+            <button
+              onClick={handleBack}
+              className="w-12 h-12 flex items-center justify-center border-[1.5px] border-[#003D2B] rounded-xl text-[#003D2B] shrink-0 transition-colors hover:bg-[#003D2B]/5"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+                arrow_back
+              </span>
+            </button>
+          )}
+          <button
+            onClick={handleNext}
+            disabled={!canProceed}
+            className={`
+              flex-1 h-12 rounded-xl font-bold text-sm tracking-wide transition-all duration-200
+              ${
+                canProceed
+                  ? "bg-[#003D2B] text-[#FFF8F1] shadow-lg shadow-[#003D2B]/20 hover:bg-[#003D2B]/90"
+                  : "bg-[#003D2B]/10 text-[#003D2B]/30 cursor-not-allowed"
+              }
+            `}
+          >
+            {stepLabel}
+          </button>
+        </div>
+      </div>
+
+      {/* Cancel Policy Sheet */}
+      <CancelPolicySheet
+        isOpen={showCancelPolicy}
+        onClose={() => setShowCancelPolicy(false)}
+      />
     </div>
   );
 }

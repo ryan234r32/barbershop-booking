@@ -1,4 +1,5 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -9,7 +10,33 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: "Manrope", "Noto Sans TC", -apple-system, "PingFang TC", sans-serif;
+  --font-headline: "Manrope", "Noto Sans TC", sans-serif;
+  --font-body: "Manrope", "Noto Sans TC", sans-serif;
+  --font-label: "Manrope", "Noto Sans TC", sans-serif;
   --font-mono: var(--font-geist-mono);
+
+  /* Stitch Design Tokens — Surface Hierarchy */
+  --color-surface: #FFF8F1;
+  --color-surface-dim: #e0d9d1;
+  --color-surface-bright: #FFF8F1;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #faf2ea;
+  --color-surface-container: #f4ede5;
+  --color-surface-container-high: #eee7df;
+  --color-surface-container-highest: #e8e1da;
+
+  /* Stitch — On-surface */
+  --color-on-surface: #1e1b17;
+  --color-on-surface-variant: #404944;
+
+  /* Stitch — Primary extended */
+  --color-primary-container: #003d2b;
+  --color-on-primary-container: #73a891;
+  --color-on-primary-fixed-variant: #1a503c;
+
+  /* Stitch — Outline */
+  --color-outline: #707974;
+  --color-outline-variant: #c0c9c2;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -145,5 +172,70 @@
   }
 }
 .animate-fadeIn {
-  animation: fadeIn 0.2s ease-out;
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Bottom Sheet slide-up */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes slideDown {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeOutOverlay {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.animate-slideUp {
+  animation: slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.animate-slideDown {
+  animation: slideDown 0.25s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+.animate-fadeInOverlay {
+  animation: fadeInOverlay 0.2s ease-out;
+}
+.animate-fadeOutOverlay {
+  animation: fadeOutOverlay 0.2s ease-out forwards;
+}
+
+/* Skeleton pulse for loading screen */
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+.animate-skeletonPulse {
+  animation: skeletonPulse 2s ease-in-out infinite;
+}
+
+/* Material Symbols Outlined base config */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24;
+  font-size: 24px;
+}
+
+/* Botanical shadow — soft ambient */
+.botanical-shadow {
+  box-shadow: 0px 20px 40px rgba(30, 27, 23, 0.04);
+}
+
+/* Glassmorphic header */
+.glassmorphic {
+  background: rgba(255, 248, 241, 0.8);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }

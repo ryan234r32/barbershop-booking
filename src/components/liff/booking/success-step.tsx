@@ -9,7 +9,6 @@ function buildGoogleCalendarUrl(
   startTime: string,
   endTime: string
 ): string {
-  // date format: "YYYY-MM-DD", time format: "HH:00"
   const startDT = `${date.replace(/-/g, "")}T${startTime.replace(":", "")}00`;
   const endDT = `${date.replace(/-/g, "")}T${endTime.replace(":", "")}00`;
   const params = new URLSearchParams({
@@ -26,10 +25,10 @@ function buildGoogleCalendarUrl(
 interface Service {
   name: string;
   slotsNeeded: number;
+  price: number;
 }
 
 export function SuccessStep({
-  bookingId,
   service,
   date,
   time,
@@ -54,63 +53,94 @@ export function SuccessStep({
   };
 
   return (
-    <div className="text-center py-8">
-      <div className="w-16 h-16 bg-[var(--color-success)]/15 rounded-full flex items-center justify-center mx-auto mb-4">
-        <svg
-          className="w-8 h-8 text-[var(--color-success)]"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2.5}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
+    <div className="flex flex-col items-center pt-48 pb-16 animate-fadeIn">
+      {/* Botanical SVG with checkmark */}
+      <svg
+        className="w-24 h-24"
+        viewBox="0 0 100 100"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+        stroke="#003D2B"
+      >
+        <path
+          d="M50 90C50 90 20 65 20 40C20 25 35 15 50 35C65 15 80 25 80 40C80 65 50 90 50 90Z"
+          fill="#003D2B"
+          fillOpacity="0.05"
+          opacity="0.1"
+        />
+        <path d="M50 90V40M50 40C50 40 70 30 85 45M50 55C50 55 30 45 15 60M50 70C50 70 65 65 75 75" />
+        <circle cx="50" cy="50" r="18" strokeWidth="1.5" fill="#FFF8F1" stroke="#003D2B" />
+        <path d="M44 50L48 54L56 46" strokeWidth="2" stroke="#003D2B" />
+      </svg>
+
+      {/* Title */}
+      <h2 className="text-3xl font-bold text-[#003D2B] tracking-tight mt-6">
+        預約成功
+      </h2>
+      <p className="text-[#003D2B]/50 font-medium text-sm mt-2">
+        確認訊息已發送到你的 LINE
+      </p>
+
+      {/* Summary card */}
+      <div className="bg-[#f4ede5] rounded-xl p-6 flex flex-col gap-4 w-full mt-8">
+        {/* Top row: service + price */}
+        <div className="flex justify-between items-start pb-4 border-b border-[#003D2B]/10">
+          <div>
+            <span className="text-xs font-bold tracking-widest text-[#003D2B]/40 uppercase mb-1 block">
+              SERVICE
+            </span>
+            <span className="text-[#003D2B] font-semibold">{service.name}</span>
+          </div>
+          <div className="text-right">
+            <span className="text-xs font-bold tracking-widest text-[#003D2B]/40 uppercase mb-1 block">
+              PRICE
+            </span>
+            <span className="text-[#003D2B] font-semibold">
+              NT$ {service.price.toLocaleString()}
+            </span>
+          </div>
+        </div>
+
+        {/* Bottom row: date + time */}
+        <div className="flex justify-between items-start">
+          <div>
+            <span className="text-xs font-bold tracking-widest text-[#003D2B]/40 uppercase mb-1 block">
+              DATE
+            </span>
+            <span className="text-[#003D2B] font-medium">{displayDate}</span>
+          </div>
+          <div className="text-right">
+            <span className="text-xs font-bold tracking-widest text-[#003D2B]/40 uppercase mb-1 block">
+              TIME
+            </span>
+            <span className="text-[#003D2B] font-medium">
+              {time} — {endTime}
+            </span>
+          </div>
+        </div>
       </div>
 
-      <h2 className="text-xl font-semibold text-[var(--color-brand)] mb-1">預約成功！</h2>
-      <p className="text-muted-foreground text-sm mb-6">我們已發送確認訊息到您的 LINE</p>
-
-      <div className="bg-[var(--color-surface)] rounded-lg p-4 text-left space-y-2 mb-6">
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">服務</span>
-          <span className="font-medium">{service.name}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">日期</span>
-          <span className="font-medium">{displayDate}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">時間</span>
-          <span className="font-medium">
-            {time} - {endTime}
-          </span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">預約編號</span>
-          <span className="font-mono text-xs text-muted-foreground">
-            {bookingId.slice(0, 8)}
-          </span>
-        </div>
-      </div>
-
-      <div className="space-y-3">
+      {/* Action buttons */}
+      <div className="flex flex-col gap-3 w-full mt-8">
         <a
           href={buildGoogleCalendarUrl(service.name, date, time, endTime)}
           target="_blank"
           rel="noopener noreferrer"
-          className="block w-full py-3 border border-[var(--color-brand)] text-[var(--color-brand)] rounded-lg font-medium hover:bg-secondary transition-colors text-center"
+          className="block w-full border-[1.5px] border-[#003D2B] text-[#003D2B] rounded-xl font-semibold text-sm py-4 text-center transition-colors hover:bg-[#003D2B]/5"
         >
-          加入行事曆
+          加入 Google 行事曆
         </a>
         <a
           href="/my-bookings"
-          className="block w-full py-3 bg-[var(--color-brand)] text-[var(--color-bg)] rounded-lg font-medium hover:opacity-90 transition-colors text-center"
+          className="block w-full border-[1.5px] border-[#003D2B] text-[#003D2B] rounded-xl font-semibold text-sm py-4 text-center transition-colors hover:bg-[#003D2B]/5"
         >
           查看我的預約
         </a>
         <button
           onClick={handleClose}
-          className="block w-full py-3 bg-secondary text-foreground rounded-lg font-medium hover:bg-[var(--color-surface)] transition-colors"
+          className="w-full bg-[#003D2B] text-[#FFF8F1] rounded-xl font-semibold text-sm py-4 shadow-lg shadow-[#003D2B]/20 transition-colors hover:bg-[#003D2B]/90"
         >
           關閉
         </button>

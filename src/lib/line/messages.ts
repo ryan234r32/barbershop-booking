@@ -1,5 +1,25 @@
 import { FlexMessage, FlexBubble, FlexCarousel } from "@line/bot-sdk";
 
+/** Build Google Calendar URL for a booking */
+function buildGoogleCalendarUrl(
+  serviceName: string,
+  date: string,
+  startTime: string,
+  endTime: string,
+): string {
+  const startDT = `${date.replace(/-/g, "")}T${startTime.replace(":", "")}00`;
+  const endDT = `${date.replace(/-/g, "")}T${endTime.replace(":", "")}00`;
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: `${serviceName} — 1008 Hair Studio`,
+    dates: `${startDT}/${endDT}`,
+    location: "台北市中正區新生南路一段144-10號",
+    details: "1008 Hair Studio 預約",
+    ctz: "Asia/Taipei",
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
 /** Booking confirmation Flex Message */
 export function bookingConfirmationMessage(params: {
   serviceName: string;
@@ -10,6 +30,8 @@ export function bookingConfirmationMessage(params: {
   shopAddress?: string;
 }): FlexMessage {
   const { serviceName, date, startTime, endTime, shopName, shopAddress } = params;
+
+  const calendarUrl = buildGoogleCalendarUrl(serviceName, date, startTime, endTime);
 
   const bubble: FlexBubble = {
     type: "bubble",
@@ -62,6 +84,25 @@ export function bookingConfirmationMessage(params: {
           wrap: true,
         },
       ],
+    },
+    footer: {
+      type: "box",
+      layout: "vertical",
+      spacing: "sm",
+      contents: [
+        {
+          type: "button",
+          action: {
+            type: "uri",
+            label: "加入 Google 行事曆",
+            uri: calendarUrl,
+          },
+          style: "primary",
+          color: "#003D2B",
+          height: "sm",
+        },
+      ],
+      backgroundColor: "#FFF8F1",
     },
   };
 
