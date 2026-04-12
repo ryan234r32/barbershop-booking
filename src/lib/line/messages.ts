@@ -1,32 +1,4 @@
-import { FlexMessage, FlexBubble, FlexCarousel, QuickReply } from "@line/bot-sdk";
-
-/** Default quick reply buttons — reusable across all responses */
-export function defaultQuickReply(): QuickReply {
-  return {
-    items: [
-      {
-        type: "action",
-        action: { type: "message", label: "立即預約", text: "預約" },
-      },
-      {
-        type: "action",
-        action: { type: "message", label: "我的預約", text: "我的預約" },
-      },
-      {
-        type: "action",
-        action: { type: "message", label: "服務價目", text: "服務" },
-      },
-      {
-        type: "action",
-        action: { type: "message", label: "營業資訊", text: "營業時間" },
-      },
-      {
-        type: "action",
-        action: { type: "message", label: "付款方式", text: "付款" },
-      },
-    ],
-  };
-}
+import { FlexMessage, FlexBubble, FlexCarousel } from "@line/bot-sdk";
 
 /** Booking confirmation Flex Message */
 export function bookingConfirmationMessage(params: {
@@ -50,10 +22,10 @@ export function bookingConfirmationMessage(params: {
           text: "預約確認 ✓",
           weight: "bold",
           size: "lg",
-          color: "#1DB446",
+          color: "#003D2B",
         },
       ],
-      backgroundColor: "#F0FFF0",
+      backgroundColor: "#FFF8F1",
     },
     body: {
       type: "box",
@@ -85,7 +57,7 @@ export function bookingConfirmationMessage(params: {
           type: "text",
           text: "如需取消，請至「我的預約」操作",
           size: "xs",
-          color: "#aaaaaa",
+          color: "#809A8E",
           margin: "xl",
           wrap: true,
         },
@@ -177,7 +149,7 @@ export function cancellationMessage(params: {
           text: "預約已取消",
           weight: "bold",
           size: "lg",
-          color: "#FF6B6B",
+          color: "#991B1B",
         },
         {
           type: "separator",
@@ -200,7 +172,7 @@ export function cancellationMessage(params: {
                 type: "text" as const,
                 text: `⚠️ 當天取消已記錄為違規 (${violationCount}/3)`,
                 size: "xs" as const,
-                color: "#FF6B6B",
+                color: "#991B1B",
                 margin: "lg" as const,
                 wrap: true,
               },
@@ -237,7 +209,7 @@ export function welcomeMessage(shopName: string, liffUrl?: string): FlexMessage 
           size: "sm",
           margin: "lg",
           wrap: true,
-          color: "#666666",
+          color: "#809A8E",
         },
         {
           type: "box",
@@ -250,7 +222,7 @@ export function welcomeMessage(shopName: string, liffUrl?: string): FlexMessage 
               text: "✂️ 剪髮 ・ 🎨 染髮 ・ 💇 燙髮 ・ 💆 護髮",
               size: "sm",
               wrap: true,
-              color: "#333333",
+              color: "#2D3A30",
             },
           ],
         },
@@ -264,7 +236,7 @@ export function welcomeMessage(shopName: string, liffUrl?: string): FlexMessage 
           size: "sm",
           margin: "lg",
           wrap: true,
-          color: "#666666",
+          color: "#809A8E",
         },
         {
           type: "text",
@@ -272,7 +244,7 @@ export function welcomeMessage(shopName: string, liffUrl?: string): FlexMessage 
           size: "sm",
           margin: "md",
           wrap: true,
-          color: "#999999",
+          color: "#809A8E",
         },
       ],
     },
@@ -291,7 +263,7 @@ export function welcomeMessage(shopName: string, liffUrl?: string): FlexMessage 
                   uri: liffUrl,
                 },
                 style: "primary" as const,
-                color: "#1DB446",
+                color: "#003D2B",
               },
               {
                 type: "button" as const,
@@ -312,7 +284,6 @@ export function welcomeMessage(shopName: string, liffUrl?: string): FlexMessage 
     type: "flex",
     altText: `歡迎加入 ${shopName}！點此預約`,
     contents: bubble,
-    quickReply: defaultQuickReply(),
   };
 }
 
@@ -336,7 +307,7 @@ export function bookingGuideMessage(liffUrl: string): FlexMessage {
           size: "sm",
           margin: "lg",
           wrap: true,
-          color: "#666666",
+          color: "#809A8E",
         },
       ],
     },
@@ -352,7 +323,7 @@ export function bookingGuideMessage(liffUrl: string): FlexMessage {
             uri: liffUrl,
           },
           style: "primary",
-          color: "#1DB446",
+          color: "#003D2B",
         },
       ],
     },
@@ -362,7 +333,6 @@ export function bookingGuideMessage(liffUrl: string): FlexMessage {
     type: "flex",
     altText: "點此開始預約",
     contents: bubble,
-    quickReply: defaultQuickReply(),
   };
 }
 
@@ -416,7 +386,7 @@ export function pricingCarouselMessage(
               type: "text" as const,
               text: `NT$${item.price.toLocaleString()}`,
               size: "sm" as const,
-              color: "#1DB446" as const,
+              color: "#003D2B" as const,
               align: "end" as const,
               flex: 2,
             },
@@ -436,7 +406,7 @@ export function pricingCarouselMessage(
             uri: liffUrl,
           },
           style: "primary" as const,
-          color: "#1DB446",
+          color: "#003D2B",
         },
       ],
     },
@@ -451,7 +421,6 @@ export function pricingCarouselMessage(
     type: "flex",
     altText: "服務價目表 — 左右滑動查看更多",
     contents: carousel,
-    quickReply: defaultQuickReply(),
   };
 }
 
@@ -519,7 +488,6 @@ export function businessInfoMessage(params: {
     type: "flex",
     altText: `${shopName} — ${hours}`,
     contents: bubble,
-    quickReply: defaultQuickReply(),
   };
 }
 
@@ -543,7 +511,7 @@ export function myBookingsGuideMessage(liffBaseUrl: string): FlexMessage {
           size: "sm",
           margin: "lg",
           wrap: true,
-          color: "#666666",
+          color: "#809A8E",
         },
       ],
     },
@@ -559,7 +527,7 @@ export function myBookingsGuideMessage(liffBaseUrl: string): FlexMessage {
             uri: `${liffBaseUrl}/my-bookings`,
           },
           style: "primary",
-          color: "#1DB446",
+          color: "#003D2B",
         },
       ],
     },
@@ -569,7 +537,6 @@ export function myBookingsGuideMessage(liffBaseUrl: string): FlexMessage {
     type: "flex",
     altText: "點此查看我的預約",
     contents: bubble,
-    quickReply: defaultQuickReply(),
   };
 }
 
@@ -593,10 +560,10 @@ export function paymentGuideMessage(params: {
           text: "💳 付款資訊",
           weight: "bold",
           size: "lg",
-          color: "#1DB446",
+          color: "#003D2B",
         },
       ],
-      backgroundColor: "#F0FFF0",
+      backgroundColor: "#FFF8F1",
     },
     body: {
       type: "box",
@@ -640,14 +607,14 @@ export function paymentGuideMessage(params: {
           size: "sm",
           margin: "sm",
           wrap: true,
-          color: "#666666",
+          color: "#809A8E",
         },
         {
           type: "text",
           text: "＊也可至現場以現金付款",
           size: "xs",
           margin: "md",
-          color: "#aaaaaa",
+          color: "#809A8E",
         },
       ],
     },
@@ -663,7 +630,7 @@ export function paymentGuideMessage(params: {
             uri: `${liffBaseUrl}/my-bookings`,
           },
           style: "primary",
-          color: "#1DB446",
+          color: "#003D2B",
         },
       ],
     },
@@ -673,7 +640,6 @@ export function paymentGuideMessage(params: {
     type: "flex",
     altText: "付款資訊 — 銀行轉帳",
     contents: bubble,
-    quickReply: defaultQuickReply(),
   };
 }
 
@@ -696,7 +662,7 @@ export function thankYouMessage(params: {
           text: "感謝光臨！",
           weight: "bold",
           size: "lg",
-          color: "#1DB446",
+          color: "#003D2B",
         },
         {
           type: "text",
@@ -704,7 +670,7 @@ export function thankYouMessage(params: {
           size: "sm",
           margin: "lg",
           wrap: true,
-          color: "#666666",
+          color: "#809A8E",
         },
         {
           type: "text",
@@ -712,7 +678,7 @@ export function thankYouMessage(params: {
           size: "sm",
           margin: "md",
           wrap: true,
-          color: "#666666",
+          color: "#809A8E",
         },
       ],
     },
@@ -728,7 +694,7 @@ export function thankYouMessage(params: {
             uri: liffUrl,
           },
           style: "primary",
-          color: "#1DB446",
+          color: "#003D2B",
         },
       ],
     },
@@ -763,10 +729,10 @@ export function adminNewBookingMessage(params: {
           text: "🆕 新預約通知",
           weight: "bold",
           size: "lg",
-          color: "#5B21B6",
+          color: "#003D2B",
         },
       ],
-      backgroundColor: "#EDE9FE",
+      backgroundColor: "#F3ECE4",
     },
     body: {
       type: "box",
@@ -824,10 +790,10 @@ export function adminCancellationMessage(params: {
           text: "❌ 預約取消通知",
           weight: "bold",
           size: "lg",
-          color: "#DC2626",
+          color: "#991B1B",
         },
       ],
-      backgroundColor: "#FEF2F2",
+      backgroundColor: "#F3ECE4",
     },
     body: {
       type: "box",
@@ -877,7 +843,7 @@ export function campaignMessage(text: string, liffUrl: string): FlexMessage {
           text: text,
           size: "md",
           wrap: true,
-          color: "#333333",
+          color: "#2D3A30",
         },
       ],
     },
@@ -893,7 +859,7 @@ export function campaignMessage(text: string, liffUrl: string): FlexMessage {
             uri: liffUrl,
           },
           style: "primary",
-          color: "#1DB446",
+          color: "#003D2B",
         },
       ],
     },
@@ -941,17 +907,17 @@ export function weeklyReportMessage(report: {
           text: "📊 每週營業報告",
           weight: "bold",
           size: "lg",
-          color: "#1DB446",
+          color: "#003D2B",
         },
         {
           type: "text",
           text: `${period.from} ~ ${period.to}`,
           size: "xs",
-          color: "#888888",
+          color: "#809A8E",
           margin: "sm",
         },
       ],
-      backgroundColor: "#F0FFF0",
+      backgroundColor: "#FFF8F1",
     },
     body: {
       type: "box",
@@ -962,7 +928,7 @@ export function weeklyReportMessage(report: {
           text: "預約概況",
           weight: "bold",
           size: "sm",
-          color: "#555555",
+          color: "#2D3A30",
         },
         {
           type: "separator",
@@ -991,7 +957,7 @@ export function weeklyReportMessage(report: {
           text: "顧客動態",
           weight: "bold",
           size: "sm",
-          color: "#555555",
+          color: "#2D3A30",
           margin: "lg",
         },
         {
@@ -1014,7 +980,7 @@ export function weeklyReportMessage(report: {
           text: "客群變動",
           weight: "bold",
           size: "sm",
-          color: "#555555",
+          color: "#2D3A30",
           margin: "lg",
         },
         {
@@ -1050,14 +1016,14 @@ function infoRow(label: string, value: string) {
         type: "text" as const,
         text: label,
         size: "sm" as const,
-        color: "#aaaaaa",
+        color: "#809A8E",
         flex: 2,
       },
       {
         type: "text" as const,
         text: value,
         size: "sm" as const,
-        color: "#333333",
+        color: "#2D3A30",
         flex: 5,
         wrap: true,
       },

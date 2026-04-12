@@ -7,7 +7,6 @@ import {
   campaignMessage,
   weeklyReportMessage,
   paymentGuideMessage,
-  defaultQuickReply,
   adminNewBookingMessage,
   adminCancellationMessage,
 } from "@/lib/line/messages";
@@ -156,30 +155,6 @@ describe("welcomeMessage", () => {
   });
 });
 
-describe("defaultQuickReply", () => {
-  it("returns 5 quick reply items", () => {
-    const qr = defaultQuickReply();
-    expect(qr.items).toHaveLength(5);
-  });
-
-  it("all items have type 'action'", () => {
-    const qr = defaultQuickReply();
-    for (const item of qr.items) {
-      expect(item.type).toBe("action");
-    }
-  });
-
-  it("includes common actions like booking and pricing", () => {
-    const qr = defaultQuickReply();
-    const labels = qr.items.map((item) => {
-      const action = item.action as { label: string };
-      return action.label;
-    });
-    expect(labels).toContain("立即預約");
-    expect(labels).toContain("服務價目");
-  });
-});
-
 describe("campaignMessage", () => {
   const text = "春季優惠！剪髮八折，快來預約！";
   const liffUrl = "https://liff.line.me/1234567890-abcdefgh";
@@ -310,11 +285,6 @@ describe("paymentGuideMessage", () => {
     expect(bodyStr).toContain("/my-bookings");
   });
 
-  it("includes quick reply", () => {
-    const msg = paymentGuideMessage(params);
-    expect(msg.quickReply).toBeDefined();
-    expect(msg.quickReply?.items).toHaveLength(5);
-  });
 });
 
 describe("adminNewBookingMessage", () => {

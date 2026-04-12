@@ -5,7 +5,6 @@ import { getLineClient } from "@/lib/line/client";
 import { verifyLineSignature } from "@/lib/line/webhook";
 import { logger } from "@/lib/utils/logger";
 import {
-  defaultQuickReply,
   welcomeMessage,
   bookingGuideMessage,
   pricingCarouselMessage,
@@ -106,7 +105,6 @@ async function handleEvent(
         await lineClient.replyMessage(event.replyToken, {
           type: "text",
           text: "謝謝您的訊息！請輸入文字或點擊下方選單操作 😊",
-          quickReply: defaultQuickReply(),
         });
       }
       break;
@@ -210,7 +208,6 @@ async function buildKeywordReply(text: string, tenantId: string): Promise<Messag
     return {
       type: "text",
       text: `不客氣！有任何需要隨時告訴我們 😊\n${shopName} 隨時為您服務！`,
-      quickReply: defaultQuickReply(),
     };
   }
 
@@ -219,15 +216,13 @@ async function buildKeywordReply(text: string, tenantId: string): Promise<Messag
     return {
       type: "text",
       text: `${shopName} 您好！👋\n\n很高興為您服務，請點擊下方按鈕快速操作：`,
-      quickReply: defaultQuickReply(),
     };
   }
 
   // Fallback: no match
   return {
     type: "text",
-    text: `感謝您的訊息！您可以試試以下操作：\n\n📅 輸入「預約」開始預約\n💰 輸入「服務」查看價目表\n🕐 輸入「營業時間」查看店家資訊\n\n或直接點擊下方按鈕 👇`,
-    quickReply: defaultQuickReply(),
+    text: `感謝您的訊息！您可以試試以下操作：\n\n📅 輸入「預約」開始預約\n💰 輸入「服務」查看價目表\n🕐 輸入「營業時間」查看店家資訊`,
   };
 }
 
