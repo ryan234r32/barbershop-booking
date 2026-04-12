@@ -338,79 +338,136 @@ export function bookingGuideMessage(liffUrl: string): FlexMessage {
 
 /** Pricing carousel Flex Message — used for keyword "價格" */
 export function pricingCarouselMessage(
-  services: Array<{ name: string; price: number; duration: number; description?: string | null }>,
+  services: Array<{
+    id: string;
+    name: string;
+    price: number;
+    duration: number;
+    description?: string | null;
+    imageUrl?: string | null;
+  }>,
   liffUrl: string
 ): FlexMessage {
-  // Group services into categories
-  const categories: Record<string, typeof services> = {};
-  for (const svc of services) {
-    let cat = "其他";
-    if (svc.name.includes("剪")) cat = "剪髮";
-    else if (svc.name.includes("染") || svc.name.includes("漂")) cat = "染髮";
-    else if (svc.name.includes("燙") || svc.name.includes("矯正")) cat = "燙髮";
-    else if (svc.name.includes("護")) cat = "護髮";
-    else if (svc.name.includes("頭皮")) cat = "頭皮調理";
-    if (!categories[cat]) categories[cat] = [];
-    categories[cat].push(svc);
+  // Derive category label from service name
+  function getCategoryLabel(name: string): string {
+    if (name.includes("剪")) return "HAIRCUT";
+    if (name.includes("漂")) return "COLOR";
+    if (name.includes("染")) return "COLOR";
+    if (name.includes("燙")) return "PERM";
+    if (name.includes("矯正")) return "STRAIGHTENING";
+    if (name.includes("護")) return "TREATMENT";
+    if (name.includes("頭皮")) return "SCALP CARE";
+    return "SERVICE";
   }
 
-  const bubbles: FlexBubble[] = Object.entries(categories).map(([cat, items]) => ({
-    type: "bubble" as const,
-    body: {
-      type: "box" as const,
-      layout: "vertical" as const,
-      contents: [
-        {
-          type: "text" as const,
-          text: cat,
-          weight: "bold" as const,
-          size: "lg" as const,
-        },
-        {
-          type: "separator" as const,
-          margin: "md" as const,
-        },
-        ...items.map((item) => ({
-          type: "box" as const,
-          layout: "horizontal" as const,
-          margin: "md" as const,
-          contents: [
-            {
-              type: "text" as const,
-              text: item.name,
-              size: "sm" as const,
-              flex: 3,
-              wrap: true,
+  // Services with variable pricing (依長度/狀況定價)
+  function formatPrice(svc: { name: string; price: number }): string {
+    const variablePrice = ["漂髮", "染髮", "溫塑燙", "縮毛矯正", "補染", "頭皮調理"];
+    const suffix = variablePrice.includes(svc.name) ? " 起" : "";
+    return `NT$${svc.price.toLocaleString()}${suffix}`;
+  }
+
+  const bubbles: FlexBubble[] = services.map((svc) => {
+    const bubble: FlexBubble = {
+      type: "bubble" as const,
+      size: "kilo" as const,
+      ...(svc.imageUrl
+        ? {
+            hero: {
+              type: "image" as const,
+              url: svc.imageUrl,
+              size: "full" as const,
+              aspectRatio: "20:13" as const,
+              aspectMode: "cover" as const,
             },
-            {
-              type: "text" as const,
-              text: `NT$${item.price.toLocaleString()}`,
-              size: "sm" as const,
-              color: "#003D2B" as const,
-              align: "end" as const,
-              flex: 2,
-            },
-          ],
-        })),
-      ],
-    },
-    footer: {
-      type: "box" as const,
-      layout: "vertical" as const,
-      contents: [
-        {
-          type: "button" as const,
-          action: {
-            type: "uri" as const,
-            label: "立即預約",
-            uri: liffUrl,
+          }
+        : {}),
+      body: {
+        type: "box" as const,
+        layout: "vertical" as const,
+        backgroundColor: "#FFF8F1",
+        paddingAll: "20px",
+        contents: [
+          // Category label (uppercase, letter-spaced)
+          {
+            type: "text" as const,
+            text: getCategoryLabel(svc.name),
+            size: "xxs" as const,
+            color: "#73a891",
+            weight: "bold" as const,
           },
-          style: "primary" as const,
-          color: "#003D2B",
-        },
-      ],
-    },
-  }));
+          // Service name
+          {
+            type: "text" as const,
+            text: svc.name,
+            size: "xl" as const,
+            weight: "bold" as const,
+            color: "#003D2B",
+            margin: "sm" as const,
+          },
+          // Description
+          {
+            type: "text" as const,
+            text: svc.description || "",
+            size: "sm" as const,
+            color: "#404944",
+            margin: "sm" as const,
+            wrap: true,
+          },
+          // Spacer
+          {
+            type: "box" as const,
+            layout: "vertical" as const,
+            contents: [],
+            flex: 1,
+          },
+          // Price + Duration row
+          {
+            type: "box" as const,
+            layout: "horizontal" as const,
+            margin: "lg" as const,
+            contents: [
+              {
+                type: "text" as const,
+                text: formatPrice(svc),
+                size: "md" as const,
+                weight: "bold" as const,
+                color: "#003D2B",
+              },
+              {
+                type: "text" as const,
+                text: `${svc.duration}min`,
+                size: "xs" as const,
+                color: "#707974",
+                align: "end" as const,
+                gravity: "bottom" as const,
+              },
+            ],
+          },
+        ],
+      },
+      footer: {
+        type: "box" as const,
+        layout: "vertical" as const,
+        backgroundColor: "#FFF8F1",
+        paddingAll: "12px",
+        contents: [
+          {
+            type: "button" as const,
+            action: {
+              type: "uri" as const,
+              label: "立即預約",
+              uri: `${liffUrl}/booking?serviceId=${svc.id}`,
+            },
+            style: "primary" as const,
+            color: "#003D2B",
+            height: "sm" as const,
+          },
+        ],
+      },
+    };
+    return bubble;
+  });
 
   const carousel: FlexCarousel = {
     type: "carousel",
@@ -419,7 +476,7 @@ export function pricingCarouselMessage(
 
   return {
     type: "flex",
-    altText: "服務價目表 — 左右滑動查看更多",
+    altText: "1008 Hair Studio 服務項目 — 左右滑動瀏覽",
     contents: carousel,
   };
 }

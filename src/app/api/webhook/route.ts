@@ -154,7 +154,7 @@ async function buildKeywordReply(text: string, tenantId: string): Promise<Messag
     const services = await prisma.service.findMany({
       where: { tenantId, isActive: true },
       orderBy: { sortOrder: "asc" },
-      select: { name: true, price: true, duration: true, description: true },
+      select: { id: true, name: true, price: true, duration: true, description: true, imageUrl: true },
     });
     return pricingCarouselMessage(services, liffUrl);
   }

@@ -31,11 +31,11 @@ describe("Keyword reply Flex Messages", () => {
 
   describe("pricingCarouselMessage", () => {
     const services = [
-      { name: "男性剪髮", price: 1000, duration: 60, description: null },
-      { name: "女性剪髮", price: 1100, duration: 60, description: null },
-      { name: "染髮", price: 2600, duration: 180, description: null },
-      { name: "溫塑燙", price: 4000, duration: 180, description: null },
-      { name: "結構式護髮", price: 2200, duration: 60, description: null },
+      { id: "svc-1", name: "男性剪髮", price: 1000, duration: 60, description: "洗髮 · 精修剪裁 · 造型完成", imageUrl: null },
+      { id: "svc-2", name: "女性剪髮", price: 1100, duration: 60, description: "洗髮 · 剪裁設計 · 吹整造型", imageUrl: null },
+      { id: "svc-3", name: "染髮", price: 2600, duration: 180, description: "全頭染色，打造專屬髮色", imageUrl: null },
+      { id: "svc-4", name: "溫塑燙", price: 4000, duration: 180, description: "溫感塑型，打造自然捲度", imageUrl: null },
+      { id: "svc-5", name: "結構式護髮", price: 2200, duration: 60, description: "深層修護，重建髮絲結構", imageUrl: null },
     ];
 
     it("returns a Flex Carousel", () => {
@@ -44,19 +44,19 @@ describe("Keyword reply Flex Messages", () => {
       expect(msg.contents.type).toBe("carousel");
     });
 
-    it("groups services by category", () => {
+    it("creates one bubble per service", () => {
       const msg = pricingCarouselMessage(services, LIFF_URL);
       const carousel = msg.contents as FlexNode;
-      // Should have categories: 剪髮, 染髮, 燙髮, 護髮
-      expect(carousel.contents.length).toBeGreaterThanOrEqual(3);
+      expect(carousel.contents.length).toBe(5);
     });
 
-    it("each bubble has a booking button", () => {
+    it("each bubble has a booking button with serviceId", () => {
       const msg = pricingCarouselMessage(services, LIFF_URL);
       const carousel = msg.contents as FlexNode;
       for (const bubble of carousel.contents) {
         expect(bubble.footer).toBeDefined();
-        expect(bubble.footer.contents[0].action.uri).toBe(LIFF_URL);
+        expect(bubble.footer.contents[0].action.uri).toContain(LIFF_URL);
+        expect(bubble.footer.contents[0].action.uri).toContain("serviceId=");
       }
     });
 
