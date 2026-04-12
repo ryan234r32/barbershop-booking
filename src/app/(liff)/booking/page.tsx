@@ -29,7 +29,7 @@ interface AvailableSlot {
 type BookingStep = "service" | "calendar" | "confirm" | "success";
 
 export default function BookingPage() {
-  const { isReady, error, userId } = useLiff();
+  const { liff, isReady, error, userId } = useLiff();
   const { toast } = useToast();
   const [step, setStep] = useState<BookingStep>("service");
   const [services, setServices] = useState<Service[]>([]);
@@ -238,22 +238,46 @@ export default function BookingPage() {
 
   return (
     <div className="max-w-md mx-auto min-h-screen flex flex-col bg-[#FFF8F1]">
-      {/* Progress indicator */}
-      <div className="px-6 pt-6 pb-2">
-        <div className="flex items-center gap-2">
-          {(["service", "calendar", "confirm"] as const).map((s, i) => (
-            <div key={s} className="flex-1">
-              <div
-                className={`h-[2px] rounded-full transition-all duration-300 ${
-                  (["service", "calendar", "confirm"] as const).indexOf(step as "service" | "calendar" | "confirm") >= i
-                    ? "bg-[#003D2B]"
-                    : "bg-[#003D2B]/10"
-                }`}
-              />
-            </div>
-          ))}
+      {/* Sticky header */}
+      <header className="sticky top-0 z-50 glassmorphic border-b-[1.5px] border-[#003D2B]/10">
+        <div className="flex items-center justify-between px-6 h-14">
+          {step !== "service" ? (
+            <button
+              onClick={handleBack}
+              className="flex items-center gap-1 text-[#003D2B] text-sm font-medium"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_back</span>
+              返回
+            </button>
+          ) : (
+            <span className="text-[#003D2B] text-sm font-bold tracking-widest uppercase">
+              1008 Hair Studio
+            </span>
+          )}
+          <button
+            onClick={() => liff?.closeWindow()}
+            className="w-10 h-10 flex items-center justify-center text-[#003D2B] hover:opacity-70 transition-opacity"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+          </button>
         </div>
-      </div>
+        {/* Progress indicator */}
+        <div className="px-6 pb-2">
+          <div className="flex items-center gap-2">
+            {(["service", "calendar", "confirm"] as const).map((s, i) => (
+              <div key={s} className="flex-1">
+                <div
+                  className={`h-[2px] rounded-full transition-all duration-300 ${
+                    (["service", "calendar", "confirm"] as const).indexOf(step as "service" | "calendar" | "confirm") >= i
+                      ? "bg-[#003D2B]"
+                      : "bg-[#003D2B]/10"
+                  }`}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </header>
 
       {/* Step content */}
       <div className="flex-1 px-6 pt-6 pb-32">
@@ -297,25 +321,15 @@ export default function BookingPage() {
 
       {/* Sticky bottom bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#FFF8F1] border-t border-[#003D2B]/5 px-6 py-4 z-50">
-        <div className="max-w-md mx-auto flex items-center gap-3">
-          {step !== "service" && (
-            <button
-              onClick={handleBack}
-              className="w-12 h-12 flex items-center justify-center border-[1.5px] border-[#003D2B] rounded-xl text-[#003D2B] shrink-0 transition-colors hover:bg-[#003D2B]/5"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-                arrow_back
-              </span>
-            </button>
-          )}
+        <div className="max-w-md mx-auto">
           <button
             onClick={handleNext}
             disabled={!canProceed}
             className={`
-              flex-1 h-12 rounded-xl font-bold text-sm tracking-wide transition-all duration-200
+              w-full h-12 rounded-lg font-bold text-sm tracking-wide transition-all duration-200
               ${
                 canProceed
-                  ? "bg-[#003D2B] text-[#FFF8F1] shadow-lg shadow-[#003D2B]/20 hover:bg-[#003D2B]/90"
+                  ? "bg-[#003D2B] text-[#FFF8F1] shadow-lg shadow-[#003D2B]/20 hover:bg-[#003D2B]/90 active:scale-[0.98]"
                   : "bg-[#003D2B]/10 text-[#003D2B]/30 cursor-not-allowed"
               }
             `}

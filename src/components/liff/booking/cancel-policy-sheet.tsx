@@ -22,7 +22,7 @@ export function CancelPolicySheet({
           {/* Block 1 — Free cancellation (green) */}
           <div className="rounded-2xl bg-[#E8F1EC] p-5">
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-[#003D2B] rounded-full flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 bg-[#003D2B] rounded-full flex items-center justify-center shrink-0 overflow-hidden">
                 <span
                   className="material-symbols-outlined text-white"
                   style={{ fontSize: 20 }}
@@ -47,7 +47,7 @@ export function CancelPolicySheet({
           {/* Block 2 — Phone only (amber) */}
           <div className="rounded-2xl bg-[#FBF1E6] p-5">
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-[#8A6A4D] rounded-full flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 bg-[#8A6A4D] rounded-full flex items-center justify-center shrink-0 overflow-hidden">
                 <span
                   className="material-symbols-outlined text-white"
                   style={{ fontSize: 20 }}
@@ -72,7 +72,7 @@ export function CancelPolicySheet({
           {/* Block 3 — Violation (red) */}
           <div className="rounded-2xl bg-[#FDEEEF] p-5">
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-[#A84A3B] rounded-full flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 bg-[#A84A3B] rounded-full flex items-center justify-center shrink-0 overflow-hidden">
                 <span
                   className="material-symbols-outlined text-white"
                   style={{ fontSize: 20 }}
