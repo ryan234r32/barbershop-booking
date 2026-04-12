@@ -1,10 +1,11 @@
 /**
  * Rich Menu Setup Script for LINE Barbershop Booking Bot
  *
- * Creates a Rich Menu with 3 buttons:
- *   Left   — "立即預約" → opens LIFF booking page
- *   Center — "我的預約" → opens LIFF my-bookings page
- *   Right  — "聯絡店家" → sends text "服務" to trigger keyword reply
+ * Creates a 2x2 Rich Menu with 4 buttons:
+ *   Top-Left     — "立即預約" → opens LIFF booking page
+ *   Top-Right    — "我的預約" → opens LIFF my-bookings page
+ *   Bottom-Left  — "服務項目" → sends text "服務價目" to trigger keyword reply
+ *   Bottom-Right — "門市資訊" → opens Google Maps to store location
  *
  * Usage:
  *   npx tsx scripts/setup-rich-menu.ts
@@ -12,7 +13,7 @@
  *
  * Prerequisites:
  *   - .env with LINE_CHANNEL_ACCESS_TOKEN and NEXT_PUBLIC_LIFF_ID
- *   - A 2500x843 PNG image (generate one with scripts/generate-rich-menu-image.html)
+ *   - A 2500x1686 PNG image saved at scripts/rich-menu.png (or pass --image)
  */
 
 import "dotenv/config";
@@ -37,22 +38,26 @@ if (!LIFF_ID) {
 
 const LIFF_BASE = `https://liff.line.me/${LIFF_ID}`;
 
+// Google Maps link for 門市資訊. Replace with your actual shop's share link
+// (open Google Maps → search your shop → Share → Copy Link).
+const STORE_MAP_URL = "https://maps.google.com/?q=1008+Hair+Studio";
+
 // ---------------------------------------------------------------------------
-// Rich Menu Definition (compact: 2500x843, 3 columns, 1 row)
+// Rich Menu Definition (2x2 grid: 2500x1686, 2 columns × 2 rows)
 // ---------------------------------------------------------------------------
 
 const richMenuBody = {
   size: {
     width: 2500,
-    height: 843,
+    height: 1686,
   },
   selected: true,
   name: "barbershop-main-menu",
   chatBarText: "選單",
   areas: [
     {
-      // Left column — 立即預約
-      bounds: { x: 0, y: 0, width: 833, height: 843 },
+      // Top-Left — 立即預約
+      bounds: { x: 0, y: 0, width: 1250, height: 843 },
       action: {
         type: "uri" as const,
         label: "立即預約",
@@ -60,8 +65,8 @@ const richMenuBody = {
       },
     },
     {
-      // Center column — 我的預約
-      bounds: { x: 833, y: 0, width: 834, height: 843 },
+      // Top-Right — 我的預約
+      bounds: { x: 1250, y: 0, width: 1250, height: 843 },
       action: {
         type: "uri" as const,
         label: "我的預約",
@@ -69,12 +74,21 @@ const richMenuBody = {
       },
     },
     {
-      // Right column — 聯絡店家
-      bounds: { x: 1667, y: 0, width: 833, height: 843 },
+      // Bottom-Left — 服務項目 (triggers keyword reply)
+      bounds: { x: 0, y: 843, width: 1250, height: 843 },
+      action: {
+        type: "message" as const,
+        label: "服務項目",
+        text: "服務價目",
+      },
+    },
+    {
+      // Bottom-Right — 門市資訊 (opens Google Maps)
+      bounds: { x: 1250, y: 843, width: 1250, height: 843 },
       action: {
         type: "uri" as const,
-        label: "聯絡店家",
-        uri: "tel:02-2396-2306",
+        label: "門市資訊",
+        uri: STORE_MAP_URL,
       },
     },
   ],
@@ -390,10 +404,11 @@ async function main() {
   // Summary
   console.log("\n=== Setup Complete ===");
   console.log(`Rich Menu ID: ${richMenuId}`);
-  console.log("Layout: 2500x843 (compact), 3 columns");
-  console.log(`  [立即預約] → ${LIFF_BASE}/booking`);
-  console.log(`  [我的預約] → ${LIFF_BASE}/my-bookings`);
-  console.log('  [聯絡店家] → tel:02-2396-2306 (直撥電話)');
+  console.log("Layout: 2500x1686 (2x2 grid)");
+  console.log(`  [立即預約]  → ${LIFF_BASE}/booking`);
+  console.log(`  [我的預約]  → ${LIFF_BASE}/my-bookings`);
+  console.log(`  [服務項目]  → sends "服務價目" keyword`);
+  console.log(`  [門市資訊]  → ${STORE_MAP_URL}`);
   console.log("");
 }
 

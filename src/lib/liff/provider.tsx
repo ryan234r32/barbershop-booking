@@ -59,12 +59,33 @@ export function LiffProvider({ children }: { children: ReactNode }) {
         const isInClient = liff.isInClient();
 
         if (!isLoggedIn) {
-          liff.login();
+          // Preserve current path so user returns to /booking, not /
+          liff.login({ redirectUri: window.location.href });
           return;
         }
 
-        // Get profile
-        const profile = await liff.getProfile();
+        // Get profile — non-blocking: if it fails, still allow usage
+        let userId: string | null = null;
+        let displayName: string | null = null;
+        let pictureUrl: string | null = null;
+
+        try {
+          const profile = await liff.getProfile();
+          userId = profile.userId;
+          displayName = profile.displayName;
+          pictureUrl = profile.pictureUrl || null;
+        } catch (profileErr) {
+          console.warn("Failed to get LINE profile, continuing without it:", profileErr);
+          // Try to get userId from decoded token as fallback
+          try {
+            const decodedToken = liff.getDecodedIDToken();
+            userId = decodedToken?.sub || null;
+            displayName = decodedToken?.name || null;
+            pictureUrl = decodedToken?.picture || null;
+          } catch {
+            console.warn("Failed to get decoded token too");
+          }
+        }
 
         setState({
           liff,
@@ -72,21 +93,19 @@ export function LiffProvider({ children }: { children: ReactNode }) {
           isInClient,
           isReady: true,
           error: null,
-          userId: profile.userId,
-          displayName: profile.displayName,
-          pictureUrl: profile.pictureUrl || null,
+          userId,
+          displayName,
+          pictureUrl,
         });
 
-        // Initialize session on backend
-        fetch("/api/liff/init", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            lineUserId: profile.userId,
-            displayName: profile.displayName,
-            pictureUrl: profile.pictureUrl,
-          }),
-        }).catch(console.error);
+        // Initialize session on backend (only if we have userId)
+        if (userId) {
+          fetch("/api/liff/init", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lineUserId: userId, displayName, pictureUrl }),
+          }).catch(console.error);
+        }
       } catch (err) {
         console.error("LIFF init error:", err);
         setState((prev) => ({

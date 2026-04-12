@@ -129,9 +129,16 @@ export default function BookingPage() {
           </div>
           <p className="text-lg font-semibold text-gray-900 mb-2">請在 LINE 中開啟</p>
           <p className="text-gray-500 text-sm mb-6">此預約系統需要透過 LINE 開啟才能使用</p>
+          <p className="text-gray-400 text-xs mb-4 break-all">({error})</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="block w-full rounded-xl bg-emerald-500 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-600 mb-2"
+          >
+            重新載入
+          </button>
           <Link
             href="/"
-            className="block rounded-xl bg-emerald-500 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-600"
+            className="block rounded-xl border border-gray-200 px-6 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
           >
             回到首頁
           </Link>
