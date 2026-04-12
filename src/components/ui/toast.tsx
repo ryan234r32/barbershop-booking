@@ -103,9 +103,9 @@ const icons: Record<ToastType, ReactNode> = {
 
 const colorMap: Record<ToastType, string> = {
   success:
-    "bg-emerald-50 text-emerald-800 border-emerald-200 shadow-emerald-100",
-  error: "bg-red-50 text-red-800 border-red-200 shadow-red-100",
-  info: "bg-blue-50 text-blue-800 border-blue-200 shadow-blue-100",
+    "bg-primary/10 text-primary border-primary/30 shadow-primary/10",
+  error: "bg-destructive/10 text-destructive border-destructive/30 shadow-destructive/10",
+  info: "bg-[var(--color-brand)]/8 text-[var(--color-brand)] border-[var(--color-brand)]/20 shadow-[var(--color-brand)]/10",
 };
 
 /* ------------------------------------------------------------------ */

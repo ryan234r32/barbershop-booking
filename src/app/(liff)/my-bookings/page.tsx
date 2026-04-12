@@ -16,11 +16,11 @@ interface Booking {
 }
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  CONFIRMED: { label: "已確認", color: "bg-emerald-100 text-emerald-700" },
-  COMPLETED: { label: "已完成", color: "bg-blue-100 text-blue-700" },
-  CANCELLED: { label: "已取消", color: "bg-gray-100 text-gray-500" },
-  NO_SHOW: { label: "未到店", color: "bg-red-100 text-red-700" },
-  CANCELLED_BY_ADMIN: { label: "店家取消", color: "bg-gray-100 text-gray-500" },
+  CONFIRMED: { label: "已確認", color: "bg-[var(--color-success)]/15 text-[var(--color-success)]" },
+  COMPLETED: { label: "已完成", color: "bg-[var(--color-brand)]/10 text-[var(--color-brand)]" },
+  CANCELLED: { label: "已取消", color: "bg-secondary text-muted-foreground" },
+  NO_SHOW: { label: "未到店", color: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]" },
+  CANCELLED_BY_ADMIN: { label: "店家取消", color: "bg-secondary text-muted-foreground" },
 };
 
 export default function MyBookingsPage() {
@@ -83,7 +83,7 @@ export default function MyBookingsPage() {
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen p-4">
-        <p className="text-red-500">{error}</p>
+        <p className="text-[var(--color-danger)]">{error}</p>
       </div>
     );
   }
@@ -98,10 +98,10 @@ export default function MyBookingsPage() {
 
       {bookings.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-400 mb-4">還沒有預約記錄</p>
+          <p className="text-muted-foreground mb-4">還沒有預約記錄</p>
           <a
             href="/booking"
-            className="inline-block px-6 py-2.5 bg-emerald-500 text-white rounded-xl font-medium"
+            className="inline-block px-6 py-2.5 bg-[var(--color-brand)] text-[var(--color-bg)] rounded-lg font-medium"
           >
             立即預約
           </a>
@@ -111,7 +111,7 @@ export default function MyBookingsPage() {
           {/* Upcoming */}
           {upcoming.length > 0 && (
             <section className="mb-6">
-              <h2 className="text-sm font-medium text-gray-400 mb-2">
+              <h2 className="text-sm font-medium text-muted-foreground mb-2">
                 即將到來
               </h2>
               <div className="space-y-3">
@@ -130,7 +130,7 @@ export default function MyBookingsPage() {
           {/* Past */}
           {past.length > 0 && (
             <section>
-              <h2 className="text-sm font-medium text-gray-400 mb-2">
+              <h2 className="text-sm font-medium text-muted-foreground mb-2">
                 歷史記錄
               </h2>
               <div className="space-y-3">
@@ -158,22 +158,22 @@ function BookingCard({
   const dateObj = new Date(booking.date);
   const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
   const displayDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()} (${weekdays[dateObj.getDay()]})`;
-  const status = STATUS_MAP[booking.status] || { label: booking.status, color: "bg-gray-100" };
+  const status = STATUS_MAP[booking.status] || { label: booking.status, color: "bg-secondary" };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
+    <div className="bg-[var(--color-surface)] rounded-lg p-4">
       <div className="flex justify-between items-start mb-2">
         <h3 className="font-medium">{booking.service.name}</h3>
         <span className={`text-xs px-2 py-0.5 rounded-full ${status.color}`}>
           {status.label}
         </span>
       </div>
-      <div className="text-sm text-gray-500 space-y-0.5">
+      <div className="text-sm text-muted-foreground space-y-0.5">
         <p>{displayDate}</p>
         <p>
           {booking.startTime} - {booking.endTime}
         </p>
-        <p className="text-emerald-600 font-medium">
+        <p className="text-[var(--color-brand)] font-medium">
           NT${booking.service.price.toLocaleString()}
         </p>
       </div>
@@ -182,7 +182,7 @@ function BookingCard({
         <button
           onClick={onCancel}
           disabled={cancelling}
-          className="mt-3 w-full py-2 text-sm text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+          className="mt-3 w-full py-2 text-sm text-[var(--color-danger)] border border-[var(--color-danger)]/30 rounded-lg hover:bg-[var(--color-danger)]/10 transition-colors disabled:opacity-50"
         >
           {cancelling ? "取消中..." : "取消預約"}
         </button>
@@ -191,7 +191,7 @@ function BookingCard({
       {booking.status === "CONFIRMED" && (
         <a
           href={`/payment/${booking.id}`}
-          className="mt-2 block w-full py-2 text-sm text-center text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
+          className="mt-2 block w-full py-2 text-sm text-center text-[var(--color-brand)] border border-[var(--color-brand)]/30 rounded-lg hover:bg-secondary transition-colors"
         >
           {booking.payment ? "查看付款" : "前往付款"}
         </a>

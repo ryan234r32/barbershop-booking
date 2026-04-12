@@ -105,12 +105,12 @@ export default function CampaignsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">行銷推播</h1>
+      <h1 className="text-2xl font-bold text-foreground mb-6">行銷推播</h1>
 
       <div className="max-w-2xl space-y-6">
         {/* Segment selector */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="bg-card rounded-xl border border-border p-6">
+          <label className="block text-sm font-medium text-foreground/80 mb-2">
             目標客群
           </label>
           <select
@@ -119,7 +119,7 @@ export default function CampaignsPage() {
               setSegment(e.target.value as SegmentValue);
               setResult(null);
             }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
           >
             {SEGMENT_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -130,14 +130,14 @@ export default function CampaignsPage() {
 
           <div className="mt-3 flex items-center gap-2">
             {loading ? (
-              <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             ) : (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/15 text-primary">
                 {selectedCount} 位用戶
               </span>
             )}
             {selectedCount > 200 && (
-              <span className="text-xs text-amber-600">
+              <span className="text-xs text-[var(--color-warning)]">
                 (單次最多推播 200 人)
               </span>
             )}
@@ -145,8 +145,8 @@ export default function CampaignsPage() {
         </div>
 
         {/* Message input */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="bg-card rounded-xl border border-border p-6">
+          <label className="block text-sm font-medium text-foreground/80 mb-2">
             推播訊息
           </label>
           <textarea
@@ -158,12 +158,12 @@ export default function CampaignsPage() {
             placeholder="例：好久沒來了！本月預約享 9 折優惠"
             maxLength={500}
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+            className="w-full px-3 py-2 border border-border rounded-lg text-sm resize-none focus:ring-2 focus:ring-primary focus:border-primary"
           />
           <div className="flex items-center justify-between mt-2">
             <span
               className={`text-xs ${
-                message.length > 450 ? "text-amber-600" : "text-gray-400"
+                message.length > 450 ? "text-[var(--color-warning)]" : "text-muted-foreground"
               }`}
             >
               {message.length}/500
@@ -176,9 +176,9 @@ export default function CampaignsPage() {
               type="checkbox"
               checked={includeBookingButton}
               onChange={(e) => setIncludeBookingButton(e.target.checked)}
-              className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+              className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
             />
-            <span className="text-sm text-gray-700">附加預約按鈕</span>
+            <span className="text-sm text-foreground/80">附加預約按鈕</span>
           </label>
         </div>
 
@@ -187,7 +187,7 @@ export default function CampaignsPage() {
           <button
             onClick={() => setShowConfirm(true)}
             disabled={!canSend || sending}
-            className="px-6 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-6 py-2.5 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {sending ? (
               <span className="flex items-center gap-2">
@@ -200,7 +200,7 @@ export default function CampaignsPage() {
           </button>
 
           {!canSend && message.trim().length > 0 && selectedCount === 0 && (
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-muted-foreground">
               該客群目前沒有可推播的用戶
             </span>
           )}
@@ -208,37 +208,37 @@ export default function CampaignsPage() {
 
         {/* Confirmation dialog */}
         {showConfirm && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          <div className="fixed inset-0 bg-foreground/40 flex items-center justify-center z-50">
+            <div className="bg-card rounded-xl p-6 max-w-sm mx-4 shadow-xl">
+              <h3 className="text-lg font-semibold text-foreground mb-2">
                 確認發送
               </h3>
-              <p className="text-sm text-gray-600 mb-1">
+              <p className="text-sm text-muted-foreground mb-1">
                 將向{" "}
-                <span className="font-medium text-emerald-700">
+                <span className="font-medium text-primary">
                   {Math.min(selectedCount, 200)} 位
                 </span>{" "}
                 {SEGMENT_OPTIONS.find((o) => o.value === segment)?.label}
                 用戶發送推播訊息。
               </p>
-              <div className="bg-gray-50 rounded-lg p-3 my-3 text-sm text-gray-700 whitespace-pre-wrap">
+              <div className="bg-background rounded-lg p-3 my-3 text-sm text-foreground/80 whitespace-pre-wrap">
                 {message.trim()}
               </div>
               {includeBookingButton && (
-                <p className="text-xs text-gray-500 mb-4">
+                <p className="text-xs text-muted-foreground mb-4">
                   含「立即預約」按鈕
                 </p>
               )}
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={() => setShowConfirm(false)}
-                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                  className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   取消
                 </button>
                 <button
                   onClick={handleSend}
-                  className="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition-colors"
+                  className="px-4 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary transition-colors"
                 >
                   確認發送
                 </button>
@@ -252,32 +252,32 @@ export default function CampaignsPage() {
           <div
             className={`rounded-xl border p-4 ${
               result.success && result.sent > 0
-                ? "bg-emerald-50 border-emerald-200"
+                ? "bg-primary/10 border-primary/30"
                 : result.success && result.sent === 0
-                  ? "bg-amber-50 border-amber-200"
-                  : "bg-red-50 border-red-200"
+                  ? "bg-[var(--color-warning)]/10 border-[var(--color-warning)]/30"
+                  : "bg-destructive/10 border-destructive/30"
             }`}
           >
             {result.success && result.sent > 0 ? (
               <div>
-                <p className="text-sm font-medium text-emerald-800">
+                <p className="text-sm font-medium text-primary">
                   推播完成
                 </p>
-                <p className="text-sm text-emerald-700 mt-1">
+                <p className="text-sm text-primary mt-1">
                   成功送出 {result.sent} 則
                   {result.failed > 0 && (
-                    <span className="text-amber-600">
+                    <span className="text-[var(--color-warning)]">
                       ，{result.failed} 則失敗
                     </span>
                   )}
                 </p>
               </div>
             ) : result.success && result.sent === 0 ? (
-              <p className="text-sm text-amber-700">
+              <p className="text-sm text-[var(--color-warning)]">
                 {result.message || "該客群目前沒有可推播的用戶"}
               </p>
             ) : (
-              <p className="text-sm text-red-700">
+              <p className="text-sm text-destructive">
                 {result.message || "發送失敗，請稍後再試"}
               </p>
             )}

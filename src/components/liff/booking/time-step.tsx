@@ -25,7 +25,7 @@ export function TimeStep({
     <div>
       <button
         onClick={onBack}
-        className="text-sm text-gray-500 mb-4 flex items-center gap-1"
+        className="text-sm text-muted-foreground mb-4 flex items-center gap-1"
       >
         ← 返回選擇日期
       </button>
@@ -34,14 +34,14 @@ export function TimeStep({
 
       {loading ? (
         <div className="flex justify-center py-8">
-          <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-[var(--color-brand)] border-t-transparent rounded-full animate-spin" />
         </div>
       ) : availableSlots.length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-gray-500">這天沒有可用的時段</p>
+          <p className="text-muted-foreground">這天沒有可用的時段</p>
           <button
             onClick={onBack}
-            className="mt-4 text-emerald-600 text-sm font-medium"
+            className="mt-4 text-[var(--color-brand)] text-sm font-medium"
           >
             選擇其他日期
           </button>
@@ -54,20 +54,20 @@ export function TimeStep({
               disabled={!slot.available}
               onClick={() => onSelect(slot.time)}
               className={`
-                py-3 px-2 rounded-xl text-center transition-all
+                py-3 px-2 rounded-lg text-center transition-all
                 ${!slot.available
-                  ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+                  ? "bg-[var(--color-surface)] text-muted-foreground/40 cursor-not-allowed"
                   : selectedTime === slot.time
-                  ? "bg-emerald-500 text-white shadow-sm"
+                  ? "bg-[var(--color-brand)] text-[var(--color-bg)]"
                   : slot.recommended
-                  ? "bg-emerald-50 text-emerald-700 border-2 border-emerald-300 hover:bg-emerald-100"
-                  : "bg-white border border-gray-200 text-gray-700 hover:border-emerald-400"
+                  ? "bg-[var(--color-bg)] text-[var(--color-brand)] border-2 border-[var(--color-brand)] hover:bg-secondary"
+                  : "bg-[var(--color-bg)] border border-[var(--color-brand)]/20 text-foreground hover:border-[var(--color-brand)]"
                 }
               `}
             >
               <span className="text-sm font-medium">{slot.time}</span>
               {slot.recommended && slot.available && selectedTime !== slot.time && (
-                <span className="block text-[10px] mt-0.5 text-emerald-500">推薦</span>
+                <span className="block text-[10px] mt-0.5 text-[var(--color-brand)]">推薦</span>
               )}
             </button>
           ))}

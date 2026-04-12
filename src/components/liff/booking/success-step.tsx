@@ -55,9 +55,9 @@ export function SuccessStep({
 
   return (
     <div className="text-center py-8">
-      <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <div className="w-16 h-16 bg-[var(--color-success)]/15 rounded-full flex items-center justify-center mx-auto mb-4">
         <svg
-          className="w-8 h-8 text-emerald-500"
+          className="w-8 h-8 text-[var(--color-success)]"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -67,27 +67,27 @@ export function SuccessStep({
         </svg>
       </div>
 
-      <h2 className="text-xl font-semibold text-gray-900 mb-1">預約成功！</h2>
-      <p className="text-gray-500 text-sm mb-6">我們已發送確認訊息到您的 LINE</p>
+      <h2 className="text-xl font-semibold text-[var(--color-brand)] mb-1">預約成功！</h2>
+      <p className="text-muted-foreground text-sm mb-6">我們已發送確認訊息到您的 LINE</p>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 text-left space-y-2 mb-6">
+      <div className="bg-[var(--color-surface)] rounded-lg p-4 text-left space-y-2 mb-6">
         <div className="flex justify-between text-sm">
-          <span className="text-gray-500">服務</span>
+          <span className="text-muted-foreground">服務</span>
           <span className="font-medium">{service.name}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-gray-500">日期</span>
+          <span className="text-muted-foreground">日期</span>
           <span className="font-medium">{displayDate}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-gray-500">時間</span>
+          <span className="text-muted-foreground">時間</span>
           <span className="font-medium">
             {time} - {endTime}
           </span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-gray-500">預約編號</span>
-          <span className="font-mono text-xs text-gray-400">
+          <span className="text-muted-foreground">預約編號</span>
+          <span className="font-mono text-xs text-muted-foreground">
             {bookingId.slice(0, 8)}
           </span>
         </div>
@@ -98,19 +98,19 @@ export function SuccessStep({
           href={buildGoogleCalendarUrl(service.name, date, time, endTime)}
           target="_blank"
           rel="noopener noreferrer"
-          className="block w-full py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors text-center"
+          className="block w-full py-3 border border-[var(--color-brand)] text-[var(--color-brand)] rounded-lg font-medium hover:bg-secondary transition-colors text-center"
         >
           加入行事曆
         </a>
         <a
           href="/my-bookings"
-          className="block w-full py-3 bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition-colors text-center"
+          className="block w-full py-3 bg-[var(--color-brand)] text-[var(--color-bg)] rounded-lg font-medium hover:opacity-90 transition-colors text-center"
         >
           查看我的預約
         </a>
         <button
           onClick={handleClose}
-          className="block w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+          className="block w-full py-3 bg-secondary text-foreground rounded-lg font-medium hover:bg-[var(--color-surface)] transition-colors"
         >
           關閉
         </button>

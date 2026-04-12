@@ -29,11 +29,11 @@ export function AdminSidebar() {
 
   const navLinks = (
     <>
-      <div className="p-6 border-b border-gray-100">
-        <h1 className="text-lg font-bold text-gray-900">
+      <div className="p-6 border-b border-border/50">
+        <h1 className="text-lg font-bold text-foreground">
           {admin?.tenant.businessName || "理髮廳"}
         </h1>
-        <p className="text-xs text-gray-400 mt-0.5">管理後台</p>
+        <p className="text-xs text-muted-foreground mt-0.5">管理後台</p>
       </div>
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
@@ -46,8 +46,8 @@ export function AdminSidebar() {
               className={`
                 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors
                 ${isActive
-                  ? "bg-emerald-50 text-emerald-700 font-medium"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-muted-foreground hover:bg-background hover:text-foreground"
                 }
               `}
             >
@@ -58,15 +58,15 @@ export function AdminSidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-gray-100">
+      <div className="p-4 border-t border-border/50">
         <div className="flex items-center justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-700 truncate">{admin?.name}</p>
-            <p className="text-xs text-gray-400 truncate">{admin?.email}</p>
+            <p className="text-sm font-medium text-foreground/80 truncate">{admin?.name}</p>
+            <p className="text-xs text-muted-foreground truncate">{admin?.email}</p>
           </div>
           <button
             onClick={logout}
-            className="text-xs text-gray-400 hover:text-red-500 transition-colors shrink-0 ml-2"
+            className="text-xs text-muted-foreground hover:text-destructive transition-colors shrink-0 ml-2"
           >
             登出
           </button>
@@ -78,10 +78,10 @@ export function AdminSidebar() {
   return (
     <>
       {/* Mobile top bar */}
-      <div className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 flex items-center px-4 z-40 lg:hidden">
+      <div className="fixed top-0 left-0 right-0 h-14 bg-card border-b border-border flex items-center px-4 z-40 lg:hidden">
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="p-2 -ml-2 text-gray-600 hover:text-gray-900"
+          className="p-2 -ml-2 text-muted-foreground hover:text-foreground"
           aria-label="Toggle menu"
         >
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -92,7 +92,7 @@ export function AdminSidebar() {
             )}
           </svg>
         </button>
-        <span className="ml-3 font-semibold text-gray-900">
+        <span className="ml-3 font-semibold text-foreground">
           {admin?.tenant.businessName || "理髮廳"}
         </span>
       </div>
@@ -100,7 +100,7 @@ export function AdminSidebar() {
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+          className="fixed inset-0 bg-foreground/30 z-40 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -108,7 +108,7 @@ export function AdminSidebar() {
       {/* Sidebar */}
       <aside
         className={`
-          fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-gray-200 flex flex-col z-50
+          fixed left-0 top-0 bottom-0 w-64 bg-card border-r border-border flex flex-col z-50
           transition-transform duration-200 ease-in-out
           lg:translate-x-0
           ${mobileOpen ? "translate-x-0" : "-translate-x-full"}

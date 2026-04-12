@@ -9,7 +9,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-3 border-[var(--color-brand)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -17,7 +17,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   if (!admin) return null; // Redirecting to login
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-background">
       <AdminSidebar />
       <main className="flex-1 pt-14 lg:pt-0 lg:ml-64 p-4 lg:p-6">{children}</main>
     </div>

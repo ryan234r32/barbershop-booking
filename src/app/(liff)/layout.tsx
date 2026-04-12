@@ -11,7 +11,7 @@ export default function LiffLayout({
   return (
     <LiffProvider>
       <ToastProvider>
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-background">
           {children}
         </div>
       </ToastProvider>

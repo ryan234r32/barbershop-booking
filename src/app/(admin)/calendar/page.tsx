@@ -18,10 +18,10 @@ const HOURS = Array.from({ length: 9 }, (_, i) => `${(11 + i).toString().padStar
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
 const STATUS_BG: Record<string, string> = {
-  CONFIRMED: "bg-emerald-200 border-emerald-400 text-emerald-800",
-  COMPLETED: "bg-blue-200 border-blue-400 text-blue-800",
-  CANCELLED: "bg-gray-200 border-gray-300 text-gray-500",
-  NO_SHOW: "bg-red-200 border-red-400 text-red-800",
+  CONFIRMED: "bg-primary/20 border-primary text-primary",
+  COMPLETED: "bg-[var(--color-brand)]/15 border-[var(--color-brand)]/30 text-[var(--color-brand)]",
+  CANCELLED: "bg-secondary border-border text-muted-foreground",
+  NO_SHOW: "bg-destructive/20 border-destructive/50 text-destructive",
 };
 
 export default function CalendarPage() {
@@ -94,22 +94,22 @@ export default function CalendarPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-2xl font-bold text-foreground">
           行事曆
           {isPending && (
-            <span className="ml-2 inline-block w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin align-middle" />
+            <span className="ml-2 inline-block w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin align-middle" />
           )}
         </h1>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setView("day")}
-            className={`px-3 py-1.5 text-sm rounded-lg ${view === "day" ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-600"}`}
+            className={`px-3 py-1.5 text-sm rounded-lg ${view === "day" ? "bg-primary text-white" : "bg-secondary text-muted-foreground"}`}
           >
             日
           </button>
           <button
             onClick={() => setView("week")}
-            className={`px-3 py-1.5 text-sm rounded-lg ${view === "week" ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-600"}`}
+            className={`px-3 py-1.5 text-sm rounded-lg ${view === "week" ? "bg-primary text-white" : "bg-secondary text-muted-foreground"}`}
           >
             週
           </button>
@@ -118,36 +118,36 @@ export default function CalendarPage() {
 
       {/* Navigation */}
       <div className="flex items-center justify-between mb-4">
-        <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-lg">
+        <button onClick={() => navigate(-1)} className="p-2 hover:bg-secondary rounded-lg">
           ‹ 上一{view === "week" ? "週" : "天"}
         </button>
         <button
           onClick={() => setCurrentDate(new Date())}
-          className="text-sm text-emerald-600 font-medium"
+          className="text-sm text-primary font-medium"
         >
           今天
         </button>
-        <button onClick={() => navigate(1)} className="p-2 hover:bg-gray-100 rounded-lg">
+        <button onClick={() => navigate(1)} className="p-2 hover:bg-secondary rounded-lg">
           下一{view === "week" ? "週" : "天"} ›
         </button>
       </div>
 
       {/* Grid */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-auto">
+      <div className="bg-card rounded-xl border border-border overflow-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-100">
-              <th className="w-16 p-2 text-xs text-gray-400 font-medium">時段</th>
+            <tr className="border-b border-border/50">
+              <th className="w-16 p-2 text-xs text-muted-foreground font-medium">時段</th>
               {displayDates.map((d) => {
                 const isToday = d.toDateString() === new Date().toDateString();
                 return (
                   <th
                     key={d.toISOString()}
-                    className={`p-2 text-center text-sm ${isToday ? "bg-emerald-50" : ""}`}
+                    className={`p-2 text-center text-sm ${isToday ? "bg-primary/10" : ""}`}
                   >
-                    <span className="text-gray-400 text-xs">{WEEKDAYS[d.getDay()]}</span>
+                    <span className="text-muted-foreground text-xs">{WEEKDAYS[d.getDay()]}</span>
                     <br />
-                    <span className={`font-medium ${isToday ? "text-emerald-600" : "text-gray-700"}`}>
+                    <span className={`font-medium ${isToday ? "text-primary" : "text-foreground/80"}`}>
                       {d.getDate()}
                     </span>
                   </th>
@@ -158,7 +158,7 @@ export default function CalendarPage() {
           <tbody>
             {HOURS.map((hour) => (
               <tr key={hour} className="border-b border-gray-50">
-                <td className="p-2 text-xs text-gray-400 text-center font-mono">
+                <td className="p-2 text-xs text-muted-foreground text-center font-mono">
                   {hour}
                 </td>
                 {displayDates.map((d) => {
@@ -167,13 +167,13 @@ export default function CalendarPage() {
                   return (
                     <td
                       key={d.toISOString() + hour}
-                      className={`p-1 h-14 ${isToday ? "bg-emerald-50/30" : ""}`}
+                      className={`p-1 h-14 ${isToday ? "bg-primary/10/30" : ""}`}
                     >
                       {cellBookings.map((b) =>
                         b.startTime === hour ? (
                           <div
                             key={b.id}
-                            className={`text-xs p-1 rounded border ${STATUS_BG[b.status] || "bg-gray-100"} truncate`}
+                            className={`text-xs p-1 rounded border ${STATUS_BG[b.status] || "bg-secondary"} truncate`}
                             title={`${b.user.displayName || "顧客"} - ${b.service.name}`}
                           >
                             <span className="font-medium">

@@ -34,10 +34,10 @@ const DAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
 const HOURS = [11, 12, 13, 14, 15, 16, 17, 18, 19];
 
 function getHeatmapColor(count: number): string {
-  if (count === 0) return "bg-gray-50 text-gray-300";
-  if (count === 1) return "bg-emerald-100 text-emerald-700";
-  if (count <= 3) return "bg-emerald-300 text-emerald-900";
-  return "bg-emerald-600 text-white";
+  if (count === 0) return "bg-background text-muted-foreground/50";
+  if (count === 1) return "bg-primary/15 text-primary";
+  if (count <= 3) return "bg-primary/30 text-primary";
+  return "bg-primary text-white";
 }
 
 export default function AnalyticsPage() {
@@ -101,7 +101,7 @@ export default function AnalyticsPage() {
   if (isPending || !data) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -120,12 +120,12 @@ export default function AnalyticsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">數據分析</h1>
+        <h1 className="text-2xl font-bold text-foreground">數據分析</h1>
         <div className="flex items-center gap-3">
           <button
             onClick={exportAnalyticsCSV}
             disabled={exporting}
-            className="px-3 py-1.5 text-sm rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            className="px-3 py-1.5 text-sm rounded-lg bg-card border border-border text-foreground/80 hover:bg-background disabled:opacity-50 transition-colors"
           >
             {exporting ? "匯出中..." : "匯出 CSV"}
           </button>
@@ -140,8 +140,8 @@ export default function AnalyticsPage() {
                 onClick={() => setPeriod(p.value)}
                 className={`px-3 py-1.5 text-sm rounded-lg ${
                   period === p.value
-                    ? "bg-emerald-500 text-white"
-                    : "bg-gray-100 text-gray-600"
+                    ? "bg-primary text-white"
+                    : "bg-secondary text-muted-foreground"
                 }`}
               >
                 {p.label}
@@ -154,16 +154,16 @@ export default function AnalyticsPage() {
       {/* Overview cards */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <StatCard label="總預約" value={overview.totalBookings} />
-        <StatCard label="完成" value={overview.completedBookings} color="text-blue-600" />
+        <StatCard label="完成" value={overview.completedBookings} color="text-[var(--color-brand)]" />
         <StatCard
           label="營收"
           value={`NT$${overview.revenue.toLocaleString()}`}
-          color="text-emerald-600"
+          color="text-primary"
         />
         <StatCard
           label="佔用率"
           value={`${overview.occupancyRate}%`}
-          color={overview.occupancyRate > 70 ? "text-emerald-600" : "text-amber-600"}
+          color={overview.occupancyRate > 70 ? "text-primary" : "text-[var(--color-warning)]"}
         />
       </div>
 
@@ -171,14 +171,14 @@ export default function AnalyticsPage() {
         <StatCard
           label="取消"
           value={overview.cancelledBookings}
-          color="text-gray-500"
+          color="text-muted-foreground"
         />
         <StatCard
           label="未到店"
           value={overview.noShowBookings}
-          color="text-red-500"
+          color="text-destructive"
         />
-        <StatCard label="新客" value={overview.newCustomers} color="text-sky-600" />
+        <StatCard label="新客" value={overview.newCustomers} color="text-[var(--color-brand)]" />
         <StatCard
           label="取消率"
           value={
@@ -186,20 +186,20 @@ export default function AnalyticsPage() {
               ? `${Math.round(((overview.cancelledBookings + overview.noShowBookings) / overview.totalBookings) * 100)}%`
               : "0%"
           }
-          color="text-orange-500"
+          color="text-[var(--color-warning)]"
         />
       </div>
 
       {/* Heatmap */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-        <h2 className="font-semibold text-gray-900 mb-4">尖峰時段熱力圖</h2>
+      <div className="bg-card rounded-xl border border-border p-6 mb-6">
+        <h2 className="font-semibold text-foreground mb-4">尖峰時段熱力圖</h2>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[500px]">
             <thead>
               <tr>
-                <th className="w-12 text-xs text-gray-400 font-normal pb-2 text-left" />
+                <th className="w-12 text-xs text-muted-foreground font-normal pb-2 text-left" />
                 {HOURS.map((h) => (
-                  <th key={h} className="text-xs text-gray-400 font-normal pb-2 text-center">
+                  <th key={h} className="text-xs text-muted-foreground font-normal pb-2 text-center">
                     {h}:00
                   </th>
                 ))}
@@ -209,7 +209,7 @@ export default function AnalyticsPage() {
               {/* Render Mon(1) through Sun(0): order 1,2,3,4,5,6,0 */}
               {[1, 2, 3, 4, 5, 6, 0].map((dow) => (
                 <tr key={dow}>
-                  <td className="text-xs text-gray-500 pr-2 py-1 font-medium">
+                  <td className="text-xs text-muted-foreground pr-2 py-1 font-medium">
                     {DAY_LABELS[dow]}
                   </td>
                   {HOURS.map((h) => {
@@ -230,20 +230,20 @@ export default function AnalyticsPage() {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center gap-3 mt-3 text-xs text-gray-400">
+        <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
           <span>少</span>
-          <div className="w-5 h-3 rounded bg-gray-50 border border-gray-200" />
-          <div className="w-5 h-3 rounded bg-emerald-100" />
-          <div className="w-5 h-3 rounded bg-emerald-300" />
-          <div className="w-5 h-3 rounded bg-emerald-600" />
+          <div className="w-5 h-3 rounded bg-background border border-border" />
+          <div className="w-5 h-3 rounded bg-primary/15" />
+          <div className="w-5 h-3 rounded bg-primary/30" />
+          <div className="w-5 h-3 rounded bg-primary" />
           <span>多</span>
         </div>
       </div>
 
       {/* Revenue Trend Chart */}
       {data.dailyRevenue && data.dailyRevenue.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-          <h2 className="font-semibold text-gray-900 mb-4">每日營收趨勢</h2>
+        <div className="bg-card rounded-xl border border-border p-6 mb-6">
+          <h2 className="font-semibold text-foreground mb-4">每日營收趨勢</h2>
           <div className="overflow-x-auto">
             <div className="flex items-end gap-1.5 h-40 min-w-[400px]">
               {data.dailyRevenue.map((d) => {
@@ -255,15 +255,15 @@ export default function AnalyticsPage() {
                     key={dateStr}
                     className="flex-1 flex flex-col items-center gap-1 group"
                   >
-                    <span className="text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                    <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                       NT${d.revenue.toLocaleString()}
                     </span>
                     <div
-                      className="w-full bg-emerald-400 hover:bg-emerald-500 rounded-t transition-colors relative"
+                      className="w-full bg-primary/50 hover:bg-primary rounded-t transition-colors relative"
                       style={{ height: `${Math.max(height, 2)}%` }}
                       title={`${dateStr}: NT$${d.revenue.toLocaleString()} / ${d.bookings} 筆`}
                     />
-                    <span className="text-[10px] text-gray-400">{displayDate}</span>
+                    <span className="text-[10px] text-muted-foreground">{displayDate}</span>
                   </div>
                 );
               })}
@@ -274,21 +274,21 @@ export default function AnalyticsPage() {
 
       <div className="grid grid-cols-2 gap-6">
         {/* Popular services */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-4">熱門服務</h2>
+        <div className="bg-card rounded-xl border border-border p-6">
+          <h2 className="font-semibold text-foreground mb-4">熱門服務</h2>
           {data.popularServices.length === 0 ? (
-            <p className="text-gray-400 text-sm">暫無數據</p>
+            <p className="text-muted-foreground text-sm">暫無數據</p>
           ) : (
             <div className="space-y-3">
               {data.popularServices.map((s, i) => (
                 <div key={i} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 bg-emerald-100 text-emerald-700 text-xs rounded-full flex items-center justify-center font-medium">
+                    <span className="w-5 h-5 bg-primary/15 text-primary text-xs rounded-full flex items-center justify-center font-medium">
                       {i + 1}
                     </span>
                     <span className="text-sm">{s.serviceName}</span>
                   </div>
-                  <span className="text-sm text-gray-500">{s.count} 筆</span>
+                  <span className="text-sm text-muted-foreground">{s.count} 筆</span>
                 </div>
               ))}
             </div>
@@ -296,10 +296,10 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Customer segments */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-4">顧客分類</h2>
+        <div className="bg-card rounded-xl border border-border p-6">
+          <h2 className="font-semibold text-foreground mb-4">顧客分類</h2>
           {data.segments.length === 0 ? (
-            <p className="text-gray-400 text-sm">暫無數據</p>
+            <p className="text-muted-foreground text-sm">暫無數據</p>
           ) : (
             <div className="space-y-3">
               {data.segments.map((s) => (
@@ -307,7 +307,7 @@ export default function AnalyticsPage() {
                   <span className="text-sm">
                     {SEGMENT_LABELS[s.segment] || s.segment}
                   </span>
-                  <span className="text-sm text-gray-500">{s._count} 人</span>
+                  <span className="text-sm text-muted-foreground">{s._count} 人</span>
                 </div>
               ))}
             </div>
@@ -317,20 +317,20 @@ export default function AnalyticsPage() {
 
       {/* Daily bookings chart (simple bar) */}
       {data.dailyBookings.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mt-6">
-          <h2 className="font-semibold text-gray-900 mb-4">每日預約數</h2>
+        <div className="bg-card rounded-xl border border-border p-6 mt-6">
+          <h2 className="font-semibold text-foreground mb-4">每日預約數</h2>
           <div className="flex items-end gap-2 h-32">
             {data.dailyBookings.map((d) => {
               const max = Math.max(...data.dailyBookings.map((x) => x.count), 1);
               const height = (d.count / max) * 100;
               return (
                 <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
-                  <span className="text-xs text-gray-500">{d.count}</span>
+                  <span className="text-xs text-muted-foreground">{d.count}</span>
                   <div
-                    className="w-full bg-emerald-400 rounded-t"
+                    className="w-full bg-primary/50 rounded-t"
                     style={{ height: `${Math.max(height, 4)}%` }}
                   />
-                  <span className="text-[10px] text-gray-400">
+                  <span className="text-[10px] text-muted-foreground">
                     {new Date(d.day).getDate()}
                   </span>
                 </div>
@@ -353,9 +353,9 @@ function StatCard({
   color?: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className={`text-2xl font-bold mt-1 ${color || "text-gray-900"}`}>
+    <div className="bg-card rounded-xl border border-border p-4">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className={`text-2xl font-bold mt-1 ${color || "text-foreground"}`}>
         {value}
       </p>
     </div>

@@ -86,24 +86,24 @@ export default function NewBookingPage() {
 
   return (
     <div className="max-w-lg">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">手動新增預約</h1>
+      <h1 className="text-2xl font-bold text-foreground mb-6">手動新增預約</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Source */}
         <div>
-          <label className="text-sm text-gray-600 block mb-1">來源</label>
+          <label className="text-sm text-muted-foreground block mb-1">來源</label>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setSource("PHONE")}
-              className={`flex-1 py-2 rounded-lg text-sm ${source === "PHONE" ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-600"}`}
+              className={`flex-1 py-2 rounded-lg text-sm ${source === "PHONE" ? "bg-primary text-white" : "bg-secondary text-muted-foreground"}`}
             >
               電話預約
             </button>
             <button
               type="button"
               onClick={() => setSource("WALK_IN")}
-              className={`flex-1 py-2 rounded-lg text-sm ${source === "WALK_IN" ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-600"}`}
+              className={`flex-1 py-2 rounded-lg text-sm ${source === "WALK_IN" ? "bg-primary text-white" : "bg-secondary text-muted-foreground"}`}
             >
               現場預約
             </button>
@@ -113,20 +113,20 @@ export default function NewBookingPage() {
         {/* Customer info */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-sm text-gray-600 block mb-1">顧客姓名</label>
+            <label className="text-sm text-muted-foreground block mb-1">顧客姓名</label>
             <input
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-400"
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
               placeholder="王小明"
             />
           </div>
           <div>
-            <label className="text-sm text-gray-600 block mb-1">電話</label>
+            <label className="text-sm text-muted-foreground block mb-1">電話</label>
             <input
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-400"
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
               placeholder="0912-345-678"
             />
           </div>
@@ -134,11 +134,11 @@ export default function NewBookingPage() {
 
         {/* Service */}
         <div>
-          <label className="text-sm text-gray-600 block mb-1">服務項目</label>
+          <label className="text-sm text-muted-foreground block mb-1">服務項目</label>
           <select
             value={selectedService}
             onChange={(e) => setSelectedService(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-400"
+            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
             required
           >
             <option value="">選擇服務</option>
@@ -152,12 +152,12 @@ export default function NewBookingPage() {
 
         {/* Date */}
         <div>
-          <label className="text-sm text-gray-600 block mb-1">日期</label>
+          <label className="text-sm text-muted-foreground block mb-1">日期</label>
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-400"
+            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
             required
           />
         </div>
@@ -165,9 +165,9 @@ export default function NewBookingPage() {
         {/* Time slots */}
         {date && selectedService && (
           <div>
-            <label className="text-sm text-gray-600 block mb-1">時段</label>
+            <label className="text-sm text-muted-foreground block mb-1">時段</label>
             {loadingSlots ? (
-              <p className="text-sm text-gray-400">載入中...</p>
+              <p className="text-sm text-muted-foreground">載入中...</p>
             ) : (
               <div className="grid grid-cols-5 gap-2">
                 {slots.map((slot) => (
@@ -178,10 +178,10 @@ export default function NewBookingPage() {
                     onClick={() => setSelectedTime(slot.time)}
                     className={`py-2 text-sm rounded-lg ${
                       !slot.available
-                        ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+                        ? "bg-secondary text-muted-foreground/50 cursor-not-allowed"
                         : selectedTime === slot.time
-                        ? "bg-emerald-500 text-white"
-                        : "bg-white border border-gray-200 hover:border-emerald-400"
+                        ? "bg-primary text-white"
+                        : "bg-card border border-border hover:border-primary"
                     }`}
                   >
                     {slot.time}
@@ -194,11 +194,11 @@ export default function NewBookingPage() {
 
         {/* Notes */}
         <div>
-          <label className="text-sm text-gray-600 block mb-1">備註</label>
+          <label className="text-sm text-muted-foreground block mb-1">備註</label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none h-20 focus:outline-none focus:border-emerald-400"
+            className="w-full px-3 py-2 border border-border rounded-lg text-sm resize-none h-20 focus:outline-none focus:border-primary"
           />
         </div>
 
@@ -206,7 +206,7 @@ export default function NewBookingPage() {
           type="submit"
           disabled={submitting || !selectedService || !date || !selectedTime}
           className={`w-full py-2.5 rounded-lg font-medium text-white ${
-            submitting ? "bg-gray-400" : "bg-emerald-500 hover:bg-emerald-600"
+            submitting ? "bg-gray-400" : "bg-primary hover:bg-primary"
           }`}
         >
           {submitting ? "建立中..." : "建立預約"}

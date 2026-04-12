@@ -108,28 +108,28 @@ export default function CustomerDetailPage({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!customer) {
-    return <div className="text-gray-400">找不到顧客</div>;
+    return <div className="text-muted-foreground">找不到顧客</div>;
   }
 
   return (
     <div className="max-w-2xl">
-      <Link href="/customers" className="text-sm text-gray-500 mb-4 inline-block">
+      <Link href="/customers" className="text-sm text-muted-foreground mb-4 inline-block">
         ← 返回顧客列表
       </Link>
 
       {/* Profile header */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-4">
+      <div className="bg-card rounded-xl border border-border p-6 mb-4">
         <div className="flex items-start gap-4">
           {customer.pictureUrl ? (
             <Image src={customer.pictureUrl} alt="" width={64} height={64} className="w-16 h-16 rounded-full" />
           ) : (
-            <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-xl text-gray-500">
+            <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center text-xl text-muted-foreground">
               {(customer.displayName || "?")[0]}
             </div>
           )}
@@ -138,23 +138,23 @@ export default function CustomerDetailPage({
               <h1 className="text-xl font-bold">
                 {customer.displayName || customer.realName || "未知顧客"}
               </h1>
-              {customer.isVip && <span className="text-amber-500 text-lg">★ VIP</span>}
+              {customer.isVip && <span className="text-[var(--color-warning)] text-lg">★ VIP</span>}
             </div>
             {customer.realName && customer.displayName && (
-              <p className="text-sm text-gray-500">真實姓名：{customer.realName}</p>
+              <p className="text-sm text-muted-foreground">真實姓名：{customer.realName}</p>
             )}
-            {customer.phone && <p className="text-sm text-gray-500">{customer.phone}</p>}
+            {customer.phone && <p className="text-sm text-muted-foreground">{customer.phone}</p>}
           </div>
           <div className="flex gap-2">
             <button
               onClick={handleToggleVip}
-              className={`text-xs px-3 py-1.5 rounded-lg ${customer.isVip ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"}`}
+              className={`text-xs px-3 py-1.5 rounded-lg ${customer.isVip ? "bg-[var(--color-warning)]/15 text-[var(--color-warning)]" : "bg-secondary text-muted-foreground"}`}
             >
               {customer.isVip ? "取消 VIP" : "設為 VIP"}
             </button>
             <button
               onClick={() => setEditing(!editing)}
-              className="text-xs px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg"
+              className="text-xs px-3 py-1.5 bg-primary/10 text-primary rounded-lg"
             >
               {editing ? "取消" : "編輯"}
             </button>
@@ -186,7 +186,7 @@ export default function CustomerDetailPage({
             />
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm"
+              className="px-4 py-2 bg-primary text-white rounded-lg text-sm"
             >
               儲存
             </button>
@@ -196,26 +196,26 @@ export default function CustomerDetailPage({
 
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-4 mb-4">
-        <div className="bg-white rounded-xl border p-4 text-center">
-          <p className="text-2xl font-bold text-gray-900">{customer.totalVisits}</p>
-          <p className="text-xs text-gray-500">總來訪次數</p>
+        <div className="bg-card rounded-xl border p-4 text-center">
+          <p className="text-2xl font-bold text-foreground">{customer.totalVisits}</p>
+          <p className="text-xs text-muted-foreground">總來訪次數</p>
         </div>
-        <div className="bg-white rounded-xl border p-4 text-center">
-          <p className="text-2xl font-bold text-gray-900">{customer.bookings.length}</p>
-          <p className="text-xs text-gray-500">預約次數</p>
+        <div className="bg-card rounded-xl border p-4 text-center">
+          <p className="text-2xl font-bold text-foreground">{customer.bookings.length}</p>
+          <p className="text-xs text-muted-foreground">預約次數</p>
         </div>
-        <div className="bg-white rounded-xl border p-4 text-center">
-          <p className={`text-2xl font-bold ${customer.violationCount > 0 ? "text-red-500" : "text-gray-900"}`}>
+        <div className="bg-card rounded-xl border p-4 text-center">
+          <p className={`text-2xl font-bold ${customer.violationCount > 0 ? "text-destructive" : "text-foreground"}`}>
             {customer.violationCount}
           </p>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             違規次數
             {customer.bookingRestricted && " (已限制)"}
           </p>
           {customer.violationCount > 0 && (
             <button
               onClick={handleClearViolations}
-              className="text-xs text-emerald-600 mt-1"
+              className="text-xs text-primary mt-1"
             >
               清除
             </button>
@@ -224,23 +224,23 @@ export default function CustomerDetailPage({
       </div>
 
       {/* Booking history */}
-      <div className="bg-white rounded-xl border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-100">
+      <div className="bg-card rounded-xl border border-border">
+        <div className="px-6 py-4 border-b border-border/50">
           <h2 className="font-semibold">預約紀錄</h2>
         </div>
-        <div className="divide-y divide-gray-50">
+        <div className="divide-y divide-border/30">
           {customer.bookings.map((b) => (
             <div key={b.id} className="px-6 py-3 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">{b.service.name}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   {new Date(b.date).toLocaleDateString("zh-TW")} {b.startTime}
                 </p>
               </div>
               <div className="text-right">
-                <span className="text-xs text-gray-400">{b.status}</span>
+                <span className="text-xs text-muted-foreground">{b.status}</span>
                 {b.cancellation?.isViolation && (
-                  <span className="block text-xs text-red-500">違規取消</span>
+                  <span className="block text-xs text-destructive">違規取消</span>
                 )}
               </div>
             </div>

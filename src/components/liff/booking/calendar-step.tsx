@@ -69,7 +69,7 @@ export function CalendarStep({
     <div>
       <button
         onClick={onBack}
-        className="text-sm text-gray-500 mb-4 flex items-center gap-1"
+        className="text-sm text-muted-foreground mb-4 flex items-center gap-1"
       >
         ← 返回選擇服務
       </button>
@@ -80,14 +80,14 @@ export function CalendarStep({
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={prevMonth}
-          className="p-2 hover:bg-gray-100 rounded-lg"
+          className="p-2 hover:bg-secondary rounded-lg"
         >
           ‹
         </button>
         <span className="font-medium">{monthLabel}</span>
         <button
           onClick={nextMonth}
-          className="p-2 hover:bg-gray-100 rounded-lg"
+          className="p-2 hover:bg-secondary rounded-lg"
         >
           ›
         </button>
@@ -98,7 +98,7 @@ export function CalendarStep({
         {WEEKDAY_NAMES.map((name) => (
           <div
             key={name}
-            className="text-center text-xs text-gray-400 font-medium py-1"
+            className="text-center text-xs text-muted-foreground font-medium py-1"
           >
             {name}
           </div>
@@ -126,10 +126,10 @@ export function CalendarStep({
               className={`
                 aspect-square flex items-center justify-center rounded-lg text-sm
                 ${selectable
-                  ? "hover:bg-emerald-50 hover:text-emerald-700 active:bg-emerald-100 cursor-pointer"
-                  : "text-gray-300 cursor-not-allowed"
+                  ? "hover:bg-secondary hover:text-[var(--color-brand)] active:bg-[var(--color-surface)] cursor-pointer"
+                  : "text-muted-foreground/40 cursor-not-allowed"
                 }
-                ${isToday ? "ring-1 ring-emerald-300" : ""}
+                ${isToday ? "ring-1 ring-[var(--color-brand)]" : ""}
               `}
             >
               {day}

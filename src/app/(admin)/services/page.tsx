@@ -90,13 +90,13 @@ export default function ServicesPage() {
   return (
     <div className="max-w-2xl">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">服務項目管理</h1>
+        <h1 className="text-2xl font-bold text-foreground">服務項目管理</h1>
         <button
           onClick={() => {
             resetForm();
             setShowForm(!showForm);
           }}
-          className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm hover:bg-emerald-600"
+          className="px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary"
         >
           {showForm ? "取消" : "新增服務"}
         </button>
@@ -106,11 +106,11 @@ export default function ServicesPage() {
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="bg-white rounded-xl border border-gray-200 p-4 mb-6 space-y-3"
+          className="bg-card rounded-xl border border-border p-4 mb-6 space-y-3"
         >
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-500">名稱</label>
+              <label className="text-xs text-muted-foreground">名稱</label>
               <input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -119,7 +119,7 @@ export default function ServicesPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500">價格 (NT$)</label>
+              <label className="text-xs text-muted-foreground">價格 (NT$)</label>
               <input
                 type="number"
                 value={form.price}
@@ -131,7 +131,7 @@ export default function ServicesPage() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-500">描述</label>
+            <label className="text-xs text-muted-foreground">描述</label>
             <input
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -141,7 +141,7 @@ export default function ServicesPage() {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="text-xs text-gray-500">時長 (分鐘)</label>
+              <label className="text-xs text-muted-foreground">時長 (分鐘)</label>
               <input
                 type="number"
                 value={form.duration}
@@ -150,7 +150,7 @@ export default function ServicesPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500">佔用時段數</label>
+              <label className="text-xs text-muted-foreground">佔用時段數</label>
               <input
                 type="number"
                 value={form.slotsNeeded}
@@ -161,7 +161,7 @@ export default function ServicesPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500">排序</label>
+              <label className="text-xs text-muted-foreground">排序</label>
               <input
                 type="number"
                 value={form.sortOrder}
@@ -173,7 +173,7 @@ export default function ServicesPage() {
 
           <button
             type="submit"
-            className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm"
+            className="px-4 py-2 bg-primary text-white rounded-lg text-sm"
           >
             {editingId ? "更新" : "新增"}
           </button>
@@ -181,32 +181,32 @@ export default function ServicesPage() {
       )}
 
       {/* List */}
-      <div className="bg-white rounded-xl border border-gray-200">
+      <div className="bg-card rounded-xl border border-border">
         {loading ? (
-          <div className="p-8 text-center text-gray-400">載入中...</div>
+          <div className="p-8 text-center text-muted-foreground">載入中...</div>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-border/30">
             {services.map((s) => (
               <div key={s.id} className="px-6 py-4 flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-gray-900">{s.name}</h3>
-                  <p className="text-sm text-gray-500">
+                  <h3 className="font-medium text-foreground">{s.name}</h3>
+                  <p className="text-sm text-muted-foreground">
                     {s.duration}分鐘 · {s.slotsNeeded}時段 · NT${s.price.toLocaleString()}
                   </p>
                   {s.description && (
-                    <p className="text-xs text-gray-400">{s.description}</p>
+                    <p className="text-xs text-muted-foreground">{s.description}</p>
                   )}
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleEdit(s)}
-                    className="text-xs px-2 py-1 text-emerald-600 hover:bg-emerald-50 rounded"
+                    className="text-xs px-2 py-1 text-primary hover:bg-primary/10 rounded"
                   >
                     編輯
                   </button>
                   <button
                     onClick={() => handleDelete(s.id)}
-                    className="text-xs px-2 py-1 text-red-500 hover:bg-red-50 rounded"
+                    className="text-xs px-2 py-1 text-destructive hover:bg-destructive/10 rounded"
                   >
                     停用
                   </button>
