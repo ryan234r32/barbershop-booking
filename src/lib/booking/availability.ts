@@ -108,8 +108,9 @@ export async function isSlotAvailable(params: {
   date: Date;
   startTime: string;
   slotsNeeded: number;
+  excludeBookingId?: string;
 }): Promise<boolean> {
-  const { tenantId, date, startTime, slotsNeeded } = params;
+  const { tenantId, date, startTime, slotsNeeded, excludeBookingId } = params;
   const startH = parseTimeToHour(startTime);
 
   const bookings = await prisma.booking.findMany({
@@ -117,6 +118,7 @@ export async function isSlotAvailable(params: {
       tenantId,
       date,
       status: "CONFIRMED",
+      ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
     },
     select: { startTime: true, slotsOccupied: true },
   });

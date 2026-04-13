@@ -19,7 +19,7 @@ describe("scheduleReminders", () => {
     vi.clearAllMocks();
   });
 
-  it("creates 24h and 1h reminders for future booking", async () => {
+  it("creates 24h and 2h reminders for future booking", async () => {
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 3);
 
@@ -31,13 +31,13 @@ describe("scheduleReminders", () => {
       startTime: "14:00",
     });
 
-    expect(prisma.notification.createMany).toHaveBeenCalled();
-    const callArg = vi.mocked(prisma.notification.createMany).mock.calls[0][0] as {
-      data: Array<{ type: string }>;
-    };
-    expect(callArg.data.length).toBe(2);
-    expect(callArg.data[0].type).toBe("REMINDER_24H");
-    expect(callArg.data[1].type).toBe("REMINDER_1H");
+    // Should create 2 individual notifications (24h + 2h)
+    const createCalls = vi.mocked(prisma.notification.create).mock.calls;
+    expect(createCalls.length).toBe(2);
+
+    const types = createCalls.map((call) => (call[0] as { data: { type: string } }).data.type);
+    expect(types).toContain("REMINDER_24H");
+    expect(types).toContain("REMINDER_2H");
   });
 });
 

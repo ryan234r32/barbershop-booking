@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:ital,wght@0,100..900;1,100..900&amp;family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-surface": "#31312c",
+                        "on-surface-variant": "#404944",
+                        "on-secondary": "#ffffff",
+                        "surface": "#fcf9f2",
+                        "primary-fixed": "#b7efd4",
+                        "secondary-container": "#d8e8ca",
+                        "on-secondary-container": "#5a6951",
+                        "error-container": "#ffdad6",
+                        "on-primary": "#ffffff",
+                        "on-surface": "#1c1c18",
+                        "on-tertiary-fixed-variant": "#77321a",
+                        "primary-fixed-dim": "#9cd2b9",
+                        "on-error-container": "#93000a",
+                        "surface-variant": "#e5e2db",
+                        "on-secondary-fixed": "#131f0d",
+                        "surface-container-highest": "#e5e2db",
+                        "primary-container": "#003d2b",
+                        "on-tertiary-fixed": "#390b00",
+                        "on-tertiary-container": "#e18668",
+                        "on-primary-container": "#73a891",
+                        "surface-tint": "#346853",
+                        "on-primary-fixed": "#002115",
+                        "tertiary-fixed-dim": "#ffb59d",
+                        "surface-bright": "#fcf9f2",
+                        "tertiary-container": "#5f210a",
+                        "on-tertiary": "#ffffff",
+                        "surface-container": "#f1eee7",
+                        "surface-container-high": "#ebe8e1",
+                        "surface-dim": "#dcdad3",
+                        "secondary": "#54634b",
+                        "outline": "#707974",
+                        "on-secondary-fixed-variant": "#3d4b35",
+                        "background": "#fcf9f2",
+                        "surface-container-low": "#f6f3ec",
+                        "error": "#ba1a1a",
+                        "inverse-on-surface": "#f3f0e9",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-primary": "#9cd2b9",
+                        "tertiary": "#410e00",
+                        "secondary-fixed": "#d8e8ca",
+                        "on-primary-fixed-variant": "#1a503c",
+                        "on-error": "#ffffff",
+                        "on-background": "#1c1c18",
+                        "outline-variant": "#c0c9c2",
+                        "primary": "#002519",
+                        "secondary-fixed-dim": "#bccbaf",
+                        "tertiary-fixed": "#ffdbd0"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Epilogue"],
+                        "body": ["Manrope"],
+                        "label": ["Manrope"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Manrope', sans-serif; background-color: #fcf9f2; color: #1c1c18; }
+        .font-epilogue { font-family: 'Epilogue', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="w-full top-0 sticky z-50 flex items-center justify-between px-6 h-16 bg-[#fcf9f2] dark:bg-stone-950 transition-opacity">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#003D2B] dark:text-emerald-500 cursor-pointer" data-icon="arrow_back">arrow_back</span>
+</div>
+<h1 class="font-['Epilogue'] tracking-tighter font-bold text-xl text-[#003D2B] dark:text-emerald-500 absolute left-1/2 -translate-x-1/2">
+            我的預約
+        </h1>
+<div class="w-6"></div> <!-- Spacer for balance -->
+</header>
+<main class="max-w-md mx-auto px-6 pt-6">
+<!-- Brand Intro / Identity -->
+<div class="mb-10 text-center">
+<p class="text-tertiary font-bold tracking-widest text-xs mb-2">1008 HAIR STUDIO</p>
+<h2 class="font-headline text-3xl font-bold tracking-tighter text-primary">The Living Atelier</h2>
+</div>
+<!-- Navigation Tabs (Curated Tray Style) -->
+<div class="bg-surface-container rounded-full p-1.5 flex mb-8">
+<button class="flex-1 py-3 px-4 rounded-full text-sm font-bold transition-all bg-primary-container text-on-primary shadow-sm">
+                即將到來
+            </button>
+<button class="flex-1 py-3 px-4 rounded-full text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high transition-colors">
+                歷史記錄
+            </button>
+</div>
+<section class="space-y-8">
+<!-- Card 1: Modern Gallery Variation -->
+<div class="group relative bg-surface-container-lowest rounded-xl border border-primary-container/10 p-6 transition-all hover:shadow-[0_8px_32px_rgba(0,61,43,0.04)]">
+<div class="flex justify-between items-start mb-6">
+<div class="space-y-1">
+<span class="text-tertiary text-[10px] font-extrabold tracking-[0.2em]">SERVICE</span>
+<h3 class="font-headline text-2xl font-bold text-primary">男性剪髮</h3>
+</div>
+<div class="text-right">
+<p class="font-headline font-bold text-primary text-xl tracking-tight">NT$1,000</p>
+</div>
+</div>
+<div class="flex items-center gap-3 py-4 border-y border-outline-variant/15 mb-6">
+<span class="material-symbols-outlined text-on-primary-container" data-icon="calendar_today">calendar_today</span>
+<p class="text-on-surface font-semibold text-sm">4/15 (二) 14:00 - 15:00</p>
+</div>
+<div class="flex items-center justify-between mt-4">
+<div class="flex gap-6 items-center">
+<a class="text-primary-container font-bold text-sm underline decoration-2 underline-offset-4 hover:opacity-70 transition-opacity" href="#">改期</a>
+<a class="text-error/70 font-bold text-sm hover:text-error transition-colors" href="#">取消</a>
+</div>
+<button class="px-6 py-2 rounded-full border-2 border-primary-container text-primary-container font-bold text-sm hover:bg-primary-container hover:text-white transition-all active:scale-95">
+                        付款
+                    </button>
+</div>
+</div>
+<!-- Card 2: Warm Atelier Variation -->
+<div class="group relative bg-surface-container-lowest rounded-xl border border-primary-container/10 p-6 transition-all hover:shadow-[0_8px_32px_rgba(0,61,43,0.04)]"><div class="flex justify-between items-start mb-6">
+<div class="space-y-1">
+<span class="text-tertiary text-[10px] font-extrabold tracking-[0.2em]">COLOURING</span>
+<h3 class="font-headline text-2xl font-bold text-primary">染髮</h3>
+</div>
+<div class="text-right">
+<p class="font-headline font-bold text-primary text-xl tracking-tight">NT$2,600</p>
+</div>
+</div>
+<div class="flex items-center gap-3 py-4 border-y border-outline-variant/15 mb-6">
+<span class="material-symbols-outlined text-on-primary-container" data-icon="calendar_today">calendar_today</span>
+<p class="text-on-surface font-semibold text-sm">4/16 (三) 10:00 - 12:30</p>
+</div>
+<div class="flex items-center justify-between mt-4">
+<div class="flex gap-6 items-center">
+<a class="text-primary-container font-bold text-sm underline decoration-2 underline-offset-4 hover:opacity-70 transition-opacity" href="#">改期</a>
+<a class="text-error/70 font-bold text-sm hover:text-error transition-colors" href="#">取消</a>
+</div>
+<button class="px-6 py-2 rounded-full border-2 border-primary-container text-primary-container font-bold text-sm hover:bg-primary-container hover:text-white transition-all active:scale-95">
+                        付款
+                    </button>
+</div></div>
+</section>
+<!-- Signature Botanical Moment -->
+<div class="mt-16 text-center opacity-40">
+<span class="material-symbols-outlined text-4xl text-primary-container" data-icon="spa">spa</span>
+<p class="font-headline text-[10px] tracking-[0.4em] text-primary mt-2">BREATHE &amp; CRAFT</p>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-[#fcf9f2]/80 dark:bg-stone-950/80 backdrop-blur-xl shadow-[0_-8px_32px_rgba(0,0,0,0.06)] rounded-t-[32px] border-t border-stone-200/20">
+<a class="flex flex-col items-center justify-center text-stone-500 dark:text-stone-400 px-5 py-2 hover:bg-[#d8e8ca] transition-colors rounded-full tap-highlight-transparent active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="home_app_logo">home_app_logo</span>
+<span class="font-['Manrope'] text-xs font-semibold mt-1">首頁</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-[#003D2B] text-white rounded-full px-5 py-2 tap-highlight-transparent active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="event_upcoming" style="font-variation-settings: 'FILL' 1;">event_upcoming</span>
+<span class="font-['Manrope'] text-xs font-semibold mt-1">預約</span>
+</a>
+<a class="flex flex-col items-center justify-center text-stone-500 dark:text-stone-400 px-5 py-2 hover:bg-[#d8e8ca] transition-colors rounded-full tap-highlight-transparent active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="auto_awesome">auto_awesome</span>
+<span class="font-['Manrope'] text-xs font-semibold mt-1">探索</span>
+</a>
+<a class="flex flex-col items-center justify-center text-stone-500 dark:text-stone-400 px-5 py-2 hover:bg-[#d8e8ca] transition-colors rounded-full tap-highlight-transparent active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-['Manrope'] text-xs font-semibold mt-1">我的</span>
+</a>
+</nav>
+</body></html>

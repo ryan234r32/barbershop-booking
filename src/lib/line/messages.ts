@@ -28,10 +28,57 @@ export function bookingConfirmationMessage(params: {
   endTime: string;
   shopName: string;
   shopAddress?: string;
+  price?: number;
+  bookingId?: string;
+  liffBaseUrl?: string;
 }): FlexMessage {
-  const { serviceName, date, startTime, endTime, shopName, shopAddress } = params;
+  const { serviceName, date, startTime, endTime, shopName, shopAddress, price, bookingId, liffBaseUrl } = params;
 
   const calendarUrl = buildGoogleCalendarUrl(serviceName, date, startTime, endTime);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const footerButtons: any[] = [];
+
+  // Primary CTA: payment (if bookingId + liffBaseUrl available)
+  if (bookingId && liffBaseUrl) {
+    footerButtons.push({
+      type: "button" as const,
+      action: {
+        type: "uri" as const,
+        label: "前往付款",
+        uri: `${liffBaseUrl}/payment/${bookingId}`,
+      },
+      style: "primary" as const,
+      color: "#003D2B",
+      height: "sm" as const,
+    });
+  }
+
+  // Secondary: Google Calendar
+  footerButtons.push({
+    type: "button" as const,
+    action: {
+      type: "uri" as const,
+      label: "加入 Google 行事曆",
+      uri: calendarUrl,
+    },
+    style: "secondary" as const,
+    height: "sm" as const,
+  });
+
+  // Tertiary: My Bookings
+  if (liffBaseUrl) {
+    footerButtons.push({
+      type: "button" as const,
+      action: {
+        type: "uri" as const,
+        label: "查看我的預約",
+        uri: `${liffBaseUrl}/my-bookings`,
+      },
+      style: "secondary" as const,
+      height: "sm" as const,
+    });
+  }
 
   const bubble: FlexBubble = {
     type: "bubble",
@@ -72,12 +119,13 @@ export function bookingConfirmationMessage(params: {
             infoRow("服務", serviceName),
             infoRow("日期", date),
             infoRow("時間", `${startTime} - ${endTime}`),
+            ...(price != null ? [infoRow("價格", `NT$${price.toLocaleString()}`)] : []),
             ...(shopAddress ? [infoRow("地址", shopAddress)] : []),
           ],
         },
         {
           type: "text",
-          text: "如需取消，請至「我的預約」操作",
+          text: "前一天可免費取消或改期",
           size: "xs",
           color: "#809A8E",
           margin: "xl",
@@ -89,19 +137,7 @@ export function bookingConfirmationMessage(params: {
       type: "box",
       layout: "vertical",
       spacing: "sm",
-      contents: [
-        {
-          type: "button",
-          action: {
-            type: "uri",
-            label: "加入 Google 行事曆",
-            uri: calendarUrl,
-          },
-          style: "primary",
-          color: "#003D2B",
-          height: "sm",
-        },
-      ],
+      contents: footerButtons,
       backgroundColor: "#FFF8F1",
     },
   };
@@ -120,9 +156,44 @@ export function reminderMessage(params: {
   startTime: string;
   shopName: string;
   hoursUntil: number;
+  bookingId?: string;
+  liffBaseUrl?: string;
+  shopAddress?: string;
 }): FlexMessage {
-  const { serviceName, date, startTime, shopName, hoursUntil } = params;
-  const timeLabel = hoursUntil === 24 ? "明天" : "即將";
+  const { serviceName, date, startTime, shopName, hoursUntil, bookingId, liffBaseUrl, shopAddress } = params;
+  const timeLabel = hoursUntil <= 2 ? "即將" : "明天";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const footerButtons: any[] = [];
+
+  // 24h reminder: reschedule + navigation buttons
+  // 2h reminder: navigation only (no cancel/reschedule to avoid last-minute cancellation)
+  if (hoursUntil > 2 && bookingId && liffBaseUrl) {
+    footerButtons.push({
+      type: "button" as const,
+      action: {
+        type: "uri" as const,
+        label: "需要改期？",
+        uri: `${liffBaseUrl}/reschedule/${bookingId}`,
+      },
+      style: "secondary" as const,
+      height: "sm" as const,
+    });
+  }
+
+  if (shopAddress) {
+    footerButtons.push({
+      type: "button" as const,
+      action: {
+        type: "uri" as const,
+        label: "導航至店家",
+        uri: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(shopAddress)}`,
+      },
+      style: "primary" as const,
+      color: "#003D2B",
+      height: "sm" as const,
+    });
+  }
 
   const bubble: FlexBubble = {
     type: "bubble",
@@ -160,6 +231,17 @@ export function reminderMessage(params: {
         },
       ],
     },
+    ...(footerButtons.length > 0
+      ? {
+          footer: {
+            type: "box" as const,
+            layout: "vertical" as const,
+            spacing: "sm" as const,
+            contents: footerButtons,
+            backgroundColor: "#FFF8F1",
+          },
+        }
+      : {}),
   };
 
   return {
@@ -176,8 +258,9 @@ export function cancellationMessage(params: {
   startTime: string;
   isViolation: boolean;
   violationCount: number;
+  liffBaseUrl?: string;
 }): FlexMessage {
-  const { serviceName, date, startTime, isViolation, violationCount } = params;
+  const { serviceName, date, startTime, isViolation, violationCount, liffBaseUrl } = params;
 
   const bubble: FlexBubble = {
     type: "bubble",
@@ -221,6 +304,29 @@ export function cancellationMessage(params: {
           : []),
       ],
     },
+    ...(liffBaseUrl
+      ? {
+          footer: {
+            type: "box" as const,
+            layout: "vertical" as const,
+            spacing: "sm" as const,
+            contents: [
+              {
+                type: "button" as const,
+                action: {
+                  type: "uri" as const,
+                  label: "重新預約",
+                  uri: `${liffBaseUrl}/booking`,
+                },
+                style: "primary" as const,
+                color: "#003D2B",
+                height: "sm" as const,
+              },
+            ],
+            backgroundColor: "#FFF8F1",
+          },
+        }
+      : {}),
   };
 
   return {
@@ -634,6 +740,414 @@ export function myBookingsGuideMessage(liffBaseUrl: string): FlexMessage {
   return {
     type: "flex",
     altText: "點此查看我的預約",
+    contents: bubble,
+  };
+}
+
+/** Dynamic "My Bookings" Flex Message — shows actual upcoming bookings as carousel */
+export function myBookingsFlexMessage(params: {
+  bookings: Array<{
+    id: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    serviceName: string;
+    price: number;
+    paymentStatus: string | null;
+  }>;
+  liffBaseUrl: string;
+  shopName: string;
+}): FlexMessage {
+  const { bookings, liffBaseUrl, shopName } = params;
+
+  const bubbles: FlexBubble[] = bookings.map((b) => {
+    const isPaid = b.paymentStatus === "RECEIVED";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buttons: any[] = [];
+
+    // "改期優先於取消" — reschedule button first (most prominent)
+    buttons.push({
+      type: "button" as const,
+      action: {
+        type: "uri" as const,
+        label: "改期",
+        uri: `${liffBaseUrl}/reschedule/${b.id}`,
+      },
+      style: "primary" as const,
+      color: "#003D2B",
+      height: "sm" as const,
+    });
+
+    // Payment button (or paid badge)
+    if (!isPaid) {
+      buttons.push({
+        type: "button" as const,
+        action: {
+          type: "uri" as const,
+          label: "前往付款",
+          uri: `${liffBaseUrl}/payment/${b.id}`,
+        },
+        style: "secondary" as const,
+        height: "sm" as const,
+      });
+    }
+
+    // Cancel button — least prominent, last
+    buttons.push({
+      type: "button" as const,
+      action: {
+        type: "uri" as const,
+        label: "取消預約",
+        uri: `${liffBaseUrl}/cancel/${b.id}`,
+      },
+      style: "secondary" as const,
+      height: "sm" as const,
+    });
+
+    return {
+      type: "bubble" as const,
+      body: {
+        type: "box" as const,
+        layout: "vertical" as const,
+        contents: [
+          {
+            type: "text" as const,
+            text: shopName,
+            size: "xs" as const,
+            color: "#809A8E",
+          },
+          {
+            type: "text" as const,
+            text: b.serviceName,
+            weight: "bold" as const,
+            size: "xl" as const,
+            margin: "sm" as const,
+          },
+          {
+            type: "separator" as const,
+            margin: "lg" as const,
+          },
+          {
+            type: "box" as const,
+            layout: "vertical" as const,
+            margin: "lg" as const,
+            spacing: "sm" as const,
+            contents: [
+              infoRow("日期", b.date),
+              infoRow("時間", `${b.startTime} - ${b.endTime}`),
+              infoRow("價格", `NT$${b.price.toLocaleString()}`),
+              ...(isPaid
+                ? [infoRow("付款", "已付款 ✓")]
+                : [infoRow("付款", "待付款")]),
+            ],
+          },
+        ],
+      },
+      footer: {
+        type: "box" as const,
+        layout: "vertical" as const,
+        spacing: "sm" as const,
+        contents: buttons,
+        backgroundColor: "#FFF8F1",
+      },
+    };
+  });
+
+  // If only one booking, return single bubble; otherwise carousel
+  const contents: FlexBubble | FlexCarousel =
+    bubbles.length === 1
+      ? bubbles[0]
+      : { type: "carousel", contents: bubbles };
+
+  return {
+    type: "flex",
+    altText: `你有 ${bookings.length} 筆即將到來的預約`,
+    contents,
+  };
+}
+
+/** Empty state for "My Bookings" — no upcoming bookings */
+export function myBookingsEmptyMessage(liffBaseUrl: string): FlexMessage {
+  const bubble: FlexBubble = {
+    type: "bubble",
+    body: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "text",
+          text: "目前沒有即將到來的預約",
+          weight: "bold",
+          size: "md",
+          color: "#003D2B",
+          align: "center" as const,
+        },
+        {
+          type: "text",
+          text: "想要預約嗎？隨時歡迎您！",
+          size: "sm",
+          color: "#809A8E",
+          margin: "md",
+          align: "center" as const,
+          wrap: true,
+        },
+      ],
+      justifyContent: "center" as const,
+      paddingTop: "24px",
+      paddingBottom: "8px",
+    },
+    footer: {
+      type: "box",
+      layout: "vertical",
+      spacing: "sm",
+      contents: [
+        {
+          type: "button",
+          action: {
+            type: "uri",
+            label: "立即預約",
+            uri: `${liffBaseUrl}/booking`,
+          },
+          style: "primary" as const,
+          color: "#003D2B",
+          height: "sm" as const,
+        },
+        {
+          type: "button",
+          action: {
+            type: "uri",
+            label: "歷史記錄",
+            uri: `${liffBaseUrl}/my-bookings`,
+          },
+          style: "secondary" as const,
+          height: "sm" as const,
+        },
+      ],
+      backgroundColor: "#FFF8F1",
+    },
+  };
+
+  return {
+    type: "flex",
+    altText: "目前沒有即將到來的預約",
+    contents: bubble,
+  };
+}
+
+/** Admin daily settlement Flex Message — sent at 20:30 to shop owner */
+export function dailySettlementMessage(params: {
+  date: string;
+  bookings: Array<{
+    customerName: string;
+    serviceName: string;
+    startTime: string;
+    status: string;
+    price: number;
+  }>;
+  summary: {
+    total: number;
+    completed: number;
+    noShow: number;
+    unresolved: number;
+    revenue: number;
+  };
+  dashboardUrl: string;
+}): FlexMessage {
+  const { date, summary, dashboardUrl } = params;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const footerContents: any[] = [];
+  if (summary.unresolved > 0) {
+    footerContents.push({
+      type: "button" as const,
+      action: {
+        type: "uri" as const,
+        label: `前往處理（${summary.unresolved} 筆待確認）`,
+        uri: dashboardUrl,
+      },
+      style: "primary" as const,
+      color: "#003D2B",
+      height: "sm" as const,
+    });
+  }
+
+  const bubble: FlexBubble = {
+    type: "bubble",
+    header: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "text",
+          text: `📋 今日預約結算`,
+          weight: "bold",
+          size: "lg",
+          color: "#003D2B",
+        },
+        {
+          type: "text",
+          text: date,
+          size: "sm",
+          color: "#809A8E",
+        },
+      ],
+      backgroundColor: "#FFF8F1",
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        infoRow("總預約", `${summary.total} 筆`),
+        infoRow("已完成", `${summary.completed} 筆`),
+        infoRow("未到", `${summary.noShow} 筆`),
+        infoRow("待確認", `${summary.unresolved} 筆`),
+        {
+          type: "separator" as const,
+          margin: "lg" as const,
+        },
+        {
+          type: "box" as const,
+          layout: "horizontal" as const,
+          margin: "lg" as const,
+          contents: [
+            {
+              type: "text" as const,
+              text: "營收",
+              size: "sm" as const,
+              color: "#809A8E",
+              flex: 2,
+            },
+            {
+              type: "text" as const,
+              text: `NT$${summary.revenue.toLocaleString()}`,
+              size: "lg" as const,
+              color: "#003D2B",
+              weight: "bold" as const,
+              flex: 5,
+            },
+          ],
+        },
+      ],
+    },
+    ...(footerContents.length > 0
+      ? {
+          footer: {
+            type: "box" as const,
+            layout: "vertical" as const,
+            spacing: "sm" as const,
+            contents: footerContents,
+            backgroundColor: "#FFF8F1",
+          },
+        }
+      : {}),
+  };
+
+  return {
+    type: "flex",
+    altText: `今日預約結算：${summary.total} 筆，營收 NT$${summary.revenue.toLocaleString()}`,
+    contents: bubble,
+  };
+}
+
+/** Reschedule confirmation Flex Message */
+export function rescheduleConfirmationMessage(params: {
+  serviceName: string;
+  oldDate: string;
+  oldStartTime: string;
+  newDate: string;
+  newStartTime: string;
+  newEndTime: string;
+  shopName: string;
+  liffBaseUrl?: string;
+  bookingId?: string;
+}): FlexMessage {
+  const { serviceName, oldDate, oldStartTime, newDate, newStartTime, newEndTime, shopName, liffBaseUrl, bookingId } = params;
+
+  const calendarUrl = buildGoogleCalendarUrl(serviceName, newDate, newStartTime, newEndTime);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const footerButtons: any[] = [
+    {
+      type: "button" as const,
+      action: {
+        type: "uri" as const,
+        label: "加入 Google 行事曆",
+        uri: calendarUrl,
+      },
+      style: "primary" as const,
+      color: "#003D2B",
+      height: "sm" as const,
+    },
+  ];
+
+  if (liffBaseUrl && bookingId) {
+    footerButtons.push({
+      type: "button" as const,
+      action: {
+        type: "uri" as const,
+        label: "查看我的預約",
+        uri: `${liffBaseUrl}/my-bookings`,
+      },
+      style: "secondary" as const,
+      height: "sm" as const,
+    });
+  }
+
+  const bubble: FlexBubble = {
+    type: "bubble",
+    header: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "text",
+          text: "預約改期成功 ✓",
+          weight: "bold",
+          size: "lg",
+          color: "#003D2B",
+        },
+      ],
+      backgroundColor: "#FFF8F1",
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "text",
+          text: shopName,
+          weight: "bold",
+          size: "xl",
+        },
+        {
+          type: "separator",
+          margin: "md",
+        },
+        {
+          type: "box",
+          layout: "vertical",
+          margin: "lg",
+          spacing: "sm",
+          contents: [
+            infoRow("服務", serviceName),
+            infoRow("原時段", `${oldDate} ${oldStartTime}`),
+            infoRow("新時段", `${newDate} ${newStartTime} - ${newEndTime}`),
+          ],
+        },
+      ],
+    },
+    footer: {
+      type: "box",
+      layout: "vertical",
+      spacing: "sm",
+      contents: footerButtons,
+      backgroundColor: "#FFF8F1",
+    },
+  };
+
+  return {
+    type: "flex",
+    altText: `預約改期成功：${newDate} ${newStartTime} ${serviceName}`,
     contents: bubble,
   };
 }

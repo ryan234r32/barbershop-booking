@@ -175,6 +175,9 @@ export async function POST(request: NextRequest) {
       // 9. Send LINE confirmation (async)
       try {
         const lineClient = getLineClient();
+        const liffBaseUrl = booking.tenant.liffId
+          ? `https://liff.line.me/${booking.tenant.liffId}`
+          : undefined;
         const message = bookingConfirmationMessage({
           serviceName: service.name,
           date: input.date,
@@ -182,6 +185,9 @@ export async function POST(request: NextRequest) {
           endTime,
           shopName: booking.tenant.businessName,
           shopAddress: booking.tenant.address || undefined,
+          price: service.price,
+          bookingId: booking.id,
+          liffBaseUrl,
         });
         await lineClient.pushMessage(input.lineUserId, message);
       } catch (lineError) {

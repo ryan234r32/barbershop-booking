@@ -109,14 +109,21 @@ export async function processPendingNotifications() {
         });
         results.sent++;
 
-      // --- REMINDER (24H) ---
+      // --- REMINDER (24H or 2H) ---
       } else if (booking && booking.status === "CONFIRMED") {
+        const reminderLiffUrl = booking.tenant.liffId
+          ? `https://liff.line.me/${booking.tenant.liffId}`
+          : undefined;
+        const hoursUntil = notification.type === "REMINDER_2H" ? 2 : 24;
         const message = reminderMessage({
           serviceName: booking.service.name,
           date: booking.date.toISOString().split("T")[0],
           startTime: booking.startTime,
           shopName: booking.tenant.businessName,
-          hoursUntil: 24,
+          hoursUntil,
+          bookingId: booking.id,
+          liffBaseUrl: reminderLiffUrl,
+          shopAddress: booking.tenant.address || undefined,
         });
 
         await lineClient.pushMessage(notification.lineUserId, message);

@@ -1,5 +1,6 @@
-import { formatTime, isSameDay, isWithinBusinessHours, nowTaipei } from "@/lib/utils/time";
+import { formatTime, isWithinBusinessHours, nowTaipei } from "@/lib/utils/time";
 import { DEFAULT_BUSINESS_HOURS } from "@/lib/utils/constants";
+import { TIMEZONE } from "@/lib/utils/constants";
 
 export interface CancellationPolicy {
   canCancelOnline: boolean;
@@ -11,10 +12,11 @@ export interface CancellationPolicy {
 /**
  * Determines cancellation policy for a booking.
  *
- * Rules:
- * - Previous day or earlier: free cancellation, no violation
- * - Same day + during business hours: must call (show phone)
- * - Same day + after business hours: online OK but counts as violation
+ * Rules (updated 2026-04-13):
+ * - ≥ 24h before appointment: free online cancellation, no violation
+ * - < 24h + during business hours: must call (show phone), NOT a violation if they call
+ * - < 24h + outside business hours: cannot cancel online, show "call during business hours"
+ * - Only No-show counts as a violation (handled separately, not here)
  */
 export function getCancellationPolicy(params: {
   bookingDate: Date;
@@ -26,24 +28,31 @@ export function getCancellationPolicy(params: {
 }): CancellationPolicy {
   const {
     bookingDate,
+    bookingTime,
     currentTime = nowTaipei(),
     businessHoursStart = DEFAULT_BUSINESS_HOURS.startTime,
     businessHoursEnd = DEFAULT_BUSINESS_HOURS.endTime,
     shopPhone = "",
   } = params;
 
-  const isToday = isSameDay(bookingDate, currentTime);
+  // Calculate exact appointment datetime in Taipei timezone
+  const bookingDateStr = bookingDate.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+  const [year, month, day] = bookingDateStr.split("-").map(Number);
+  const [hour] = bookingTime.split(":").map(Number);
+  const appointmentTime = new Date(Date.UTC(year, month - 1, day, hour - 8, 0, 0));
 
-  // Previous day or earlier — free cancellation
-  if (!isToday) {
+  const hoursUntil = (appointmentTime.getTime() - currentTime.getTime()) / (1000 * 60 * 60);
+
+  // ≥ 24h before — free online cancellation
+  if (hoursUntil >= 24) {
     return {
       canCancelOnline: true,
       isViolation: false,
-      reason: "前一天取消，不收費用",
+      reason: "距離預約超過 24 小時，可免費取消",
     };
   }
 
-  // Same day — check if within business hours
+  // < 24h — check if currently within business hours
   const currentTimeStr = formatTime(currentTime);
   const duringBusinessHours = isWithinBusinessHours(
     currentTimeStr,
@@ -52,19 +61,20 @@ export function getCancellationPolicy(params: {
   );
 
   if (duringBusinessHours) {
-    // Must call — cannot cancel online
+    // Must call during business hours
     return {
       canCancelOnline: false,
-      isViolation: true,
-      reason: "當天營業時間內取消，請致電店家",
+      isViolation: false,
+      reason: "24 小時內的取消，請致電店家",
       phoneNumber: shopPhone,
     };
   }
 
-  // Same day, after business hours — online OK but violation
+  // Outside business hours — tell them to call during business hours
   return {
-    canCancelOnline: true,
-    isViolation: true,
-    reason: "當天取消將記錄為一次違規",
+    canCancelOnline: false,
+    isViolation: false,
+    reason: `24 小時內的取消，請於營業時間（${businessHoursStart}-${businessHoursEnd}）致電店家`,
+    phoneNumber: shopPhone,
   };
 }

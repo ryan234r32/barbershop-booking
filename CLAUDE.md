@@ -28,7 +28,7 @@ npm run db:migrate       # Create migration
 ## Architecture
 
 ### Route Groups
-- `src/app/(liff)/` — Customer LIFF pages (booking, my-bookings, payment), wrapped by `LiffProvider`
+- `src/app/(liff)/` — Customer LIFF pages (booking, my-bookings, payment, cancel, reschedule), wrapped by `LiffProvider`
 - `src/app/(admin)/` — Admin dashboard, wrapped by `AdminProvider` (checks auth on mount via `/api/auth/me`)
 - `src/app/login/` — Admin login, **outside** `(admin)` route group to avoid auth redirect loop
 - `src/app/api/` — All API routes
@@ -58,6 +58,15 @@ npm run db:migrate       # Create migration
 - `src/app/api/health/route.ts` — Health check (DB + Redis, no auth)
 - `src/app/api/cron/weekly-report/route.ts` — Auto-send weekly report to admin via LINE
 
+### V1.2 Post-Booking Journey (new)
+- `src/app/(liff)/cancel/[bookingId]/page.tsx` — Cancel confirmation page with 24h policy + "改期優先於取消" design
+- `src/app/(liff)/reschedule/[bookingId]/page.tsx` — Reschedule page reusing CalendarStep
+- `src/app/api/bookings/[id]/reschedule/route.ts` — Reschedule API (UPDATE, preserves booking ID + payment)
+- `src/app/api/bookings/past-due/route.ts` — Admin-only: list past-due CONFIRMED bookings
+- `src/app/api/cron/daily-settlement/route.ts` — 20:30 Taipei: push daily summary to admin LINE
+- `src/components/ui/modal.tsx` — Reusable modal (supports non-dismissible mode)
+- `src/components/admin/past-due-modal.tsx` — Forces admin to confirm 已收款/未到 for each past-due booking
+
 ### Booking Creation Flow (critical path)
 1. Validate input with Zod → 2. Fetch service → 3. Upsert user → 4. Check `user.bookingRestricted` → 5. **Acquire Redis lock** → 6. **Double-check slot availability** inside lock → 7. Create booking in DB → 8. Schedule reminders (async) → 9. Send LINE confirmation (async) → 10. **Notify admin via LINE** (async) → 11. **Release lock in finally block**
 
@@ -66,6 +75,7 @@ npm run db:migrate       # Create migration
 - `/api/cron/cleanup` — 19:00 UTC (3AM Taipei), maintenance tasks
 - `/api/cron/at-risk` — Sunday 20:00 UTC (Monday 4AM Taipei), CRM segmentation
 - `/api/cron/weekly-report` — Sunday 22:00 UTC (Monday 6AM Taipei), push weekly report to admin
+- `/api/cron/daily-settlement` — 12:30 UTC (20:30 Taipei), push daily settlement summary to admin
 
 ## Key Conventions
 - All dates use **Asia/Taipei** timezone — always use `nowTaipei()` for current time
@@ -86,7 +96,7 @@ npm run db:migrate       # Create migration
 ## Business Rules
 - Business hours: 11:00-20:00, 1-hour slots (9 slots/day)
 - Haircut = 1 slot, Perm/Color = 3-4 consecutive slots (up to 8)
-- Cancellation: previous day = free; same day + business hours = call only; same day + after hours = online but violation
+- Cancellation: ≥24h before = free online; <24h = must call (not a violation); only No-show = violation
 - 3 violations = restricted to phone booking for 1 month
 - Payment: cash or bank transfer only (no online payment)
 - CRM segments: NEW → REGULAR → VIP, or AT_RISK (60d inactive) → LAPSED (120d)

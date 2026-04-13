@@ -39,6 +39,25 @@ export async function scheduleReminders(params: {
       },
     });
   }
+
+  // Schedule 2-hour-before reminder
+  const [h] = params.startTime.split(":").map(Number);
+  const twoHoursBefore = new Date(
+    Date.UTC(year, month - 1, day, h - 2 - 8, 0, 0) // (startTime - 2h) Taipei = UTC-8
+  );
+
+  if (twoHoursBefore > now) {
+    await prisma.notification.create({
+      data: {
+        tenantId,
+        bookingId,
+        type: "REMINDER_2H",
+        scheduledAt: twoHoursBefore,
+        lineUserId,
+        status: "PENDING",
+      },
+    });
+  }
 }
 
 /**

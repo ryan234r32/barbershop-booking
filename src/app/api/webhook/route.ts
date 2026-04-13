@@ -10,6 +10,8 @@ import {
   pricingCarouselMessage,
   businessInfoMessage,
   myBookingsGuideMessage,
+  myBookingsFlexMessage,
+  myBookingsEmptyMessage,
   paymentGuideMessage,
 } from "@/lib/line/messages";
 
@@ -93,8 +95,17 @@ async function handleEvent(
       if (!event.replyToken) break;
 
       if (event.message.type === "text") {
-        const reply = await buildKeywordReply(event.message.text, tenantId);
-        await lineClient.replyMessage(event.replyToken, reply);
+        const lineUserId = event.source.userId || "";
+        const reply = await buildKeywordReply(event.message.text, tenantId, lineUserId);
+
+        if (reply.usePush && lineUserId) {
+          // Dynamic replies (DB queries) use pushMessage to avoid 1s webhook timeout
+          lineClient.pushMessage(lineUserId, reply.message).catch((err) =>
+            logger.error("Failed to push keyword reply", err, "webhook")
+          );
+        } else {
+          await lineClient.replyMessage(event.replyToken, reply.message);
+        }
       } else if (
         event.message.type === "sticker" ||
         event.message.type === "image" ||
@@ -119,8 +130,14 @@ async function handleEvent(
  * Keyword auto-reply logic.
  * Matching: substring contains, first-match-wins, priority top to bottom.
  */
-async function buildKeywordReply(text: string, tenantId: string): Promise<Message> {
+interface KeywordReplyResult {
+  message: Message;
+  usePush: boolean;
+}
+
+async function buildKeywordReply(text: string, tenantId: string, lineUserId: string): Promise<KeywordReplyResult> {
   const lowerText = text.toLowerCase();
+  const reply = (message: Message, usePush = false): KeywordReplyResult => ({ message, usePush });
 
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
@@ -139,14 +156,54 @@ async function buildKeywordReply(text: string, tenantId: string): Promise<Messag
   const liffUrl = `https://liff.line.me/${liffId}`;
   const shopName = tenant?.businessName || "理髮廳";
 
-  // Priority 1: My bookings / query keywords (must check before "預約" to avoid false match)
+  // Priority 1: My bookings — dynamic query, uses pushMessage
   if (matchKeywords(lowerText, ["我的預約", "查詢", "紀錄", "記錄"])) {
-    return myBookingsGuideMessage(liffUrl);
+    if (!lineUserId) return reply(myBookingsGuideMessage(liffUrl));
+
+    const user = await prisma.user.findUnique({
+      where: { tenantId_lineUserId: { tenantId, lineUserId } },
+      select: { id: true },
+    });
+
+    if (!user) return reply(myBookingsEmptyMessage(liffUrl), true);
+
+    const bookings = await prisma.booking.findMany({
+      where: {
+        userId: user.id,
+        status: "CONFIRMED",
+        date: { gte: new Date() },
+      },
+      include: {
+        service: { select: { name: true, price: true } },
+        payment: { select: { status: true } },
+      },
+      orderBy: [{ date: "asc" }, { startTime: "asc" }],
+      take: 10,
+    });
+
+    if (bookings.length === 0) return reply(myBookingsEmptyMessage(liffUrl), true);
+
+    return reply(
+      myBookingsFlexMessage({
+        bookings: bookings.map((b) => ({
+          id: b.id,
+          date: b.date.toISOString().split("T")[0],
+          startTime: b.startTime,
+          endTime: b.endTime,
+          serviceName: b.service.name,
+          price: b.service.price,
+          paymentStatus: b.payment?.status || null,
+        })),
+        liffBaseUrl: liffUrl,
+        shopName,
+      }),
+      true // usePush — async, avoids webhook timeout
+    );
   }
 
   // Priority 2: Booking keywords
   if (matchKeywords(lowerText, ["預約", "我要預約", "訂位", "book"])) {
-    return bookingGuideMessage(liffUrl);
+    return reply(bookingGuideMessage(liffUrl));
   }
 
   // Priority 3: Pricing keywords
@@ -156,17 +213,17 @@ async function buildKeywordReply(text: string, tenantId: string): Promise<Messag
       orderBy: { sortOrder: "asc" },
       select: { id: true, name: true, price: true, duration: true, description: true, imageUrl: true },
     });
-    return pricingCarouselMessage(services, liffUrl);
+    return reply(pricingCarouselMessage(services, liffUrl));
   }
 
   // Priority 4: Payment / transfer keywords
   if (matchKeywords(lowerText, ["付款", "轉帳", "匯款"])) {
-    return paymentGuideMessage({
+    return reply(paymentGuideMessage({
       bankName: tenant?.bankInfo || "請洽店家",
       bankAccountName: tenant?.bankAccountName || "請洽店家",
       bankAccountNumber: tenant?.bankAccountNumber || "請洽店家",
       liffBaseUrl: liffUrl,
-    });
+    }));
   }
 
   // Priority 5: Business hours / location keywords
@@ -174,13 +231,13 @@ async function buildKeywordReply(text: string, tenantId: string): Promise<Messag
     const googleMapsUrl = tenant?.address
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tenant.address)}`
       : undefined;
-    return businessInfoMessage({
+    return reply(businessInfoMessage({
       shopName,
       address: tenant?.address || "請洽店家",
       phone: tenant?.phone || "請洽店家",
       hours: "週二至週日 11:00-20:00（週一公休）",
       googleMapsUrl,
-    });
+    }));
   }
 
   // Priority 6: Phone / contact keywords
@@ -189,41 +246,74 @@ async function buildKeywordReply(text: string, tenantId: string): Promise<Messag
     const googleMapsUrl = tenant?.address
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tenant.address)}`
       : undefined;
-    return businessInfoMessage({
+    return reply(businessInfoMessage({
       shopName,
       address: tenant?.address || "請洽店家",
       phone,
       hours: "週二至週日 11:00-20:00（週一公休）",
       googleMapsUrl,
-    });
+    }));
   }
 
-  // Priority 7: Cancellation / booking management keywords
-  if (matchKeywords(lowerText, ["取消", "改時間", "更改", "cancel"])) {
-    return myBookingsGuideMessage(liffUrl);
+  // Priority 7: Cancellation / booking management keywords — same as "我的預約", dynamic
+  if (matchKeywords(lowerText, ["取消", "改時間", "更改", "cancel", "改期"])) {
+    if (!lineUserId) return reply(myBookingsGuideMessage(liffUrl));
+
+    const user = await prisma.user.findUnique({
+      where: { tenantId_lineUserId: { tenantId, lineUserId } },
+      select: { id: true },
+    });
+
+    if (!user) return reply(myBookingsEmptyMessage(liffUrl), true);
+
+    const bookings = await prisma.booking.findMany({
+      where: { userId: user.id, status: "CONFIRMED", date: { gte: new Date() } },
+      include: { service: { select: { name: true, price: true } }, payment: { select: { status: true } } },
+      orderBy: [{ date: "asc" }, { startTime: "asc" }],
+      take: 10,
+    });
+
+    if (bookings.length === 0) return reply(myBookingsEmptyMessage(liffUrl), true);
+
+    return reply(
+      myBookingsFlexMessage({
+        bookings: bookings.map((b) => ({
+          id: b.id,
+          date: b.date.toISOString().split("T")[0],
+          startTime: b.startTime,
+          endTime: b.endTime,
+          serviceName: b.service.name,
+          price: b.service.price,
+          paymentStatus: b.payment?.status || null,
+        })),
+        liffBaseUrl: liffUrl,
+        shopName,
+      }),
+      true
+    );
   }
 
   // Priority 8: Thank you keywords
   if (matchKeywords(lowerText, ["謝謝", "感謝", "thanks", "thank you"])) {
-    return {
+    return reply({
       type: "text",
       text: `不客氣！有任何需要隨時告訴我們 😊\n${shopName} 隨時為您服務！`,
-    };
+    });
   }
 
   // Priority 9: Greeting keywords
   if (matchKeywords(lowerText, ["你好", "哈囉", "hi", "hello", "嗨"])) {
-    return {
+    return reply({
       type: "text",
       text: `${shopName} 您好！👋\n\n很高興為您服務，請點擊下方按鈕快速操作：`,
-    };
+    });
   }
 
   // Fallback: no match
-  return {
+  return reply({
     type: "text",
     text: `感謝您的訊息！您可以試試以下操作：\n\n📅 輸入「預約」開始預約\n💰 輸入「服務」查看價目表\n🕐 輸入「營業時間」查看店家資訊`,
-  };
+  });
 }
 
 function matchKeywords(text: string, keywords: string[]): boolean {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
+import { PastDueModal } from "@/components/admin/past-due-modal";
 
 interface Booking {
   id: string;
@@ -46,21 +47,29 @@ export default function DashboardPage() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [exportingCSV, setExportingCSV] = useState(false);
+  const [pastDueBookings, setPastDueBookings] = useState<Booking[]>([]);
+  const [showPastDueModal, setShowPastDueModal] = useState(false);
 
-  useEffect(() => {
+  const loadData = () => {
     const today = new Date().toISOString().split("T")[0];
 
     Promise.all([
       fetch(`/api/bookings?date=${today}`).then((r) => r.json()),
       fetch("/api/admin/analytics?period=week").then((r) => r.json()),
+      fetch("/api/bookings/past-due").then((r) => r.json()),
     ])
-      .then(([bookingsData, analyticsData]) => {
+      .then(([bookingsData, analyticsData, pastDueData]) => {
         setTodayBookings(bookingsData.bookings || []);
         setAnalytics(analyticsData);
+        const pastDue = pastDueData.bookings || [];
+        setPastDueBookings(pastDue);
+        if (pastDue.length > 0) setShowPastDueModal(true);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadData(); }, []);
 
   const handleAction = async (bookingId: string, action: string) => {
     const res = await fetch(`/api/bookings/${bookingId}`, {
@@ -116,6 +125,18 @@ export default function DashboardPage() {
 
   return (
     <div>
+      {/* Past-due booking confirmation modal */}
+      {showPastDueModal && pastDueBookings.length > 0 && (
+        <PastDueModal
+          bookings={pastDueBookings}
+          onProcessed={() => {
+            setShowPastDueModal(false);
+            setPastDueBookings([]);
+            loadData(); // Refresh dashboard data
+          }}
+        />
+      )}
+
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-foreground">儀表板</h1>
         <button

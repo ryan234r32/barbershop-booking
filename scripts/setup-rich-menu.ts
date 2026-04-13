@@ -65,12 +65,12 @@ const richMenuBody = {
       },
     },
     {
-      // Top-Right — 我的預約
+      // Top-Right — 我的預約 (message action → triggers dynamic Flex Message via webhook)
       bounds: { x: 1250, y: 0, width: 1250, height: 843 },
       action: {
-        type: "uri" as const,
+        type: "message" as const,
         label: "我的預約",
-        uri: `${LIFF_BASE}/my-bookings`,
+        text: "我的預約",
       },
     },
     {
@@ -406,7 +406,7 @@ async function main() {
   console.log(`Rich Menu ID: ${richMenuId}`);
   console.log("Layout: 2500x1686 (2x2 grid)");
   console.log(`  [立即預約]  → ${LIFF_BASE}/booking`);
-  console.log(`  [我的預約]  → ${LIFF_BASE}/my-bookings`);
+  console.log(`  [我的預約]  → sends "我的預約" keyword (dynamic Flex Message)`);
   console.log(`  [服務項目]  → sends "服務價目" keyword`);
   console.log(`  [門市資訊]  → ${STORE_MAP_URL}`);
   console.log("");

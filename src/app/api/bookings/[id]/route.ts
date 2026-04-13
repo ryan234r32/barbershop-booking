@@ -123,12 +123,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       // Send LINE cancellation message
       try {
         const lineClient = getLineClient();
+        const cancelLiffUrl = booking.tenant.businessName
+          ? `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}`
+          : undefined;
         const msg = cancellationMessage({
           serviceName: booking.service.name,
           date: booking.date.toISOString().split("T")[0],
           startTime: booking.startTime,
           isViolation: policy.isViolation,
           violationCount: booking.user.violationCount + (policy.isViolation ? 1 : 0),
+          liffBaseUrl: cancelLiffUrl,
         });
         await lineClient.pushMessage(booking.user.lineUserId, msg);
       } catch (lineError) {

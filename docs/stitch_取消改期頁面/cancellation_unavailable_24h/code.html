@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Noto+Sans+TC:wght@300;400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#003d2b",
+                        "on-surface-variant": "#404944",
+                        "inverse-surface": "#343023",
+                        "error": "#ba1a1a",
+                        "secondary-container": "#b6edc2",
+                        "primary": "#002519",
+                        "primary-fixed-dim": "#9cd2b9",
+                        "on-error": "#ffffff",
+                        "surface-bright": "#fff8ef",
+                        "secondary-fixed": "#b9efc5",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#6b3833",
+                        "on-primary-fixed-variant": "#1a503c",
+                        "tertiary-fixed-dim": "#fdb4ad",
+                        "surface-container-highest": "#eae2cf",
+                        "primary-fixed": "#b7efd4",
+                        "surface-container-low": "#fcf3df",
+                        "tertiary-fixed": "#ffdad6",
+                        "surface": "#fff8ef",
+                        "on-tertiary-fixed": "#360e0c",
+                        "surface-variant": "#eae2cf",
+                        "on-secondary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "inverse-primary": "#9cd2b9",
+                        "background": "#fff8ef",
+                        "surface-container": "#f6edda",
+                        "on-secondary-container": "#3b6d4b",
+                        "tertiary-container": "#562723",
+                        "outline-variant": "#c0c9c2",
+                        "secondary-fixed-dim": "#9dd3aa",
+                        "on-secondary-fixed": "#00210e",
+                        "tertiary": "#3b1210",
+                        "on-surface": "#1f1b10",
+                        "surface-tint": "#346853",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed-variant": "#1e5031",
+                        "on-primary-container": "#73a891",
+                        "on-primary-fixed": "#002115",
+                        "outline": "#707974",
+                        "on-tertiary-container": "#d08d86",
+                        "on-background": "#1f1b10",
+                        "secondary": "#376847",
+                        "surface-dim": "#e2d9c6",
+                        "on-primary": "#ffffff",
+                        "inverse-on-surface": "#f9f0dc",
+                        "surface-container-high": "#f0e7d4",
+                        "surface-container-lowest": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope", "Noto Sans TC"],
+                        "body": ["Manrope", "Noto Sans TC"],
+                        "label": ["Manrope", "Noto Sans TC"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Manrope', 'Noto Sans TC', sans-serif; background-color: #fff8ef; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-header { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+        body { min-height: 100dvh; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-background">
+<header class="fixed top-0 w-full h-[56px] z-50 bg-white/80 backdrop-blur-xl flex items-center justify-between px-6 border-b border-outline-variant/10">
+<div class="flex items-center gap-1 cursor-pointer text-[#003D2B] active:scale-95 transition-all">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'wght' 600;">arrow_back_ios</span>
+<span class="font-medium text-lg tracking-tight">返回</span>
+</div>
+<div class="cursor-pointer text-[#003D2B] active:scale-95 transition-all">
+<span class="material-symbols-outlined text-2xl">close</span>
+</div>
+</header>
+<main class="pt-[72px] pb-12 px-5 max-w-md mx-auto space-y-4">
+<div class="hidden">
+<img alt="Hero" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBLMRjsReHCO74FF0ObDCep6ubNeNQztW-Yh0FCwE7S6A2rhVPTN2eRmFF_VQP2Tv1ghKUjlVDvKjlhOyZNdjWd70ye3EGlAW-67qARIaIepjZaMMTxuDtw14xi3OY4PIFsOOUbuZrN2YPNuU9zk2mFYu7cvI-BE7zWw_I1uPN8kAvPDZQtNtr1eq8Bc2nyuqCWmxwxDqbWq6p7X9HHkiN-tkpHIQLavnKbII7wvP_SP1YZ0I5TiAUkMls4WzXT60Zyhz__ckj1lwY"/>
+</div>
+<div class="bg-[#F3ECE4] rounded-xl overflow-hidden shadow-sm border border-primary/5">
+<div class="p-5 pb-4">
+<div class="flex justify-between items-start mb-3">
+<h1 class="text-2xl font-bold text-[#003D2B] tracking-tight leading-tight">男性剪髮</h1>
+<span class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold opacity-60">預約內容</span>
+</div>
+<div class="space-y-3">
+<div class="flex items-center gap-2 text-[#2D3A30]">
+<span class="material-symbols-outlined text-base">calendar_today</span>
+<p class="font-medium">4/15 (二) · 14:00 — 15:00</p>
+</div>
+<div class="flex justify-between items-baseline">
+<span class="text-xs text-on-surface-variant">應付金額</span>
+<span class="text-xl font-bold text-[#003D2B]">NT$1,000</span>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-low p-5 border-t border-primary/10">
+<div class="mb-4">
+<h2 class="text-[#003D2B] font-semibold text-base">改到其他時間？</h2>
+<p class="text-on-secondary-container/70 text-xs">不用取消，直接選新時段就好</p>
+</div>
+<button class="w-full h-[48px] bg-primary-container text-[#FFF8F1] rounded-sm font-bold tracking-wide active:scale-[0.98] transition-transform flex items-center justify-center gap-2">
+                    選擇新時段
+                    <span class="material-symbols-outlined text-sm">event_repeat</span>
+</button>
+</div>
+</div>
+<div class="pt-2 space-y-4">
+<div class="relative flex items-center">
+<div class="flex-grow border-t border-outline-variant/30"></div>
+<span class="flex-shrink mx-3 h-7 w-7 rounded-full border border-outline-variant/30 flex items-center justify-center text-[10px] text-on-surface-variant font-medium">或</span>
+<div class="flex-grow border-t border-outline-variant/30"></div>
+</div>
+<div class="flex flex-col items-center">
+<div class="w-full text-center py-2">
+<a class="inline-flex flex-col items-center group" href="tel:0223962306">
+<div class="bg-[#C88B3B]/10 px-3 py-1 rounded-full mb-3 inline-flex items-center gap-1.5 border border-[#C88B3B]/10">
+<span class="material-symbols-outlined text-[16px] text-[#C88B3B]">warning</span>
+<p class="text-[#C88B3B] font-medium text-xs">24 小時內的取消，請致電店家</p>
+</div>
+<span class="text-[10px] text-on-surface-variant uppercase tracking-[0.2em] font-bold mb-1 opacity-60">點擊撥打預約專線</span>
+<span class="text-3xl font-bold text-[#003D2B] flex items-center gap-2 group-active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">call</span>
+                            02-2396-2306
+                        </span>
+<span class="text-xs text-on-surface-variant/80 mt-1.5 font-medium">營業時間 11:00 — 20:00</span>
+</a>
+</div>
+<div class="mt-6 w-full bg-[#F3ECE4] p-4 rounded-xl flex gap-3 items-center">
+<span class="material-symbols-outlined text-primary/40 text-xl shrink-0" style="font-variation-settings: 'wght' 300;">info</span>
+<p class="text-[13px] text-on-surface-variant leading-snug">
+                        24 小時內未到店且未致電取消，將記錄為一次違規
+                        <span class="font-bold text-[#003D2B] whitespace-nowrap">（目前 0/3 次）</span>
+</p>
+</div>
+</div>
+</div>
+<footer class="mt-8 text-center">
+<a class="inline-block text-on-surface-variant/70 text-sm font-medium border-b border-on-surface-variant/20 pb-0.5 active:opacity-60 transition-opacity" href="#">
+                返回我的預約
+            </a>
+</footer>
+</main>
+
+</body></html>

@@ -2,6 +2,7 @@
 
 import { AdminProvider, useAdmin } from "@/lib/admin/auth-context";
 import { AdminSidebar } from "@/components/admin/sidebar";
+import { ToastProvider } from "@/components/ui/toast";
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const { admin, loading } = useAdmin();
@@ -17,10 +18,12 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   if (!admin) return null; // Redirecting to login
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <AdminSidebar />
-      <main className="flex-1 pt-14 lg:pt-0 lg:ml-64 p-4 lg:p-6">{children}</main>
-    </div>
+    <ToastProvider>
+      <div className="flex min-h-screen bg-background">
+        <AdminSidebar />
+        <main className="flex-1 pt-14 lg:pt-0 lg:ml-64 p-4 lg:p-6">{children}</main>
+      </div>
+    </ToastProvider>
   );
 }
 

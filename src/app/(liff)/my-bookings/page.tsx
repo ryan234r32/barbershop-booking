@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useLiff } from "@/lib/liff/provider";
-import { useToast } from "@/components/ui/toast";
 import { IconClose, IconCalendar, IconClock } from "@/components/liff/icons";
 
 interface Booking {
@@ -48,10 +47,8 @@ function formatDate(dateStr: string): string {
 
 export default function MyBookingsPage() {
   const { isReady, error, userId, liff } = useLiff();
-  const { toast } = useToast();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cancelling, setCancelling] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"upcoming" | "history">("upcoming");
 
   useEffect(() => {
@@ -64,45 +61,9 @@ export default function MyBookingsPage() {
       .finally(() => setLoading(false));
   }, [isReady, userId]);
 
-  const handleCancel = async (bookingId: string) => {
-    if (!window.confirm("確定要取消這個預約嗎？")) return;
-
-    setCancelling(bookingId);
-    try {
-      const res = await fetch(`/api/bookings/${bookingId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "cancel" }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (data.phoneNumber) {
-          toast({ message: `${data.error}\n請致電：${data.phoneNumber}`, type: "error" });
-        } else {
-          toast({ message: data.error || "取消失敗", type: "error" });
-        }
-        return;
-      }
-
-      if (data.cancellation?.isViolation) {
-        toast({ message: "取消成功，但此次取消已記錄為一次違規", type: "info" });
-      } else {
-        toast({ message: "預約已取消", type: "success" });
-      }
-
-      setBookings((prev) =>
-        prev.map((b) =>
-          b.id === bookingId ? { ...b, status: "CANCELLED" } : b
-        )
-      );
-    } catch {
-      toast({ message: "網路錯誤，請稍後再試", type: "error" });
-    } finally {
-      setCancelling(null);
-    }
-  };
+  const liffBaseUrl = typeof window !== "undefined"
+    ? `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}`
+    : "";
 
   const upcoming = bookings.filter((b) => b.status === "CONFIRMED");
   const history = bookings.filter((b) =>
@@ -248,14 +209,20 @@ export default function MyBookingsPage() {
                   {/* Action buttons (upcoming only) */}
                   {isUpcoming && (
                     <div className="pl-2 space-y-3">
+                      {/* Reschedule > Cancel > Payment — "改期優先於取消" */}
                       <div className="flex space-x-3">
-                        <button
-                          onClick={() => handleCancel(booking.id)}
-                          disabled={cancelling === booking.id}
-                          className="flex-1 py-3 text-[0.75rem] font-bold tracking-[0.1em] border-[1.5px] border-[#C88B3B]/40 text-[#C88B3B] uppercase rounded disabled:opacity-50 transition-colors hover:bg-[#C88B3B]/5"
+                        <a
+                          href={`${liffBaseUrl}/reschedule/${booking.id}`}
+                          className="flex-1 py-3 text-[0.75rem] font-bold tracking-[0.1em] text-[#003D2B] underline underline-offset-2 text-center"
                         >
-                          {cancelling === booking.id ? "取消中..." : "取消"}
-                        </button>
+                          改期
+                        </a>
+                        <a
+                          href={`${liffBaseUrl}/cancel/${booking.id}`}
+                          className="flex-1 py-3 text-[0.75rem] font-bold tracking-[0.1em] text-[#C88B3B] text-center"
+                        >
+                          取消
+                        </a>
                       </div>
                       <a
                         href={`/payment/${booking.id}`}
