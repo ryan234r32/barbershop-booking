@@ -7,6 +7,9 @@ export const createBookingSchema = z.object({
   startTime: z.string().regex(/^\d{2}:00$/),
   lineUserId: z.string().min(1),
   notes: z.string().optional(),
+  realName: z.string().optional(),
+  phone: z.string().optional(),
+  birthday: z.string().optional(), // "MM-DD" format
 });
 
 export const cancelBookingSchema = z.object({

@@ -8,6 +8,7 @@ import { ServiceStep } from "@/components/liff/booking/service-step";
 import { CalendarStep } from "@/components/liff/booking/calendar-step";
 import { ConfirmStep } from "@/components/liff/booking/confirm-step";
 import { SuccessStep } from "@/components/liff/booking/success-step";
+import { UserInfoSheet } from "@/components/liff/booking/user-info-sheet";
 import { LoadingScreen } from "@/components/liff/loading-screen";
 import { IconArrowBack, IconClose } from "@/components/liff/icons";
 
@@ -29,7 +30,7 @@ interface AvailableSlot {
 type BookingStep = "service" | "calendar" | "confirm" | "success";
 
 export default function BookingPage() {
-  const { liff, isReady, error, userId } = useLiff();
+  const { liff, isReady, error, userId, displayName, realName, phone, birthday } = useLiff();
   const { toast } = useToast();
   const [step, setStep] = useState<BookingStep>("service");
   const [services, setServices] = useState<Service[]>([]);
@@ -43,6 +44,8 @@ export default function BookingPage() {
   const [bookingResult, setBookingResult] = useState<{ id: string } | null>(null);
   const [notes, setNotes] = useState("");
   const [policyAgreed, setPolicyAgreed] = useState(false);
+  const [showUserInfoSheet, setShowUserInfoSheet] = useState(false);
+  const [userInfo, setUserInfo] = useState<{ name: string; phone: string; birthday?: string } | null>(null);
 
   // Load services
   useEffect(() => {
@@ -96,8 +99,10 @@ export default function BookingPage() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (infoOverride?: { name: string; phone: string; birthday?: string }) => {
     if (!selectedService || !selectedDate || !selectedTime || !userId) return;
+
+    const info = infoOverride || userInfo;
 
     setSubmitting(true);
     try {
@@ -110,6 +115,9 @@ export default function BookingPage() {
           startTime: selectedTime,
           lineUserId: userId,
           notes: notes || undefined,
+          realName: info?.name,
+          phone: info?.phone,
+          birthday: info?.birthday,
         }),
       });
 
@@ -152,7 +160,13 @@ export default function BookingPage() {
         if (selectedDate && selectedTime) setStep("confirm");
         break;
       case "confirm":
-        handleSubmit();
+        // If user already has phone + realName, skip the info sheet
+        if (phone && realName) {
+          setUserInfo({ name: realName, phone });
+          handleSubmit({ name: realName, phone });
+        } else {
+          setShowUserInfoSheet(true);
+        }
         break;
     }
   };
@@ -309,6 +323,10 @@ export default function BookingPage() {
               onNotesChange={setNotes}
               policyAgreed={policyAgreed}
               onPolicyAgreedChange={setPolicyAgreed}
+              serviceName={selectedService.name}
+              date={selectedDate}
+              startTime={selectedTime}
+              price={selectedService.price}
             />
           )}
         </div>
@@ -334,6 +352,18 @@ export default function BookingPage() {
         </div>
       </div>
 
+      {/* User info collection sheet */}
+      <UserInfoSheet
+        isOpen={showUserInfoSheet}
+        onClose={() => setShowUserInfoSheet(false)}
+        onSubmit={(data) => {
+          setUserInfo(data);
+          setShowUserInfoSheet(false);
+          handleSubmit(data);
+        }}
+        defaultName={displayName || ""}
+        defaultPhone=""
+      />
     </div>
   );
 }

@@ -92,6 +92,26 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // 2b. Update user profile if provided
+    if (input.realName || input.phone || input.birthday) {
+      const profileUpdate: Record<string, unknown> = {};
+      if (input.realName) profileUpdate.realName = input.realName;
+      if (input.phone) profileUpdate.phone = input.phone;
+      if (input.birthday) {
+        // birthday comes as "MM-DD" from frontend
+        const [month, day] = input.birthday.split("-").map(Number);
+        if (month && day) {
+          profileUpdate.birthday = new Date(2000, month - 1, day); // year doesn't matter for birthday
+          profileUpdate.birthdayMonth = month;
+          profileUpdate.birthdayDay = day;
+        }
+      }
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: profileUpdate,
+      });
+    }
+
     // 3. Check if user is restricted
     if (user.bookingRestricted) {
       throw new BookingRestrictedError();

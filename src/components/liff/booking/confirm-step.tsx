@@ -8,11 +8,19 @@ export function ConfirmStep({
   onNotesChange,
   policyAgreed,
   onPolicyAgreedChange,
+  serviceName,
+  date,
+  startTime,
+  price,
 }: {
   notes: string;
   onNotesChange: (v: string) => void;
   policyAgreed: boolean;
   onPolicyAgreedChange: (v: boolean) => void;
+  serviceName?: string;
+  date?: string;
+  startTime?: string;
+  price?: number;
 }) {
   const [policyExpanded, setPolicyExpanded] = useState(true);
 
@@ -25,6 +33,36 @@ export function ConfirmStep({
       <h2 className="font-bold text-2xl text-[#003D2B] mt-1 mb-6">
         備註與確認
       </h2>
+
+      {/* Booking summary card */}
+      {serviceName && (
+        <div className="bg-[#E8F1EC] rounded-xl p-4 mb-6">
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-[#003D2B]/60">服務</span>
+              <span className="text-sm font-medium text-[#003D2B]">{serviceName}</span>
+            </div>
+            {date && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-[#003D2B]/60">日期</span>
+                <span className="text-sm font-medium text-[#003D2B]">{date}</span>
+              </div>
+            )}
+            {startTime && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-[#003D2B]/60">時間</span>
+                <span className="text-sm font-medium text-[#003D2B]">{startTime}</span>
+              </div>
+            )}
+            {price != null && (
+              <div className="flex justify-between items-center pt-1.5 border-t border-[#003D2B]/10">
+                <span className="text-sm text-[#003D2B]/60">預估金額</span>
+                <span className="text-sm font-bold text-[#003D2B]">NT${price.toLocaleString()}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Notes textarea */}
       <label className="text-xs font-medium text-[#003D2B]/50 mb-1 block">備註（選填）</label>
