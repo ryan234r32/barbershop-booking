@@ -24,6 +24,7 @@ export function UserInfoSheet({
 }) {
   const [name, setName] = useState(defaultName || "");
   const [phone, setPhone] = useState(defaultPhone || "");
+  const [birthdayYear, setBirthdayYear] = useState(""); // 民國年
   const [birthdayMonth, setBirthdayMonth] = useState("");
   const [birthdayDay, setBirthdayDay] = useState("");
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
@@ -62,17 +63,22 @@ export function UserInfoSheet({
       phone: phone.trim(),
     };
 
-    // Only include birthday if both month and day are selected
-    if (birthdayMonth && birthdayDay) {
-      data.birthday = `${birthdayMonth.padStart(2, "0")}-${birthdayDay.padStart(2, "0")}`;
+    // Only include birthday if all three fields are filled
+    if (birthdayYear && birthdayMonth && birthdayDay) {
+      const westernYear = parseInt(birthdayYear) + 1911;
+      data.birthday = `${westernYear}-${birthdayMonth.padStart(2, "0")}-${birthdayDay.padStart(2, "0")}`;
     }
 
     onSubmit(data);
   };
 
+  // 民國年 40~113（西元 1951~2024），涵蓋大部分客群
+  const currentRocYear = new Date().getFullYear() - 1911;
+  const years = Array.from({ length: currentRocYear - 40 + 1 }, (_, i) => currentRocYear - i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const westernYear = birthdayYear ? parseInt(birthdayYear) + 1911 : 2000;
   const daysInMonth = birthdayMonth
-    ? new Date(2000, parseInt(birthdayMonth), 0).getDate()
+    ? new Date(westernYear, parseInt(birthdayMonth), 0).getDate()
     : 31;
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
@@ -129,23 +135,35 @@ export function UserInfoSheet({
             )}
           </div>
 
-          {/* Birthday (optional) */}
+          {/* Birthday (optional) — 民國年月日 */}
           <div>
             <label className="text-[0.7rem] font-bold tracking-[0.1em] uppercase text-[#003D2B]/40 mb-1 block">
               生日（選填）
             </label>
-            <div className="flex gap-3">
+            <div className="flex gap-2">
+              <select
+                value={birthdayYear}
+                onChange={(e) => setBirthdayYear(e.target.value)}
+                className="flex-[1.2] bg-[#faf2ea] border-0 rounded-lg py-2.5 px-2 text-sm text-[#003D2B] focus:ring-1 focus:ring-[#003D2B]"
+              >
+                <option value="">民國年</option>
+                {years.map((y) => (
+                  <option key={y} value={String(y)}>
+                    {y} 年
+                  </option>
+                ))}
+              </select>
               <select
                 value={birthdayMonth}
                 onChange={(e) => {
                   setBirthdayMonth(e.target.value);
-                  // Reset day if it exceeds new month's max
+                  const yr = birthdayYear ? parseInt(birthdayYear) + 1911 : 2000;
                   const newMax = e.target.value
-                    ? new Date(2000, parseInt(e.target.value), 0).getDate()
+                    ? new Date(yr, parseInt(e.target.value), 0).getDate()
                     : 31;
                   if (parseInt(birthdayDay) > newMax) setBirthdayDay("");
                 }}
-                className="flex-1 bg-[#faf2ea] border-0 rounded-lg py-2.5 px-3 text-sm text-[#003D2B] focus:ring-1 focus:ring-[#003D2B]"
+                className="flex-1 bg-[#faf2ea] border-0 rounded-lg py-2.5 px-2 text-sm text-[#003D2B] focus:ring-1 focus:ring-[#003D2B]"
               >
                 <option value="">月</option>
                 {months.map((m) => (
@@ -157,7 +175,7 @@ export function UserInfoSheet({
               <select
                 value={birthdayDay}
                 onChange={(e) => setBirthdayDay(e.target.value)}
-                className="flex-1 bg-[#faf2ea] border-0 rounded-lg py-2.5 px-3 text-sm text-[#003D2B] focus:ring-1 focus:ring-[#003D2B]"
+                className="flex-1 bg-[#faf2ea] border-0 rounded-lg py-2.5 px-2 text-sm text-[#003D2B] focus:ring-1 focus:ring-[#003D2B]"
               >
                 <option value="">日</option>
                 {days.map((d) => (

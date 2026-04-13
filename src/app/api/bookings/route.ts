@@ -98,10 +98,10 @@ export async function POST(request: NextRequest) {
       if (input.realName) profileUpdate.realName = input.realName;
       if (input.phone) profileUpdate.phone = input.phone;
       if (input.birthday) {
-        // birthday comes as "MM-DD" from frontend
-        const [month, day] = input.birthday.split("-").map(Number);
-        if (month && day) {
-          profileUpdate.birthday = new Date(2000, month - 1, day); // year doesn't matter for birthday
+        // birthday comes as "YYYY-MM-DD" from frontend (western year)
+        const [year, month, day] = input.birthday.split("-").map(Number);
+        if (year && month && day) {
+          profileUpdate.birthday = new Date(year, month - 1, day);
           profileUpdate.birthdayMonth = month;
           profileUpdate.birthdayDay = day;
         }
