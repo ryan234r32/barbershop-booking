@@ -41,6 +41,7 @@ model Tenant {
   holidays          Holiday[]
   adminUsers        AdminUser[]
   notifications     Notification[]
+  pushSubscriptions PushSubscription[]
 
   @@map("tenants")
 }
@@ -67,7 +68,8 @@ model AdminUser {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
-  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  pushSubscriptions PushSubscription[]
 
   @@unique([tenantId, email])
   @@map("admin_users")
@@ -76,6 +78,24 @@ model AdminUser {
 enum AdminRole {
   OWNER
   STAFF
+}
+
+model PushSubscription {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  adminUserId String   @map("admin_user_id")
+  endpoint    String   @unique
+  p256dh      String
+  auth        String
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id])
+
+  @@index([tenantId, adminUserId])
+  @@map("push_subscriptions")
 }
 
 // ============================================

@@ -27,6 +27,12 @@ export const metadata: Metadata = {
   description:
     "台北中正區專業髮廊，LINE 線上即時預約剪髮、染髮、燙髮服務。",
   metadataBase: new URL("https://barbershop-booking-swart.vercel.app"),
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "1008 管理",
+  },
   openGraph: {
     title: "1008 Hair Studio — LINE 線上預約",
     description: "台北中正區專業髮廊，LINE 線上即時預約",
@@ -34,10 +40,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      {
-        url: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✂️</text></svg>",
-        type: "image/svg+xml",
-      },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/icon-192.png", sizes: "192x192" },
     ],
   },
   other: {

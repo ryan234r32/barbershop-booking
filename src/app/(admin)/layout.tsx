@@ -2,6 +2,7 @@
 
 import { AdminProvider, useAdmin } from "@/lib/admin/auth-context";
 import { AdminSidebar } from "@/components/admin/sidebar";
+import { AdminTabBar } from "@/components/admin/tab-bar";
 import { ToastProvider } from "@/components/ui/toast";
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
@@ -9,7 +10,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-[var(--color-bg)]">
         <div className="w-8 h-8 border-3 border-[var(--color-brand)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -19,9 +20,17 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
 
   return (
     <ToastProvider>
-      <div className="flex min-h-screen bg-background">
+      <div className="flex min-h-screen bg-[var(--color-bg)]">
+        {/* Desktop: sidebar */}
         <AdminSidebar />
-        <main className="flex-1 pt-14 lg:pt-0 lg:ml-64 p-4 lg:p-6">{children}</main>
+
+        {/* Content area */}
+        <main className="flex-1 pt-14 lg:pt-0 lg:ml-64 pb-16 lg:pb-0 p-4 lg:p-6">
+          {children}
+        </main>
+
+        {/* Mobile: bottom tab bar */}
+        <AdminTabBar />
       </div>
     </ToastProvider>
   );

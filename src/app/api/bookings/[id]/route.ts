@@ -141,6 +141,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
       // Notify admin of cancellation (fire-and-forget)
       notifyAdminCancellation({
+        tenantId: booking.tenantId,
         displayName: booking.user.displayName || "未知顧客",
         serviceName: booking.service.name,
         date: booking.date.toISOString().split("T")[0],
@@ -258,6 +259,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
       // Notify admin of admin-initiated cancellation (fire-and-forget)
       notifyAdminCancellation({
+        tenantId: booking.tenantId,
         displayName: booking.user.displayName || "未知顧客",
         serviceName: booking.service.name,
         date: booking.date.toISOString().split("T")[0],

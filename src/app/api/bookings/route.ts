@@ -23,8 +23,18 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "50");
 
+    const from = searchParams.get("from");
+    const to = searchParams.get("to");
+
     const where: Record<string, unknown> = { tenantId };
-    if (date) where.date = new Date(date + "T00:00:00+08:00");
+    if (from && to) {
+      where.date = {
+        gte: new Date(from + "T00:00:00+08:00"),
+        lte: new Date(to + "T23:59:59+08:00"),
+      };
+    } else if (date) {
+      where.date = new Date(date + "T00:00:00+08:00");
+    }
     if (userId) where.userId = userId;
     if (status) where.status = status;
 
@@ -42,8 +52,8 @@ export async function GET(request: NextRequest) {
       prisma.booking.findMany({
         where,
         include: {
-          service: { select: { name: true, duration: true, price: true } },
-          user: { select: { displayName: true, lineUserId: true, phone: true } },
+          service: { select: { name: true, duration: true, price: true, slotsNeeded: true } },
+          user: { select: { id: true, displayName: true, lineUserId: true, phone: true, segment: true, totalVisits: true, notes: true, lastVisitAt: true } },
           payment: { select: { status: true, method: true } },
         },
         orderBy: [{ date: "asc" }, { startTime: "asc" }],
@@ -196,6 +206,7 @@ export async function POST(request: NextRequest) {
 
       // 10. Notify admin (fire-and-forget)
       notifyAdminNewBooking({
+        tenantId: input.tenantId,
         displayName: user.displayName || "未知顧客",
         serviceName: service.name,
         date: input.date,

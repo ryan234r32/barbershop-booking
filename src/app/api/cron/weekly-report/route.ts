@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyCronSecret } from "@/lib/utils/cron-auth";
 import { createTenantLineClient } from "@/lib/line/client";
 import { weeklyReportMessage } from "@/lib/line/messages";
-import { generateWeeklyReport } from "@/app/api/admin/weekly-report/route";
+import { generateWeeklyReport } from "@/lib/reports/weekly-report";
 import { logger } from "@/lib/utils/logger";
 
 /** GET /api/cron/weekly-report — auto-send weekly report to admin via LINE
