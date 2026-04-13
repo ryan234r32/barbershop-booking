@@ -160,9 +160,8 @@ export default function BookingPage() {
         if (selectedDate && selectedTime) setStep("confirm");
         break;
       case "confirm":
-        // If user already has phone + realName, skip the info sheet
-        console.log("[Booking] confirm step — phone:", phone, "realName:", realName);
-        if (phone && realName) {
+        // If user already has all three: realName + phone + birthday, skip the info sheet
+        if (phone && realName && birthday) {
           setUserInfo({ name: realName, phone });
           handleSubmit({ name: realName, phone });
         } else {

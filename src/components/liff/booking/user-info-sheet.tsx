@@ -27,7 +27,7 @@ export function UserInfoSheet({
   const [birthdayYear, setBirthdayYear] = useState(""); // 民國年
   const [birthdayMonth, setBirthdayMonth] = useState("");
   const [birthdayDay, setBirthdayDay] = useState("");
-  const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
+  const [errors, setErrors] = useState<{ name?: string; phone?: string; birthday?: string }>({});
 
   // Sync defaults when they change (e.g. after LIFF init loads)
   useEffect(() => {
@@ -39,7 +39,7 @@ export function UserInfoSheet({
   }, [defaultPhone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const validate = (): boolean => {
-    const newErrors: { name?: string; phone?: string } = {};
+    const newErrors: { name?: string; phone?: string; birthday?: string } = {};
 
     if (!name.trim()) {
       newErrors.name = "請輸入姓名";
@@ -51,6 +51,10 @@ export function UserInfoSheet({
       newErrors.phone = "請輸入有效的手機號碼（09 開頭，共 10 碼）";
     }
 
+    if (!birthdayYear || !birthdayMonth || !birthdayDay) {
+      newErrors.birthday = "請選擇完整的出生年月日";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -58,16 +62,12 @@ export function UserInfoSheet({
   const handleSubmit = () => {
     if (!validate()) return;
 
+    const westernYear = parseInt(birthdayYear) + 1911;
     const data: UserInfoData = {
       name: name.trim(),
       phone: phone.trim(),
+      birthday: `${westernYear}-${birthdayMonth.padStart(2, "0")}-${birthdayDay.padStart(2, "0")}`,
     };
-
-    // Only include birthday if all three fields are filled
-    if (birthdayYear && birthdayMonth && birthdayDay) {
-      const westernYear = parseInt(birthdayYear) + 1911;
-      data.birthday = `${westernYear}-${birthdayMonth.padStart(2, "0")}-${birthdayDay.padStart(2, "0")}`;
-    }
 
     onSubmit(data);
   };
@@ -135,10 +135,10 @@ export function UserInfoSheet({
             )}
           </div>
 
-          {/* Birthday (optional) — 民國年月日 */}
+          {/* Birthday — 民國年月日 */}
           <div>
             <label className="text-[0.7rem] font-bold tracking-[0.1em] uppercase text-[#003D2B]/40 mb-1 block">
-              生日（選填）
+              生日 *
             </label>
             <div className="flex gap-2">
               <select
@@ -185,9 +185,13 @@ export function UserInfoSheet({
                 ))}
               </select>
             </div>
-            <p className="text-[10px] text-[#003D2B]/40 mt-1.5">
-              生日月來店有小驚喜
-            </p>
+            {errors.birthday ? (
+              <span className="text-xs text-[#A84A3B] mt-1.5 block">{errors.birthday}</span>
+            ) : (
+              <p className="text-[10px] text-[#003D2B]/40 mt-1.5">
+                生日月來店有小驚喜
+              </p>
+            )}
           </div>
         </div>
 
