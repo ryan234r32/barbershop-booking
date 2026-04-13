@@ -21,10 +21,27 @@ function isRateLimited(ip: string): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // LINE WebView landing on root "/" → redirect to /booking internally.
-  // This handles the case where LIFF opens the Endpoint URL root instead of
-  // the /booking path (e.g. during Endpoint URL cache propagation).
+  // ─── LIFF Path Routing ───
+  // When LINE opens https://liff.line.me/{ID}/my-bookings, LIFF SDK
+  // redirects to the Endpoint URL with ?liff.state=%2Fmy-bookings
+  // We need to extract that path and redirect accordingly.
   if (pathname === "/") {
+    const liffState = request.nextUrl.searchParams.get("liff.state");
+    if (liffState) {
+      const targetPath = decodeURIComponent(liffState).split("?")[0];
+      if (targetPath && targetPath !== "/") {
+        const redirectUrl = new URL(targetPath, request.url);
+        // Preserve other query params (excluding liff.state)
+        request.nextUrl.searchParams.forEach((value, key) => {
+          if (key !== "liff.state") {
+            redirectUrl.searchParams.set(key, value);
+          }
+        });
+        return NextResponse.redirect(redirectUrl);
+      }
+    }
+
+    // LINE WebView landing on root without liff.state → default to /booking
     const ua = request.headers.get("user-agent") || "";
     const isLine = /Line\//i.test(ua);
     if (isLine) {
