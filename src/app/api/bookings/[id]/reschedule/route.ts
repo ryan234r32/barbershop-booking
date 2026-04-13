@@ -132,7 +132,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       // Notify admin
       notifyAdminNewBooking({
-        tenantId: booking.tenantId,
         displayName: booking.user.displayName || "未知顧客",
         serviceName: booking.service.name,
         date: input.date,
