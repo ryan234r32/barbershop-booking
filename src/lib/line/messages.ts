@@ -754,6 +754,7 @@ export function myBookingsFlexMessage(params: {
     serviceName: string;
     price: number;
     paymentStatus: string | null;
+    isWithin24h?: boolean;
   }>;
   liffBaseUrl: string;
   shopName: string;
@@ -762,23 +763,50 @@ export function myBookingsFlexMessage(params: {
 
   const bubbles: FlexBubble[] = bookings.map((b) => {
     const isPaid = b.paymentStatus === "RECEIVED";
+    const within24h = b.isWithin24h ?? false;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buttons: any[] = [];
 
-    // "改期優先於取消" — reschedule button first (most prominent)
-    buttons.push({
-      type: "button" as const,
-      action: {
-        type: "uri" as const,
-        label: "改期",
-        uri: `${liffBaseUrl}/reschedule/${b.id}`,
-      },
-      style: "primary" as const,
-      color: "#003D2B",
-      height: "sm" as const,
-    });
+    if (within24h) {
+      // Within 24h: show "call to reschedule/cancel" message instead of action buttons
+      buttons.push({
+        type: "button" as const,
+        action: {
+          type: "uri" as const,
+          label: "改期/取消請致電店家",
+          uri: `${liffBaseUrl}/cancel/${b.id}`,
+        },
+        style: "secondary" as const,
+        height: "sm" as const,
+      });
+    } else {
+      // "改期優先於取消" — reschedule button first (most prominent)
+      buttons.push({
+        type: "button" as const,
+        action: {
+          type: "uri" as const,
+          label: "改期",
+          uri: `${liffBaseUrl}/reschedule/${b.id}`,
+        },
+        style: "primary" as const,
+        color: "#003D2B",
+        height: "sm" as const,
+      });
 
-    // Payment button (or paid badge)
+      // Cancel button — least prominent
+      buttons.push({
+        type: "button" as const,
+        action: {
+          type: "uri" as const,
+          label: "取消預約",
+          uri: `${liffBaseUrl}/cancel/${b.id}`,
+        },
+        style: "secondary" as const,
+        height: "sm" as const,
+      });
+    }
+
+    // Payment button (always show if not paid)
     if (!isPaid) {
       buttons.push({
         type: "button" as const,
@@ -791,18 +819,6 @@ export function myBookingsFlexMessage(params: {
         height: "sm" as const,
       });
     }
-
-    // Cancel button — least prominent, last
-    buttons.push({
-      type: "button" as const,
-      action: {
-        type: "uri" as const,
-        label: "取消預約",
-        uri: `${liffBaseUrl}/cancel/${b.id}`,
-      },
-      style: "secondary" as const,
-      height: "sm" as const,
-    });
 
     return {
       type: "bubble" as const,

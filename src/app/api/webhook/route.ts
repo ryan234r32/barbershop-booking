@@ -200,15 +200,25 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
 
     return reply(
       myBookingsFlexMessage({
-        bookings: upcoming.map((b) => ({
-          id: b.id,
-          date: b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE }),
-          startTime: b.startTime,
-          endTime: b.endTime,
-          serviceName: b.service.name,
-          price: b.service.price,
-          paymentStatus: b.payment?.status || null,
-        })),
+        bookings: upcoming.map((b) => {
+          // Calculate hours until appointment for 24h restriction display
+          const bDateStr = b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+          const [bY, bM, bD] = bDateStr.split("-").map(Number);
+          const [bH] = b.startTime.split(":").map(Number);
+          const appointmentTime = new Date(Date.UTC(bY, bM - 1, bD, bH - 8, 0, 0));
+          const hoursUntil = (appointmentTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+          return {
+            id: b.id,
+            date: bDateStr,
+            startTime: b.startTime,
+            endTime: b.endTime,
+            serviceName: b.service.name,
+            price: b.service.price,
+            paymentStatus: b.payment?.status || null,
+            isWithin24h: hoursUntil < 24,
+          };
+        }),
         liffBaseUrl: liffUrl,
         shopName,
       }),
@@ -274,33 +284,53 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
   if (matchKeywords(lowerText, ["取消", "改時間", "更改", "cancel", "改期"])) {
     if (!lineUserId) return reply(myBookingsGuideMessage(liffUrl));
 
-    const user = await prisma.user.findUnique({
+    const user7 = await prisma.user.findUnique({
       where: { tenantId_lineUserId: { tenantId, lineUserId } },
       select: { id: true },
     });
 
-    if (!user) return reply(myBookingsEmptyMessage(liffUrl), true);
+    if (!user7) return reply(myBookingsEmptyMessage(liffUrl), true);
 
-    const bookings = await prisma.booking.findMany({
-      where: { userId: user.id, status: "CONFIRMED", date: { gte: new Date() } },
+    const now7 = nowTaipei();
+    const todayStr7 = now7.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+    const todayDate7 = new Date(todayStr7 + "T00:00:00+08:00");
+    const currentTime7 = formatTime(now7);
+
+    const bookings7 = await prisma.booking.findMany({
+      where: { userId: user7.id, status: "CONFIRMED", date: { gte: todayDate7 } },
       include: { service: { select: { name: true, price: true } }, payment: { select: { status: true } } },
       orderBy: [{ date: "asc" }, { startTime: "asc" }],
       take: 10,
     });
 
-    if (bookings.length === 0) return reply(myBookingsEmptyMessage(liffUrl), true);
+    const upcoming7 = bookings7.filter((b) => {
+      const bDateStr = b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+      if (bDateStr === todayStr7) return b.endTime > currentTime7;
+      return true;
+    });
+
+    if (upcoming7.length === 0) return reply(myBookingsEmptyMessage(liffUrl), true);
 
     return reply(
       myBookingsFlexMessage({
-        bookings: bookings.map((b) => ({
-          id: b.id,
-          date: b.date.toISOString().split("T")[0],
-          startTime: b.startTime,
-          endTime: b.endTime,
-          serviceName: b.service.name,
-          price: b.service.price,
-          paymentStatus: b.payment?.status || null,
-        })),
+        bookings: upcoming7.map((b) => {
+          const bDateStr = b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+          const [bY, bM, bD] = bDateStr.split("-").map(Number);
+          const [bH] = b.startTime.split(":").map(Number);
+          const appointmentTime = new Date(Date.UTC(bY, bM - 1, bD, bH - 8, 0, 0));
+          const hoursUntil = (appointmentTime.getTime() - now7.getTime()) / (1000 * 60 * 60);
+
+          return {
+            id: b.id,
+            date: bDateStr,
+            startTime: b.startTime,
+            endTime: b.endTime,
+            serviceName: b.service.name,
+            price: b.service.price,
+            paymentStatus: b.payment?.status || null,
+            isWithin24h: hoursUntil < 24,
+          };
+        }),
         liffBaseUrl: liffUrl,
         shopName,
       }),
