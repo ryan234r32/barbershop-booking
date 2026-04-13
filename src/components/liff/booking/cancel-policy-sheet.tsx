@@ -1,6 +1,7 @@
 "use client";
 
 import { BottomSheet } from "@/components/liff/bottom-sheet";
+import { IconEventAvailable, IconPhone, IconWarning, IconInfo } from "@/components/liff/icons";
 
 export function CancelPolicySheet({
   isOpen,
@@ -23,12 +24,7 @@ export function CancelPolicySheet({
           <div className="rounded-2xl bg-[#E8F1EC] p-5">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 bg-[#003D2B] rounded-full flex items-center justify-center shrink-0 overflow-hidden">
-                <span
-                  className="material-symbols-outlined text-white"
-                  style={{ fontSize: 20 }}
-                >
-                  event_available
-                </span>
+                <IconEventAvailable className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
@@ -48,12 +44,7 @@ export function CancelPolicySheet({
           <div className="rounded-2xl bg-[#FBF1E6] p-5">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 bg-[#8A6A4D] rounded-full flex items-center justify-center shrink-0 overflow-hidden">
-                <span
-                  className="material-symbols-outlined text-white"
-                  style={{ fontSize: 20 }}
-                >
-                  call
-                </span>
+                <IconPhone className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
@@ -73,12 +64,7 @@ export function CancelPolicySheet({
           <div className="rounded-2xl bg-[#FDEEEF] p-5">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 bg-[#A84A3B] rounded-full flex items-center justify-center shrink-0 overflow-hidden">
-                <span
-                  className="material-symbols-outlined text-white"
-                  style={{ fontSize: 20 }}
-                >
-                  warning
-                </span>
+                <IconWarning className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
@@ -97,12 +83,7 @@ export function CancelPolicySheet({
 
         {/* Footer warning */}
         <div className="mt-8 flex items-center gap-3 p-4 bg-[#f4ede5] rounded-xl">
-          <span
-            className="material-symbols-outlined text-[#003D2B]/60 shrink-0"
-            style={{ fontSize: 20 }}
-          >
-            info
-          </span>
+          <IconInfo className="w-5 h-5 text-[#003D2B]/60 shrink-0" />
           <p className="text-xs text-[#003D2B]/70 leading-relaxed">
             累積 <span className="font-bold text-[#003D2B]">3 次</span>違規 → 系統將暫停線上預約權限 30 天
           </p>

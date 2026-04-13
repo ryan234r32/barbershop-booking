@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useLiff } from "@/lib/liff/provider";
 import { useToast } from "@/components/ui/toast";
+import { IconClose, IconCalendar, IconClock } from "@/components/liff/icons";
 
 interface Booking {
   id: string;
@@ -128,7 +129,7 @@ export default function MyBookingsPage() {
             onClick={() => liff?.closeWindow()}
             className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#F3ECE4] transition-colors"
           >
-            <span className="material-symbols-outlined text-[#003D2B]">close</span>
+            <IconClose className="w-5 h-5 text-[#003D2B]" />
           </button>
         </div>
       </header>
@@ -220,9 +221,7 @@ export default function MyBookingsPage() {
                   <div className="border-t border-[#c0c9c2]/20 py-6 flex flex-wrap gap-y-4 gap-x-10 pl-2">
                     {/* Date */}
                     <div className="flex items-start gap-3">
-                      <span className="material-symbols-outlined text-[#003D2B]/60 text-xl mt-0.5">
-                        calendar_today
-                      </span>
+                      <IconCalendar className="w-5 h-5 text-[#003D2B]/60 mt-0.5" />
                       <div>
                         <p className="text-[0.7rem] text-[#003D2B]/40 font-bold uppercase tracking-widest">
                           日期
@@ -234,9 +233,7 @@ export default function MyBookingsPage() {
                     </div>
                     {/* Time */}
                     <div className="flex items-start gap-3">
-                      <span className="material-symbols-outlined text-[#003D2B]/60 text-xl mt-0.5">
-                        schedule
-                      </span>
+                      <IconClock className="w-5 h-5 text-[#003D2B]/60 mt-0.5" />
                       <div>
                         <p className="text-[0.7rem] text-[#003D2B]/40 font-bold uppercase tracking-widest">
                           時間
@@ -273,6 +270,13 @@ export default function MyBookingsPage() {
             })}
           </div>
         )}
+
+        <div className="text-center py-8 text-sm text-[#003D2B]/50">
+          <p>需要協助？</p>
+          <a href="tel:02-2396-2306" className="text-[#003D2B] font-semibold underline underline-offset-2">
+            02-2396-2306
+          </a>
+        </div>
       </main>
     </div>
   );

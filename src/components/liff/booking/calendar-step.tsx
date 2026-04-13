@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import { IconChevronLeft, IconChevronRight } from "@/components/liff/icons";
 
 // Monday-first weekday labels
 const WEEKDAY_NAMES = ["一", "二", "三", "四", "五", "六", "日"];
@@ -147,31 +148,27 @@ export function CalendarStep({
       <span className="font-headline text-[10px] tracking-[0.15em] font-semibold text-[#003D2B]/60 uppercase">
         STEP 02
       </span>
-      <h2 className="font-headline font-bold text-[2rem] text-[#003D2B] mt-2 mb-8">
+      <h2 className="font-headline font-bold text-[2rem] text-[#003D2B] mt-2 mb-4">
         選擇日期與時段
       </h2>
 
       {/* Month navigation */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
           <button
             onClick={prevMonth}
             className="p-1 text-[#003D2B]/40 hover:text-[#003D2B] transition-colors"
           >
-            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-              chevron_left
-            </span>
+            <IconChevronLeft />
           </button>
-          <span className="font-headline font-semibold text-sm text-[#003D2B] min-w-[120px] text-center">
+          <span className="font-headline font-semibold text-sm text-[#003D2B] min-w-[100px] text-center">
             {monthLabel}
           </span>
           <button
             onClick={nextMonth}
             className="p-1 text-[#003D2B]/40 hover:text-[#003D2B] transition-colors"
           >
-            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-              chevron_right
-            </span>
+            <IconChevronRight />
           </button>
         </div>
         <button

@@ -1,5 +1,7 @@
 "use client";
 
+import { IconArrowBack, IconClose } from "@/components/liff/icons";
+
 interface BrandHeaderProps {
   title?: string;
   showBack?: boolean;
@@ -16,53 +18,32 @@ export function BrandHeader({
   rightContent,
 }: BrandHeaderProps) {
   return (
-    <header
-      className="glassmorphic fixed top-0 left-0 right-0 z-50 h-16 flex items-center px-4"
-      style={{
-        borderBottom: "1.5px solid rgba(0,61,43,0.1)",
-      }}
-    >
+    <header className="glassmorphic fixed top-0 left-0 right-0 z-50 h-14 flex items-center px-4 border-b-[1.5px] border-[#003D2B]/10">
       <div className="flex items-center justify-between w-full max-w-lg mx-auto">
-        {/* Left side */}
         <div className="flex items-center gap-2">
           {showBack && (
             <button
               onClick={onBack}
-              className="flex items-center justify-center w-10 h-10 -ml-2 rounded-full transition-colors active:bg-[#003D2B]/5"
+              className="flex items-center justify-center w-10 h-10 -ml-2 text-[#003D2B]"
               aria-label="返回"
             >
-              <span
-                className="material-symbols-outlined"
-                style={{ color: "#003D2B", fontSize: 24 }}
-              >
-                arrow_back
-              </span>
+              <IconArrowBack className="w-5 h-5" />
             </button>
           )}
-          <span
-            className="font-headline font-bold tracking-widest uppercase text-sm"
-            style={{ color: "#003D2B" }}
-          >
+          <span className="font-bold tracking-widest uppercase text-sm text-[#003D2B]">
             {title}
           </span>
         </div>
-
-        {/* Right side */}
         <div className="flex items-center">
           {rightContent
             ? rightContent
             : onClose && (
                 <button
                   onClick={onClose}
-                  className="flex items-center justify-center w-10 h-10 -mr-2 rounded-full transition-colors active:bg-[#003D2B]/5"
+                  className="flex items-center justify-center w-10 h-10 -mr-2 text-[#003D2B]"
                   aria-label="關閉"
                 >
-                  <span
-                    className="material-symbols-outlined"
-                    style={{ color: "#003D2B", fontSize: 24 }}
-                  >
-                    close
-                  </span>
+                  <IconClose className="w-5 h-5" />
                 </button>
               )}
         </div>

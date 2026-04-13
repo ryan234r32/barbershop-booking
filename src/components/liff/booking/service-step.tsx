@@ -1,5 +1,7 @@
 "use client";
 
+import { IconCheck } from "@/components/liff/icons";
+
 interface Service {
   id: string;
   name: string;
@@ -52,12 +54,7 @@ export function ServiceStep({
               {/* Selected checkmark */}
               {isSelected && (
                 <div className="absolute top-3 right-3 w-5 h-5 bg-[#003D2B] rounded-full flex items-center justify-center">
-                  <span
-                    className="material-symbols-outlined text-[#FFF8F1]"
-                    style={{ fontSize: 14, fontVariationSettings: "'wght' 700" }}
-                  >
-                    check
-                  </span>
+                  <IconCheck className="w-3.5 h-3.5 text-white" />
                 </div>
               )}
 

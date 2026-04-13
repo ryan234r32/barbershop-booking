@@ -8,8 +8,8 @@ import { ServiceStep } from "@/components/liff/booking/service-step";
 import { CalendarStep } from "@/components/liff/booking/calendar-step";
 import { ConfirmStep } from "@/components/liff/booking/confirm-step";
 import { SuccessStep } from "@/components/liff/booking/success-step";
-import { CancelPolicySheet } from "@/components/liff/booking/cancel-policy-sheet";
 import { LoadingScreen } from "@/components/liff/loading-screen";
+import { IconArrowBack, IconClose } from "@/components/liff/icons";
 
 interface Service {
   id: string;
@@ -42,7 +42,7 @@ export default function BookingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [bookingResult, setBookingResult] = useState<{ id: string } | null>(null);
   const [notes, setNotes] = useState("");
-  const [showCancelPolicy, setShowCancelPolicy] = useState(false);
+  const [policyAgreed, setPolicyAgreed] = useState(false);
 
   // Load services
   useEffect(() => {
@@ -137,7 +137,7 @@ export default function BookingPage() {
       case "calendar":
         return !!selectedDate && !!selectedTime;
       case "confirm":
-        return !submitting;
+        return policyAgreed && !submitting;
       default:
         return false;
     }
@@ -246,7 +246,7 @@ export default function BookingPage() {
               onClick={handleBack}
               className="flex items-center gap-1 text-[#003D2B] text-sm font-medium"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_back</span>
+              <IconArrowBack className="w-5 h-5" />
               返回
             </button>
           ) : (
@@ -258,11 +258,11 @@ export default function BookingPage() {
             onClick={() => liff?.closeWindow()}
             className="w-10 h-10 flex items-center justify-center text-[#003D2B] hover:opacity-70 transition-opacity"
           >
-            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+            <IconClose className="w-5 h-5" />
           </button>
         </div>
         {/* Progress indicator */}
-        <div className="px-6 pb-2">
+        <div className="px-6 pb-1.5">
           <div className="flex items-center gap-2">
             {(["service", "calendar", "confirm"] as const).map((s, i) => (
               <div key={s} className="flex-1">
@@ -305,15 +305,10 @@ export default function BookingPage() {
 
           {step === "confirm" && selectedService && (
             <ConfirmStep
-              service={selectedService}
-              date={selectedDate}
-              time={selectedTime}
               notes={notes}
               onNotesChange={setNotes}
-              onConfirm={handleSubmit}
-              onBack={handleBack}
-              submitting={submitting}
-              onShowCancelPolicy={() => setShowCancelPolicy(true)}
+              policyAgreed={policyAgreed}
+              onPolicyAgreedChange={setPolicyAgreed}
             />
           )}
         </div>
@@ -339,11 +334,6 @@ export default function BookingPage() {
         </div>
       </div>
 
-      {/* Cancel Policy Sheet */}
-      <CancelPolicySheet
-        isOpen={showCancelPolicy}
-        onClose={() => setShowCancelPolicy(false)}
-      />
     </div>
   );
 }

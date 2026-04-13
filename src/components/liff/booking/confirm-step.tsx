@@ -1,54 +1,145 @@
 "use client";
 
-interface Service {
-  name: string;
-  duration: number;
-  price: number;
-  slotsNeeded: number;
-}
+import { useState } from "react";
+import { IconEventAvailable, IconPhone, IconWarning, IconInfo } from "@/components/liff/icons";
 
 export function ConfirmStep({
   notes,
   onNotesChange,
-  onShowCancelPolicy,
+  policyAgreed,
+  onPolicyAgreedChange,
 }: {
-  service: Service;
-  date: string;
-  time: string;
   notes: string;
   onNotesChange: (v: string) => void;
-  onConfirm: () => void;
-  onBack: () => void;
-  submitting: boolean;
-  onShowCancelPolicy: () => void;
+  policyAgreed: boolean;
+  onPolicyAgreedChange: (v: boolean) => void;
 }) {
+  const [policyExpanded, setPolicyExpanded] = useState(true);
+
   return (
     <div>
       {/* Step label */}
-      <span className="font-headline text-[10px] tracking-[0.15em] font-semibold text-[#003D2B]/60 uppercase">
+      <span className="text-[10px] tracking-[0.15em] font-semibold text-[#003D2B]/60 uppercase">
         STEP 03
       </span>
-
-      {/* Title */}
-      <h2 className="font-headline font-bold text-[2rem] text-[#003D2B] mt-2 mb-8">
-        備註（選填）
+      <h2 className="font-bold text-2xl text-[#003D2B] mt-1 mb-6">
+        備註與確認
       </h2>
 
-      {/* Notes textarea — underline-only style */}
+      {/* Notes textarea */}
+      <label className="text-xs font-medium text-[#003D2B]/50 mb-1 block">備註（選填）</label>
       <textarea
         value={notes}
         onChange={(e) => onNotesChange(e.target.value)}
         placeholder="想告訴設計師什麼嗎？"
-        className="w-full bg-transparent border-t-0 border-l-0 border-r-0 border-b-[1.5px] border-[#003D2B]/20 focus:ring-0 focus:outline-none focus:border-[#003D2B] px-0 py-2 text-sm text-[#003D2B] placeholder:text-[#003D2B]/30 min-h-[40px] resize-none font-body"
+        className="w-full bg-transparent border-0 border-b-[1.5px] border-[#003D2B]/20 focus:ring-0 focus:outline-none focus:border-[#003D2B] px-0 py-2 text-sm text-[#003D2B] placeholder:text-[#003D2B]/30 min-h-[60px] resize-none"
       />
 
-      {/* Cancel policy link */}
-      <button
-        onClick={onShowCancelPolicy}
-        className="mt-8 text-xs font-bold text-[#003D2B] underline underline-offset-4 decoration-[#003D2B]/30 block"
-      >
-        查看取消政策
-      </button>
+      {/* Cancel policy — inline */}
+      <div className="mt-8">
+        <button
+          onClick={() => setPolicyExpanded(!policyExpanded)}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <h3 className="font-bold text-base text-[#003D2B]">取消政策</h3>
+          <span className={`text-[#003D2B]/40 text-sm transition-transform ${policyExpanded ? 'rotate-0' : '-rotate-90'}`}>
+            ▼
+          </span>
+        </button>
+
+        {policyExpanded && (
+          <div className="mt-4 space-y-3 animate-fadeIn">
+            {/* Block 1 — Free */}
+            <div className="rounded-xl bg-[#E8F1EC] p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-[#003D2B] rounded-full flex items-center justify-center shrink-0">
+                  <IconEventAvailable className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="font-bold text-[#003D2B] text-sm">前一天取消</span>
+                    <span className="bg-[#003D2B] text-white rounded-full text-[10px] px-2 py-0.5 font-medium">
+                      免費
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#404944] leading-relaxed">
+                    預約前一日 23:59 前取消，不收任何費用。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Block 2 — Phone */}
+            <div className="rounded-xl bg-[#FBF1E6] p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-[#8A6A4D] rounded-full flex items-center justify-center shrink-0">
+                  <IconPhone className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="font-bold text-[#5C4633] text-sm">當天營業時間內</span>
+                    <span className="bg-[#8A6A4D] text-white rounded-full text-[10px] px-2 py-0.5 font-medium">
+                      電話聯繫
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#404944] leading-relaxed">
+                    請直接撥打電話與店家聯繫。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Block 3 — Violation */}
+            <div className="rounded-xl bg-[#FDEEEF] p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-[#A84A3B] rounded-full flex items-center justify-center shrink-0">
+                  <IconWarning className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="font-bold text-[#93000A] text-sm">當天非營業時間</span>
+                    <span className="bg-[#A84A3B] text-white rounded-full text-[10px] px-2 py-0.5 font-medium">
+                      記違規一次
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#404944] leading-relaxed">
+                    線上取消將自動記錄違規一次。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Warning footer */}
+            <div className="flex items-center gap-2 px-1 pt-1">
+              <IconInfo className="w-4 h-4 text-[#003D2B]/40 shrink-0" />
+              <p className="text-[11px] text-[#003D2B]/60">
+                累積 <span className="font-bold text-[#003D2B]">3 次</span>違規 → 暫停線上預約 30 天
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Checkbox — agree to policy */}
+      <label className="mt-6 flex items-start gap-3 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={policyAgreed}
+          onChange={(e) => onPolicyAgreedChange(e.target.checked)}
+          className="mt-0.5 w-5 h-5 rounded border-[#003D2B]/30 text-[#003D2B] focus:ring-[#003D2B] focus:ring-offset-0"
+        />
+        <span className="text-sm text-[#003D2B]">
+          我已閱讀並同意取消政策
+        </span>
+      </label>
+
+      {/* Phone number */}
+      <div className="mt-8 text-center text-xs text-[#003D2B]/40">
+        需要協助？致電{" "}
+        <a href="tel:02-2396-2306" className="text-[#003D2B] font-medium underline underline-offset-2">
+          02-2396-2306
+        </a>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, use, useRef } from "react";
 import Image from "next/image";
 import { useLiff } from "@/lib/liff/provider";
 import { useToast } from "@/components/ui/toast";
+import { IconArrowBack, IconCheckCircle, IconCloudUpload } from "@/components/liff/icons";
 
 interface BookingDetail {
   id: string;
@@ -154,7 +155,7 @@ export default function PaymentPage({
             href="/my-bookings"
             className="flex items-center gap-1 text-sm text-[#003D2B]/70 font-medium hover:text-[#003D2B] transition-colors"
           >
-            <span className="material-symbols-outlined text-lg">arrow_back</span>
+            <IconArrowBack className="w-5 h-5" />
             返回我的預約
           </a>
           <h1 className="text-lg font-bold text-[#003D2B] tracking-tight">付款</h1>
@@ -197,7 +198,7 @@ export default function PaymentPage({
         {isPaid ? (
           <div className="flex flex-col items-center py-12 space-y-4">
             <div className="w-16 h-16 rounded-full bg-[#4A7C59]/10 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[#4A7C59] text-3xl">check_circle</span>
+              <IconCheckCircle className="w-8 h-8 text-[#4A7C59]" />
             </div>
             <p className="text-lg font-bold text-[#003D2B]">已確認收款</p>
             <p className="text-sm text-[#404944]/60">感謝您的付款，期待為您服務</p>
@@ -280,7 +281,7 @@ export default function PaymentPage({
                     {booking.payment?.screenshotUrl || uploaded ? (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2 text-[#4A7C59]">
-                          <span className="material-symbols-outlined text-lg">check_circle</span>
+                          <IconCheckCircle className="w-5 h-5" />
                           <span className="text-xs font-bold tracking-widest">已上傳</span>
                         </div>
                         {(previewUrl || booking.payment?.screenshotUrl) && (
@@ -309,9 +310,7 @@ export default function PaymentPage({
                           </>
                         ) : (
                           <>
-                            <span className="material-symbols-outlined text-[30px] text-[#003D2B]/40">
-                              cloud_upload
-                            </span>
+                            <IconCloudUpload className="w-7 h-7 text-[#003D2B]/40" />
                             <span className="text-xs font-bold tracking-widest text-[#003D2B]/60">
                               上傳轉帳截圖
                             </span>
