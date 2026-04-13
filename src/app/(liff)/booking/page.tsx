@@ -161,6 +161,7 @@ export default function BookingPage() {
         break;
       case "confirm":
         // If user already has phone + realName, skip the info sheet
+        console.log("[Booking] confirm step — phone:", phone, "realName:", realName);
         if (phone && realName) {
           setUserInfo({ name: realName, phone });
           handleSubmit({ name: realName, phone });
