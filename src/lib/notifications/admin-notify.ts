@@ -2,11 +2,11 @@ import { getLineClient } from "@/lib/line/client";
 import { adminNewBookingMessage, adminCancellationMessage } from "@/lib/line/messages";
 
 /**
- * Send a LINE push notification to the admin when a new booking is created.
+ * Send LINE push notification to admin when a new booking is created.
  * Fire-and-forget — should never block booking creation.
- * Silently skips if ADMIN_LINE_USER_ID is not configured.
  */
 export async function notifyAdminNewBooking(params: {
+  tenantId?: string;
   displayName: string;
   serviceName: string;
   date: string;
@@ -23,11 +23,11 @@ export async function notifyAdminNewBooking(params: {
 }
 
 /**
- * Send a LINE push notification to the admin when a booking is cancelled.
+ * Send LINE push notification to admin when a booking is cancelled.
  * Fire-and-forget — should never block cancellation flow.
- * Silently skips if ADMIN_LINE_USER_ID is not configured.
  */
 export async function notifyAdminCancellation(params: {
+  tenantId?: string;
   displayName: string;
   serviceName: string;
   date: string;
