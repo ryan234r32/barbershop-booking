@@ -125,7 +125,7 @@ export function bookingConfirmationMessage(params: {
         },
         {
           type: "text",
-          text: "前一天可免費取消或改期",
+          text: "24 小時前可免費取消，4 小時前可改期",
           size: "xs",
           color: "#809A8E",
           margin: "xl",
