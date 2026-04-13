@@ -754,7 +754,7 @@ export function myBookingsFlexMessage(params: {
     serviceName: string;
     price: number;
     paymentStatus: string | null;
-    isWithin24h?: boolean;
+    hoursUntilAppointment?: number;
   }>;
   liffBaseUrl: string;
   shopName: string;
@@ -763,24 +763,14 @@ export function myBookingsFlexMessage(params: {
 
   const bubbles: FlexBubble[] = bookings.map((b) => {
     const isPaid = b.paymentStatus === "RECEIVED";
-    const within24h = b.isWithin24h ?? false;
+    const hours = b.hoursUntilAppointment ?? 999;
+    const canReschedule = hours >= 4;   // 4h for reschedule
+    const canCancel = hours >= 24;       // 24h for cancel
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buttons: any[] = [];
 
-    if (within24h) {
-      // Within 24h: show "call to reschedule/cancel" message instead of action buttons
-      buttons.push({
-        type: "button" as const,
-        action: {
-          type: "uri" as const,
-          label: "改期/取消請致電店家",
-          uri: `${liffBaseUrl}/cancel/${b.id}`,
-        },
-        style: "secondary" as const,
-        height: "sm" as const,
-      });
-    } else {
-      // "改期優先於取消" — reschedule button first (most prominent)
+    // Reschedule button
+    if (canReschedule) {
       buttons.push({
         type: "button" as const,
         action: {
@@ -792,13 +782,41 @@ export function myBookingsFlexMessage(params: {
         color: "#003D2B",
         height: "sm" as const,
       });
+    }
 
-      // Cancel button — least prominent
+    // Cancel button
+    if (canCancel) {
       buttons.push({
         type: "button" as const,
         action: {
           type: "uri" as const,
           label: "取消預約",
+          uri: `${liffBaseUrl}/cancel/${b.id}`,
+        },
+        style: "secondary" as const,
+        height: "sm" as const,
+      });
+    }
+
+    // If neither reschedule nor cancel available, show phone prompt
+    if (!canReschedule && !canCancel) {
+      buttons.push({
+        type: "button" as const,
+        action: {
+          type: "uri" as const,
+          label: "改期/取消請致電店家",
+          uri: `${liffBaseUrl}/cancel/${b.id}`,
+        },
+        style: "secondary" as const,
+        height: "sm" as const,
+      });
+    } else if (canReschedule && !canCancel) {
+      // Can reschedule but not cancel — show hint
+      buttons.push({
+        type: "button" as const,
+        action: {
+          type: "uri" as const,
+          label: "取消請致電店家",
           uri: `${liffBaseUrl}/cancel/${b.id}`,
         },
         style: "secondary" as const,

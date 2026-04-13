@@ -216,7 +216,7 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
             serviceName: b.service.name,
             price: b.service.price,
             paymentStatus: b.payment?.status || null,
-            isWithin24h: hoursUntil < 24,
+            hoursUntilAppointment: hoursUntil,
           };
         }),
         liffBaseUrl: liffUrl,
@@ -328,7 +328,7 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
             serviceName: b.service.name,
             price: b.service.price,
             paymentStatus: b.payment?.status || null,
-            isWithin24h: hoursUntil < 24,
+            hoursUntilAppointment: hoursUntil,
           };
         }),
         liffBaseUrl: liffUrl,

@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isSlotAvailable } from "@/lib/booking/availability";
 import { acquireBookingLock, releaseBookingLock } from "@/lib/booking/lock";
-import { getCancellationPolicy } from "@/lib/booking/cancellation";
 import { cancelBookingNotifications, scheduleReminders } from "@/lib/notifications/scheduler";
 import { getLineClient } from "@/lib/line/client";
 import { rescheduleConfirmationMessage } from "@/lib/line/messages";
@@ -38,16 +37,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return Response.json({ error: "只能改期已確認的預約" }, { status: 400 });
     }
 
-    // Check reschedule policy (same as cancel — ≥24h required)
-    const policy = getCancellationPolicy({
-      bookingDate: booking.date,
-      bookingTime: booking.startTime,
-      shopPhone: booking.tenant.phone || undefined,
-    });
+    // Check reschedule policy — 4h before appointment (more lenient than cancel's 24h)
+    const bookingDateStr = booking.date.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+    const [bY, bM, bD] = bookingDateStr.split("-").map(Number);
+    const [bH] = booking.startTime.split(":").map(Number);
+    const appointmentTime = new Date(Date.UTC(bY, bM - 1, bD, bH - 8, 0, 0));
+    const now = new Date();
+    const hoursUntil = (appointmentTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-    if (!policy.canCancelOnline) {
+    if (hoursUntil < 4) {
       return Response.json(
-        { error: "24 小時內的改期，請致電店家", phoneNumber: booking.tenant.phone },
+        { error: "4 小時內的改期，請致電店家", phoneNumber: booking.tenant.phone },
         { status: 403 }
       );
     }
@@ -132,6 +132,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       // Notify admin
       notifyAdminNewBooking({
+        tenantId: booking.tenantId,
         displayName: booking.user.displayName || "未知顧客",
         serviceName: booking.service.name,
         date: input.date,
