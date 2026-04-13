@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { getLineClient } from "@/lib/line/client";
 import { verifyLineSignature } from "@/lib/line/webhook";
 import { logger } from "@/lib/utils/logger";
+import { nowTaipei, formatTime } from "@/lib/utils/time";
+import { TIMEZONE } from "@/lib/utils/constants";
 import {
   welcomeMessage,
   bookingGuideMessage,
@@ -167,11 +169,17 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
 
     if (!user) return reply(myBookingsEmptyMessage(liffUrl), true);
 
+    // Use Taipei timezone for date comparison
+    const now = nowTaipei();
+    const todayStr = now.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+    const todayDate = new Date(todayStr + "T00:00:00+08:00");
+    const currentTime = formatTime(now);
+
     const bookings = await prisma.booking.findMany({
       where: {
         userId: user.id,
         status: "CONFIRMED",
-        date: { gte: new Date() },
+        date: { gte: todayDate },
       },
       include: {
         service: { select: { name: true, price: true } },
@@ -181,13 +189,20 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
       take: 10,
     });
 
-    if (bookings.length === 0) return reply(myBookingsEmptyMessage(liffUrl), true);
+    // Filter out today's bookings whose end time has already passed
+    const upcoming = bookings.filter((b) => {
+      const bDateStr = b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+      if (bDateStr === todayStr) return b.endTime > currentTime;
+      return true;
+    });
+
+    if (upcoming.length === 0) return reply(myBookingsEmptyMessage(liffUrl), true);
 
     return reply(
       myBookingsFlexMessage({
-        bookings: bookings.map((b) => ({
+        bookings: upcoming.map((b) => ({
           id: b.id,
-          date: b.date.toISOString().split("T")[0],
+          date: b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE }),
           startTime: b.startTime,
           endTime: b.endTime,
           serviceName: b.service.name,
@@ -197,7 +212,7 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
         liffBaseUrl: liffUrl,
         shopName,
       }),
-      true // usePush — async, avoids webhook timeout
+      true
     );
   }
 
