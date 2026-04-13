@@ -4,9 +4,8 @@ import { processPendingNotifications } from "@/lib/notifications/sender";
 import { scheduleBirthdayNotifications } from "@/lib/notifications/scheduler";
 import { verifyCronSecret } from "@/lib/utils/cron-auth";
 import { logger } from "@/lib/utils/logger";
-import { TIMEZONE } from "@/lib/utils/constants";
 
-/** GET /api/cron/reminders — Vercel Cron Job (hourly) to schedule birthdays + send pending notifications */
+/** GET /api/cron/reminders — Vercel Cron Job (daily 9AM Taipei) to schedule birthdays + send pending notifications */
 export async function GET(request: NextRequest) {
   if (!verifyCronSecret(request)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -15,32 +14,22 @@ export async function GET(request: NextRequest) {
   try {
     let birthdayCount = 0;
 
-    // Schedule birthday greetings once per day at 9 AM Taipei time
-    const taipeiHour = parseInt(
-      new Date().toLocaleString("en-US", {
-        timeZone: TIMEZONE,
-        hour: "numeric",
-        hour12: false,
-      })
-    );
+    // Schedule birthday greetings (runs daily, no hour gate needed)
+    const tenants = await prisma.tenant.findMany({
+      where: { isActive: true },
+      select: { id: true },
+    });
 
-    if (taipeiHour === 9) {
-      const tenants = await prisma.tenant.findMany({
-        where: { isActive: true },
-        select: { id: true },
-      });
-
-      for (const tenant of tenants) {
-        try {
-          const count = await scheduleBirthdayNotifications(tenant.id);
-          birthdayCount += count;
-        } catch (err) {
-          logger.error(
-            `Failed to schedule birthdays for tenant ${tenant.id}`,
-            err,
-            "cron/reminders"
-          );
-        }
+    for (const tenant of tenants) {
+      try {
+        const count = await scheduleBirthdayNotifications(tenant.id);
+        birthdayCount += count;
+      } catch (err) {
+        logger.error(
+          `Failed to schedule birthdays for tenant ${tenant.id}`,
+          err,
+          "cron/reminders"
+        );
       }
     }
 
