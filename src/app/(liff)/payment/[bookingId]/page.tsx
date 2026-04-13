@@ -111,8 +111,16 @@ export default function PaymentPage({
     }
   };
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
     if (paymentMethod === "cash") {
+      // Notify backend so it can record method + send LINE push
+      try {
+        await fetch(`/api/payments/${bookingId}/confirm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ method: "CASH" }),
+        });
+      } catch { /* non-blocking */ }
       toast({ message: "已選擇現金付款，到店時直接付款即可", type: "success" });
     } else if (paymentMethod === "transfer" && !uploaded && !booking?.payment?.screenshotUrl) {
       toast({ message: "請先上傳轉帳截圖", type: "info" });

@@ -65,7 +65,13 @@ export default function MyBookingsPage() {
     ? `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}`
     : "";
 
-  const upcoming = bookings.filter((b) => b.status === "CONFIRMED");
+  // Filter out CONFIRMED bookings whose date+endTime has already passed
+  const now = new Date();
+  const upcoming = bookings.filter((b) => {
+    if (b.status !== "CONFIRMED") return false;
+    const bookingEnd = new Date(`${b.date}T${b.endTime}:00+08:00`);
+    return bookingEnd > now;
+  });
   const history = bookings.filter((b) =>
     ["COMPLETED", "CANCELLED", "NO_SHOW", "CANCELLED_BY_ADMIN"].includes(b.status)
   );

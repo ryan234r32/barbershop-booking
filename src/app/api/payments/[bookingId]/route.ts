@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { errorResponse } from "@/lib/utils/errors";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
+import { getLineClient } from "@/lib/line/client";
+import { logger } from "@/lib/utils/logger";
 
 type RouteParams = { params: Promise<{ bookingId: string }> };
 
@@ -56,6 +58,39 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         notes: body.notes,
       },
     });
+
+    // When admin confirms payment received, notify customer via LINE
+    if (body.status === "RECEIVED") {
+      try {
+        const booking = await prisma.booking.findUnique({
+          where: { id: bookingId },
+          include: {
+            user: { select: { lineUserId: true } },
+            service: { select: { name: true } },
+          },
+        });
+        if (booking?.user.lineUserId) {
+          const lineClient = getLineClient();
+          await lineClient.pushMessage(booking.user.lineUserId, {
+            type: "flex",
+            altText: "付款已確認",
+            contents: {
+              type: "bubble",
+              body: {
+                type: "box",
+                layout: "vertical",
+                contents: [
+                  { type: "text", text: "付款已確認 ✓", weight: "bold", size: "lg", color: "#4A7C59" },
+                  { type: "text", text: `${booking.service.name} 的款項已確認收到，感謝您！`, size: "sm", color: "#2D3A30", margin: "md", wrap: true },
+                ],
+              },
+            },
+          });
+        }
+      } catch (lineErr) {
+        logger.error("Failed to notify customer of payment confirmation", lineErr, "payments");
+      }
+    }
 
     return Response.json({ payment });
   } catch (error) {
