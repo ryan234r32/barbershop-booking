@@ -106,6 +106,10 @@ model User {
   lastVisitAt       DateTime?       @map("last_visit_at")
   firstVisitAt      DateTime?       @map("first_visit_at")
 
+  birthday          DateTime?       @db.Date @map("birthday")
+  birthdayMonth     Int?            @map("birthday_month")
+  birthdayDay       Int?            @map("birthday_day")
+
   notes             String?
   tags              String[]        @default([])
   createdAt         DateTime        @default(now()) @map("created_at")
@@ -118,6 +122,7 @@ model User {
   @@unique([tenantId, lineUserId])
   @@index([tenantId, segment])
   @@index([tenantId, lastVisitAt])
+  @@index([tenantId, birthdayMonth, birthdayDay])
   @@map("users")
 }
 
@@ -331,6 +336,8 @@ enum NotificationType {
   CANCELLATION_CONFIRMATION
   WELCOME
   THANK_YOU
+  FOLLOW_UP_7D
+  BIRTHDAY_GREETING
   CUSTOM
 }
 

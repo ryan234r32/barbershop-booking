@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCancellationPolicy } from "@/lib/booking/cancellation";
-import { cancelBookingNotifications, scheduleThankYou } from "@/lib/notifications/scheduler";
+import { cancelBookingNotifications, scheduleThankYou, scheduleFollowUp } from "@/lib/notifications/scheduler";
 import { getLineClient } from "@/lib/line/client";
 import { cancellationMessage } from "@/lib/line/messages";
 import { notifyAdminCancellation } from "@/lib/notifications/admin-notify";
@@ -184,6 +184,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         });
       } catch (err) {
         console.error("Failed to schedule thank-you:", err);
+      }
+
+      // Schedule 7-day follow-up for perm/color services
+      try {
+        await scheduleFollowUp({
+          tenantId: booking.tenantId,
+          bookingId: id,
+          lineUserId: booking.user.lineUserId,
+          serviceName: booking.service.name,
+        });
+      } catch (err) {
+        console.error("Failed to schedule follow-up:", err);
       }
 
       return Response.json({ booking: updated });

@@ -20,6 +20,7 @@ interface CustomerDetail {
   totalVisits: number;
   lastVisitAt: string | null;
   firstVisitAt: string | null;
+  birthday: string | null;
   notes: string | null;
   tags: string[];
   createdAt: string;
@@ -44,7 +45,7 @@ export default function CustomerDetailPage({
   const [customer, setCustomer] = useState<CustomerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ realName: "", phone: "", notes: "" });
+  const [form, setForm] = useState({ realName: "", phone: "", birthday: "", notes: "" });
 
   useEffect(() => {
     fetch(`/api/customers/${id}`)
@@ -55,6 +56,7 @@ export default function CustomerDetailPage({
           setForm({
             realName: data.customer.realName || "",
             phone: data.customer.phone || "",
+            birthday: data.customer.birthday ? data.customer.birthday.split("T")[0] : "",
             notes: data.customer.notes || "",
           });
         }
@@ -64,10 +66,14 @@ export default function CustomerDetailPage({
   }, [id]);
 
   const handleSave = async () => {
+    const payload = {
+      ...form,
+      birthday: form.birthday || null,
+    };
     const res = await fetch(`/api/customers/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify(payload),
     });
 
     if (res.ok) {
@@ -176,6 +182,15 @@ export default function CustomerDetailPage({
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 placeholder="電話"
                 className="px-3 py-2 border rounded-lg text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">生日</label>
+              <input
+                type="date"
+                value={form.birthday}
+                onChange={(e) => setForm({ ...form, birthday: e.target.value })}
+                className="px-3 py-2 border rounded-lg text-sm w-full"
               />
             </div>
             <textarea

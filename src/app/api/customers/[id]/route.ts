@@ -56,10 +56,24 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const body = await request.json();
 
     // Only allow these fields to be updated
-    const allowed = ["realName", "phone", "email", "notes", "tags", "isVip", "bookingRestricted", "violationCount"];
+    const allowed = ["realName", "phone", "email", "notes", "tags", "isVip", "bookingRestricted", "violationCount", "birthday"];
     const data: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in body) data[key] = body[key];
+    }
+
+    // Special: auto-compute birthdayMonth/Day when birthday is set
+    if ("birthday" in body) {
+      if (body.birthday) {
+        const d = new Date(body.birthday);
+        data.birthday = d;
+        data.birthdayMonth = d.getMonth() + 1;
+        data.birthdayDay = d.getDate();
+      } else {
+        data.birthday = null;
+        data.birthdayMonth = null;
+        data.birthdayDay = null;
+      }
     }
 
     // Special: if clearing restriction, also clear restrictedUntil

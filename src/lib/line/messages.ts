@@ -1104,6 +1104,218 @@ export function weeklyReportMessage(report: {
   };
 }
 
+/** 7-day follow-up message for perm/color services with care tips */
+export function followUpMessage(params: {
+  serviceType: "perm" | "color";
+  serviceName: string;
+  shopName: string;
+  liffUrl: string;
+}): FlexMessage {
+  const { serviceType, serviceName, shopName, liffUrl } = params;
+
+  const isPerm = serviceType === "perm";
+
+  const title = isPerm ? "燙髮後護理小提醒" : "染髮後護色小提醒";
+  const tips = isPerm
+    ? [
+        "洗髮後用毛巾輕壓吸水，避免搓揉",
+        "建議使用無硫酸鹽洗髮精",
+        "每週使用一次深層護髮膜",
+        "避免將頭髮綁太緊或用細橡皮筋",
+        "減少使用高溫造型工具",
+      ]
+    : [
+        "洗髮時使用溫涼水，避免過熱",
+        "建議使用護色專用洗髮精",
+        "減少高溫造型，保護髮色",
+        "定期補色可維持最佳效果",
+        "外出時可戴帽子防止紫外線褪色",
+      ];
+
+  const bubble: FlexBubble = {
+    type: "bubble",
+    header: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "text",
+          text: `💆 ${title}`,
+          weight: "bold",
+          size: "lg",
+          color: "#003D2B",
+        },
+      ],
+      backgroundColor: "#FFF8F1",
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "text",
+          text: `上次的${serviceName}還滿意嗎？以下是居家護理建議，幫助您維持最佳效果：`,
+          size: "sm",
+          wrap: true,
+          color: "#809A8E",
+        },
+        {
+          type: "separator",
+          margin: "lg",
+        },
+        {
+          type: "box",
+          layout: "vertical",
+          margin: "lg",
+          spacing: "md",
+          contents: tips.map((tip) => ({
+            type: "box" as const,
+            layout: "horizontal" as const,
+            contents: [
+              {
+                type: "text" as const,
+                text: "•",
+                size: "sm" as const,
+                color: "#003D2B",
+                flex: 1,
+              },
+              {
+                type: "text" as const,
+                text: tip,
+                size: "sm" as const,
+                color: "#2D3A30",
+                flex: 9,
+                wrap: true,
+              },
+            ],
+          })),
+        },
+        {
+          type: "text",
+          text: "有任何問題歡迎隨時詢問我們！",
+          size: "xs",
+          color: "#809A8E",
+          margin: "xl",
+          wrap: true,
+        },
+      ],
+    },
+    footer: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "button",
+          action: {
+            type: "uri",
+            label: "預約回訪",
+            uri: liffUrl,
+          },
+          style: "primary",
+          color: "#003D2B",
+        },
+      ],
+    },
+  };
+
+  return {
+    type: "flex",
+    altText: `${shopName}：${title}，為您整理居家護理建議`,
+    contents: bubble,
+  };
+}
+
+/** Birthday greeting message */
+export function birthdayMessage(params: {
+  displayName: string;
+  shopName: string;
+  liffUrl: string;
+}): FlexMessage {
+  const { displayName, shopName, liffUrl } = params;
+  const name = displayName || "您";
+
+  const bubble: FlexBubble = {
+    type: "bubble",
+    header: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "text",
+          text: "🎂 生日快樂！",
+          weight: "bold",
+          size: "xl",
+          color: "#003D2B",
+        },
+      ],
+      backgroundColor: "#FFF8F1",
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "text",
+          text: `親愛的 ${name}，`,
+          weight: "bold",
+          size: "md",
+          color: "#2D3A30",
+        },
+        {
+          type: "text",
+          text: `${shopName} 祝您生日快樂！🎉\n祝您新的一歲健康快樂、天天好心情！`,
+          size: "sm",
+          margin: "lg",
+          wrap: true,
+          color: "#809A8E",
+        },
+        {
+          type: "separator",
+          margin: "xl",
+        },
+        {
+          type: "text",
+          text: "🎁 生日月來店消費享小驚喜",
+          weight: "bold",
+          size: "sm",
+          margin: "lg",
+          color: "#003D2B",
+        },
+        {
+          type: "text",
+          text: "預約時跟我們說是壽星，有專屬小禮物喔！",
+          size: "xs",
+          margin: "sm",
+          wrap: true,
+          color: "#809A8E",
+        },
+      ],
+    },
+    footer: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "button",
+          action: {
+            type: "uri",
+            label: "立即預約",
+            uri: liffUrl,
+          },
+          style: "primary",
+          color: "#003D2B",
+        },
+      ],
+    },
+  };
+
+  return {
+    type: "flex",
+    altText: `${shopName} 祝 ${name} 生日快樂！🎂 來店消費享驚喜`,
+    contents: bubble,
+  };
+}
+
 // Helper: create an info row for Flex Message
 function infoRow(label: string, value: string) {
   return {
