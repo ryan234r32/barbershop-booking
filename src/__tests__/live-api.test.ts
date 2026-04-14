@@ -327,15 +327,15 @@ describeIf("Live API — LINE: Webhook", () => {
 });
 
 describeIf("Live API — LIFF: Session Init", () => {
-  it("rejects init without lineUserId", async () => {
+  it("rejects init without X-LIFF-ID-Token header", async () => {
     const res = await fetch(`${BASE_URL}/api/liff/init`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(401);
     const data = await res.json();
-    expect(data.error).toContain("lineUserId");
+    expect(data.code).toBe("UNAUTHORIZED");
   });
 });

@@ -128,10 +128,17 @@ export function LiffProvider({ children }: { children: ReactNode }) {
 
         if (userId) {
           try {
+            const idToken = liff.getIDToken?.() || "";
             const initRes = await fetch("/api/liff/init", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ lineUserId: userId, displayName, pictureUrl }),
+              headers: {
+                "Content-Type": "application/json",
+                ...(idToken ? { "X-LIFF-ID-Token": idToken } : {}),
+              },
+              // Body is now for optional profile hints only; server uses the verified
+              // token's sub for lineUserId. Keeping displayName/pictureUrl as fallbacks
+              // in case the token payload omits them (profile scope not granted).
+              body: JSON.stringify({ displayName, pictureUrl }),
             });
             if (initRes.ok) {
               const initData = await initRes.json();
