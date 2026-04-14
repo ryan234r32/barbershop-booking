@@ -26,6 +26,22 @@ interface Booking {
     notes: string | null;
     lastVisitAt: string | null;
   };
+  payment?: { status: string; method: string | null } | null;
+}
+
+function isPaid(b: Booking): boolean {
+  return b.payment?.status === "RECEIVED";
+}
+
+/** Returns the card background class based on completion/payment status. */
+function cardBgClass(b: Booking): string {
+  if (b.status === "COMPLETED" || isPaid(b)) {
+    return "bg-[var(--color-success)]/15"; // paid / completed — moss green
+  }
+  if (b.slotsOccupied > 1) {
+    return "bg-[var(--color-brand)]/10"; // multi-slot unpaid — subtle brand tint
+  }
+  return "bg-[var(--color-surface)]"; // single-slot unpaid — sand
 }
 
 interface MonthlySummary {
@@ -35,7 +51,7 @@ interface MonthlySummary {
 // ─── Constants ───
 const HOURS = Array.from({ length: 9 }, (_, i) => `${(11 + i).toString().padStart(2, "0")}:00`);
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
-const SLOT_HEIGHT = 72;
+const SLOT_HEIGHT = 96;
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -470,22 +486,34 @@ export default function CalendarPage() {
                     {booking ? (
                       <div
                         onClick={() => openBookingDetail(booking)}
-                        className={`rounded-lg p-3 h-full cursor-pointer transition-colors hover:opacity-90 ${
-                          booking.slotsOccupied > 1
-                            ? "bg-[var(--color-brand)]/10"
-                            : "bg-[var(--color-surface)]"
-                        }`}
+                        className={`rounded-lg p-3 h-full cursor-pointer transition-colors hover:opacity-90 flex flex-col ${cardBgClass(booking)}`}
                       >
-                        <div className="flex items-start justify-between">
-                          <div className="min-w-0">
-                            <p className="font-semibold text-[var(--color-text-primary)] text-[15px] truncate">
-                              {booking.user.displayName || "顧客"}
-                            </p>
-                            <p className="text-sm text-[var(--color-text-body)] mt-0.5">
-                              {booking.service.name}
-                            </p>
-                          </div>
+                        {/* Time range */}
+                        <p className="text-[11px] text-[var(--color-text-muted)] font-mono mb-1">
+                          {booking.startTime} - {booking.endTime}
+                        </p>
+
+                        {/* Customer name + segment */}
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-semibold text-[var(--color-text-primary)] text-[16px] leading-tight truncate flex-1">
+                            {booking.user.displayName || "顧客"}
+                          </p>
                           <SegmentBadge segment={booking.user.segment} />
+                        </div>
+
+                        {/* Service pill + paid indicator */}
+                        <div className="mt-auto flex items-center gap-2 pt-2">
+                          <span className="inline-block px-2 py-0.5 rounded bg-[var(--color-bg)]/60 text-[var(--color-text-body)] text-[11px] font-medium">
+                            {booking.service.name}
+                          </span>
+                          {isPaid(booking) && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-[var(--color-success)]">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                              已付款
+                            </span>
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -502,15 +530,24 @@ export default function CalendarPage() {
               );
             })}
 
-            {/* Red Time Indicator */}
+            {/* Red Time Indicator (current time) */}
             {timeIndicatorTop !== null && isToday(currentDate) && (
-              <div
-                className="absolute left-0 right-0 pointer-events-none z-10 flex items-center"
-                style={{ top: timeIndicatorTop }}
-              >
-                <div className="w-2.5 h-2.5 rounded-full bg-[var(--color-danger)] ml-[42px] -mr-1.5 shrink-0" />
-                <div className="flex-1 h-[2px] bg-[var(--color-danger)]" />
-              </div>
+              <>
+                {/* Time label on left */}
+                <div
+                  className="absolute left-0 pointer-events-none z-10 w-14 pr-2 text-right"
+                  style={{ top: timeIndicatorTop - 8 }}
+                >
+                  <span className="text-xs font-semibold text-[var(--color-danger)] font-mono">
+                    {String(now.getHours()).padStart(2, "0")}:{String(now.getMinutes()).padStart(2, "0")}
+                  </span>
+                </div>
+                {/* Red horizontal line */}
+                <div
+                  className="absolute left-14 right-0 h-[1.5px] bg-[var(--color-danger)] pointer-events-none z-10"
+                  style={{ top: timeIndicatorTop }}
+                />
+              </>
             )}
 
             {/* Drag Preview Overlay */}
@@ -581,21 +618,50 @@ export default function CalendarPage() {
               </thead>
               <tbody>
                 {HOURS.map((hour) => (
-                  <tr key={hour}>
+                  <tr key={hour} style={{ height: 44 }}>
                     <td className="p-0.5 text-[10px] text-[var(--color-text-muted)] font-mono align-top pt-1">
                       {hour.slice(0, 2)}
                     </td>
                     {weekDates.map((d) => {
                       const dateStr = formatDate(d);
+                      const booking = getBookingAtSlot(dateStr, hour);
                       const occupied = isSlotOccupied(dateStr, hour);
+                      const isContinuation = occupied && !booking;
+
+                      // Skip continuation slots — parent booking uses rowSpan
+                      if (isContinuation) return null;
+
+                      if (booking) {
+                        const paid = isPaid(booking);
+                        const cellBg = paid
+                          ? "bg-[var(--color-success)]/20 hover:bg-[var(--color-success)]/30"
+                          : "bg-[var(--color-brand)]/15 hover:bg-[var(--color-brand)]/25";
+                        return (
+                          <td
+                            key={dateStr + hour}
+                            rowSpan={booking.slotsOccupied > 1 ? booking.slotsOccupied : 1}
+                            className="p-0.5 align-top"
+                          >
+                            <div
+                              onClick={() => openBookingDetail(booking)}
+                              className={`w-full h-full rounded p-1 cursor-pointer transition-colors ${cellBg}`}
+                            >
+                              <p className="text-[10px] font-semibold text-[var(--color-text-primary)] truncate leading-tight">
+                                {booking.user.displayName || "顧客"}
+                              </p>
+                              <p className="text-[9px] text-[var(--color-text-muted)] truncate mt-0.5 leading-tight">
+                                {booking.service.name}
+                              </p>
+                            </div>
+                          </td>
+                        );
+                      }
+
                       return (
                         <td key={dateStr + hour} className="p-0.5">
                           <div
-                            className={`w-full h-8 rounded transition-colors cursor-pointer ${
-                              occupied
-                                ? "bg-[var(--color-brand)]/25 hover:bg-[var(--color-brand)]/35"
-                                : "bg-[var(--color-bg)] hover:bg-[var(--color-surface)]"
-                            }`}
+                            className="w-full h-full rounded transition-colors cursor-pointer bg-[var(--color-bg)] hover:bg-[var(--color-surface)]"
+                            style={{ minHeight: 40 }}
                             onClick={() => { setCurrentDate(d); setView("day"); }}
                           />
                         </td>
