@@ -23,6 +23,12 @@ export class BookingRestrictedError extends AppError {
   }
 }
 
+export class UnauthorizedError extends AppError {
+  constructor(message: string = "請先登入") {
+    super(message, 401, "UNAUTHORIZED");
+  }
+}
+
 export class CancellationNotAllowedError extends AppError {
   public phoneNumber?: string;
 

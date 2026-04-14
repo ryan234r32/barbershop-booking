@@ -55,17 +55,21 @@ export default function NewBookingPage() {
 
     setSubmitting(true);
     try {
-      // For admin bookings, we create a placeholder LINE user ID
-      const lineUserId = `admin-${Date.now()}`;
-
+      // Auth via admin cookie or Bearer (iOS PWA fallback). Server synthesizes lineUserId.
+      const bearer = typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
       const res = await fetch("/api/bookings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+        },
         body: JSON.stringify({
           serviceId: selectedService,
           date,
           startTime: selectedTime,
-          lineUserId,
+          displayName: customerName || undefined,
+          phone: customerPhone || undefined,
+          source,
           notes: `[${source === "PHONE" ? "電話" : "現場"}] ${customerName} ${customerPhone}\n${notes}`.trim(),
         }),
       });

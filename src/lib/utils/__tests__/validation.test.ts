@@ -76,7 +76,9 @@ describe("createBookingSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects empty lineUserId", () => {
+  it.skip("rejects empty lineUserId", () => {
+    // Deprecated: lineUserId is now derived from auth context (LIFF cookie /
+    // admin session), not the request body. The schema marks it optional.
     const result = createBookingSchema.safeParse({
       ...validBooking,
       lineUserId: "",

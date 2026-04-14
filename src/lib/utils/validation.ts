@@ -5,7 +5,10 @@ export const createBookingSchema = z.object({
   serviceId: z.string().uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   startTime: z.string().regex(/^\d{2}:00$/),
-  lineUserId: z.string().min(1),
+  // lineUserId is no longer accepted from the body — it is derived from the
+  // authenticated caller (admin cookie or LIFF ID token). See booking-auth.ts.
+  // Kept optional here for backwards compatibility with old clients; ignored.
+  lineUserId: z.string().optional(),
   notes: z.string().optional(),
   realName: z.string().optional(),
   displayName: z.string().optional(),

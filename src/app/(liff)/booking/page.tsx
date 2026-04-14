@@ -106,14 +106,19 @@ export default function BookingPage() {
 
     setSubmitting(true);
     try {
+      // Get LIFF ID token so the server can verify the caller's identity.
+      // If missing (unlikely in the LINE app), the server will reject with 401.
+      const idToken = liff?.getIDToken?.() || "";
       const res = await fetch("/api/bookings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { "X-LIFF-ID-Token": idToken } : {}),
+        },
         body: JSON.stringify({
           serviceId: selectedService.id,
           date: selectedDate,
           startTime: selectedTime,
-          lineUserId: userId,
           notes: notes || undefined,
           realName: info?.name,
           phone: info?.phone,

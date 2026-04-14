@@ -82,11 +82,16 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
     }
     setLoading(true);
     try {
+      // Auth comes from the admin_token cookie (or Bearer header on iOS PWA).
+      // The server generates a synthetic lineUserId internally — we never send one.
+      const bearer = typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
       const res = await fetch("/api/bookings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+        },
         body: JSON.stringify({
-          lineUserId: `admin-${Date.now()}`,
           displayName: customerName.trim(),
           phone: phone.trim() || undefined,
           serviceId,

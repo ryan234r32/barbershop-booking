@@ -8,6 +8,8 @@ import { bookingConfirmationMessage } from "@/lib/line/messages";
 import { notifyAdminNewBooking } from "@/lib/notifications/admin-notify";
 import { createBookingSchema } from "@/lib/utils/validation";
 import { errorResponse, AppError, SlotUnavailableError, BookingRestrictedError } from "@/lib/utils/errors";
+import { requireBookingAuth } from "@/lib/auth/booking-auth";
+import { randomUUID } from "node:crypto";
 import { addHours, parseTimeToHour, nowTaipei } from "@/lib/utils/time";
 import { DEFAULT_BUSINESS_HOURS } from "@/lib/utils/constants";
 import { logger } from "@/lib/utils/logger";
@@ -73,9 +75,22 @@ export async function GET(request: NextRequest) {
 /** POST /api/bookings — create a new booking */
 export async function POST(request: NextRequest) {
   try {
+    // 0. Verify caller identity BEFORE anything else.
+    //    Admin path → cookie/Bearer JWT. LIFF path → X-LIFF-ID-Token header verified by LINE.
+    //    No auth → 401. lineUserId in body is IGNORED (previously allowed impersonation).
+    const auth = await requireBookingAuth(request);
+
     const body = await request.json();
     const input = createBookingSchema.parse(body);
-    const tenantId = input.tenantId || process.env.DEFAULT_TENANT_ID!;
+
+    // Derive identity from auth, NOT from body.
+    // Admin-created bookings synthesize a per-booking lineUserId since walk-in/phone
+    // customers may have no LINE account. LIFF path uses the verified token subject.
+    const authedLineUserId =
+      auth.type === "admin"
+        ? `manual-${auth.adminId}-${randomUUID()}`
+        : auth.lineUserId;
+    const tenantId = auth.tenantId;
 
     // 1. Get service details
     const service = await prisma.service.findUnique({
@@ -108,7 +123,7 @@ export async function POST(request: NextRequest) {
       where: {
         tenantId_lineUserId: {
           tenantId,
-          lineUserId: input.lineUserId,
+          lineUserId: authedLineUserId,
         },
       },
     });
@@ -116,7 +131,7 @@ export async function POST(request: NextRequest) {
       user = await prisma.user.create({
         data: {
           tenantId,
-          lineUserId: input.lineUserId,
+          lineUserId: authedLineUserId,
         },
       });
     }
@@ -184,7 +199,9 @@ export async function POST(request: NextRequest) {
           startTime: input.startTime,
           endTime,
           slotsOccupied: service.slotsNeeded,
-          source: input.source || "LIFF",
+          // LIFF calls are always "LIFF" regardless of what client sends; admin may
+          // choose PHONE or WALK_IN (default WALK_IN if omitted).
+          source: auth.type === "liff" ? "LIFF" : (input.source || "WALK_IN"),
           notes: input.notes,
         },
         include: {
@@ -203,15 +220,16 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Admin-created bookings use synthetic lineUserId (e.g. "admin-<ts>") — skip LINE push & reminders
-      const isRealLineUser = !input.lineUserId.startsWith("admin-");
+      // Only real LIFF users get LINE pushes & reminders. Admin-created bookings
+      // (auth.type === "admin") may have no LINE account — skip those entirely.
+      const isRealLineUser = auth.type === "liff";
 
       // 8. Schedule reminders (async, don't block response)
       if (isRealLineUser) {
         scheduleReminders({
           tenantId,
           bookingId: booking.id,
-          lineUserId: input.lineUserId,
+          lineUserId: authedLineUserId,
           bookingDate: dateObj,
           startTime: input.startTime,
         }).catch((err) => logger.error("Failed to schedule reminders", err, "bookings", { bookingId: booking.id }));
@@ -235,9 +253,9 @@ export async function POST(request: NextRequest) {
             bookingId: booking.id,
             liffBaseUrl,
           });
-          await lineClient.pushMessage(input.lineUserId, message);
+          await lineClient.pushMessage(authedLineUserId, message);
         } catch (lineError) {
-          logger.error("Failed to send LINE confirmation", lineError, "bookings", { lineUserId: input.lineUserId });
+          logger.error("Failed to send LINE confirmation", lineError, "bookings", { lineUserId: authedLineUserId });
         }
       }
 
