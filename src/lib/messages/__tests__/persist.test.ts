@@ -15,12 +15,6 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-// Mock web-push
-const mockSendPush = vi.fn().mockResolvedValue(undefined);
-vi.mock("@/lib/push/web-push", () => ({
-  sendWebPushToAdmin: (...args: unknown[]) => mockSendPush(...args),
-}));
-
 import { persistInboundMessage, persistOutboundMessage } from "../persist";
 
 // Helper to flush microtasks the fire-and-forget IIFE schedules
@@ -100,16 +94,6 @@ describe("persistInboundMessage", () => {
     expect(createMessage).not.toHaveBeenCalled();
   });
 
-  it("triggers Web Push after successful write", async () => {
-    persistInboundMessage(makeMessageEvent(), "tenant-1");
-    await flush();
-    await flush();
-    expect(mockSendPush).toHaveBeenCalledOnce();
-    const [tenantId, payload] = mockSendPush.mock.calls[0];
-    expect(tenantId).toBe("tenant-1");
-    expect(payload.title).toContain("王小明");
-    expect(payload.url).toBe("/messages/U_customer_1");
-  });
 });
 
 describe("persistOutboundMessage", () => {

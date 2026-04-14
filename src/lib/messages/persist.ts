@@ -2,7 +2,7 @@ import type { MessageEvent, Message as LineMessage } from "@line/bot-sdk";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/utils/logger";
 import { sendWebPushToAdmin } from "@/lib/push/web-push";
-import { MessageDirection, MessageType } from "@prisma/client";
+import { MessageDirection, MessageType, MessageKind } from "@prisma/client";
 
 /**
  * Map a LINE event.message.type to our MessageType enum.
@@ -83,9 +83,12 @@ export function persistInboundMessage(
         },
       });
 
-      // Push to admin (best-effort)
+      // Fire-and-forget Web Push to admin (best effort).
       const displayName = userId
-        ? (await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true } }))?.displayName
+        ? (await prisma.user.findUnique({
+            where: { id: userId },
+            select: { displayName: true },
+          }))?.displayName
         : null;
 
       sendWebPushToAdmin(tenantId, {
@@ -93,7 +96,9 @@ export function persistInboundMessage(
         body: (content || "").slice(0, 80),
         url: `/messages/${lineUserId}`,
         tag: `message-${lineUserId}`,
-      }).catch((err) => logger.error("Web Push message failed", err, "persist-inbound"));
+      }).catch((err) =>
+        logger.error("Web Push message failed", err, "persist-inbound"),
+      );
     } catch (err) {
       // Unique constraint violation = LINE replay. Log at debug, not error.
       const code = (err as { code?: string })?.code;
@@ -115,6 +120,7 @@ export function persistOutboundMessage(params: {
   lineUserId: string;
   message: LineMessage;
   clientMessageId?: string;
+  kind?: MessageKind;
 }): void {
   (async () => {
     try {
@@ -137,6 +143,7 @@ export function persistOutboundMessage(params: {
           clientMessageId: params.clientMessageId,
           direction: MessageDirection.OUTBOUND,
           type,
+          kind: params.kind ?? MessageKind.STANDARD,
           content,
           raw: m as unknown as object,
           isRead: true, // outbound is read by admin by definition

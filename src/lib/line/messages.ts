@@ -125,7 +125,7 @@ export function bookingConfirmationMessage(params: {
         },
         {
           type: "text",
-          text: "24 小時前可免費取消，4 小時前可改期",
+          text: "24 小時前可免費取消，改期隨時可線上操作",
           size: "xs",
           color: "#809A8E",
           margin: "xl",
@@ -336,62 +336,86 @@ export function cancellationMessage(params: {
   };
 }
 
-/** Welcome message for new followers */
-export function welcomeMessage(shopName: string, liffUrl?: string): FlexMessage {
+/**
+ * Welcome Flex for new followers — 植物系極簡風格.
+ * Dark green header band + minimal info body + 2-button CTA.
+ * Secondary button uses LINE message action to send "服務" keyword,
+ * keeping the user in-chat for the pricing carousel.
+ */
+export function welcomeMessage(params: {
+  shopName: string;
+  tagline?: string;
+  hours?: string;
+  closedDay?: string;
+  phone?: string;
+  liffUrl?: string;
+}): FlexMessage {
+  const {
+    shopName,
+    tagline = "台北中正區・植物系極簡風格",
+    hours = "週二至週日 11:00-20:00",
+    closedDay = "每週一",
+    phone,
+    liffUrl,
+  } = params;
+
   const bubble: FlexBubble = {
     type: "bubble",
-    body: {
+    header: {
       type: "box",
       layout: "vertical",
+      paddingAll: "24px",
+      backgroundColor: "#003D2B",
       contents: [
         {
           type: "text",
-          text: `歡迎加入 ${shopName}！🎉`,
+          text: shopName.toUpperCase(),
           weight: "bold",
           size: "xl",
+          color: "#FFFFFF",
+          align: "center",
         },
         {
           type: "text",
-          text: "很高興為您服務！我們提供：",
+          text: tagline,
           size: "sm",
-          margin: "lg",
+          color: "#B8CFC4",
+          align: "center",
+          margin: "sm",
           wrap: true,
-          color: "#809A8E",
         },
+      ],
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      spacing: "md",
+      contents: [
+        {
+          type: "text",
+          text: "服務項目",
+          weight: "bold",
+          size: "sm",
+          color: "#2D3A30",
+        },
+        {
+          type: "text",
+          text: "剪髮・染髮・燙髮・護髮",
+          size: "sm",
+          color: "#809A8E",
+          margin: "xs",
+        },
+        { type: "separator", margin: "lg" },
         {
           type: "box",
           layout: "vertical",
-          margin: "md",
+          margin: "lg",
           spacing: "sm",
           contents: [
-            {
-              type: "text",
-              text: "✂️ 剪髮 ・ 🎨 染髮 ・ 💇 燙髮 ・ 💆 護髮",
-              size: "sm",
-              wrap: true,
-              color: "#2D3A30",
-            },
+            infoRow("營業時間", hours),
+            infoRow("公休", closedDay),
+            ...(phone ? [infoRow("電話", phone)] : []),
           ],
-        },
-        {
-          type: "separator",
-          margin: "lg",
-        },
-        {
-          type: "text",
-          text: "透過 LINE 即可輕鬆預約，隨時查看可用時段、管理預約，不必打電話！",
-          size: "sm",
-          margin: "lg",
-          wrap: true,
-          color: "#809A8E",
-        },
-        {
-          type: "text",
-          text: "👇 點擊下方按鈕或輸入關鍵字開始",
-          size: "sm",
-          margin: "md",
-          wrap: true,
-          color: "#809A8E",
         },
       ],
     },
@@ -415,9 +439,9 @@ export function welcomeMessage(shopName: string, liffUrl?: string): FlexMessage 
               {
                 type: "button" as const,
                 action: {
-                  type: "uri" as const,
-                  label: "查看我的預約",
-                  uri: `${liffUrl}/my-bookings`,
+                  type: "message" as const,
+                  label: "查看服務與價格",
+                  text: "服務",
                 },
                 style: "secondary" as const,
               },
@@ -431,6 +455,18 @@ export function welcomeMessage(shopName: string, liffUrl?: string): FlexMessage 
     type: "flex",
     altText: `歡迎加入 ${shopName}！點此預約`,
     contents: bubble,
+  };
+}
+
+/**
+ * Busy notice — sent at most once per 6h to users whose text doesn't match
+ * any keyword. Lets them know the owner will reply later and nudges them
+ * toward the rich menu for self-service.
+ */
+export function busyNoticeMessage(): { type: "text"; text: string } {
+  return {
+    type: "text",
+    text: "收到您的訊息了！🙌\n老闆可能正在服務客人，看到會盡快回覆您 🙇\n\n若要預約或查看服務，可直接使用下方選單，免等老闆回覆 👇",
   };
 }
 

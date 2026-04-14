@@ -131,27 +131,51 @@ describe("cancellationMessage", () => {
 });
 
 describe("welcomeMessage", () => {
-  it("includes shop name", () => {
-    const msg = welcomeMessage("1008 Hair Studio");
+  it("includes shop name (uppercased in header)", () => {
+    const msg = welcomeMessage({ shopName: "1008 Hair Studio" });
     expect(msg.altText).toContain("1008 Hair Studio");
     const bodyStr = JSON.stringify(msg.contents);
-    expect(bodyStr).toContain("1008 Hair Studio");
+    expect(bodyStr).toContain("1008 HAIR STUDIO");
   });
 
   it("includes booking button when liffUrl is provided", () => {
-    const msg = welcomeMessage(
-      "1008 Hair Studio",
-      "https://liff.line.me/1234567890-abcdefgh"
-    );
+    const msg = welcomeMessage({
+      shopName: "1008 Hair Studio",
+      liffUrl: "https://liff.line.me/1234567890-abcdefgh",
+    });
     const bodyStr = JSON.stringify(msg.contents);
     expect(bodyStr).toContain("立即預約");
     expect(bodyStr).toContain("https://liff.line.me/1234567890-abcdefgh");
   });
 
-  it("omits booking button when liffUrl is not provided", () => {
-    const msg = welcomeMessage("1008 Hair Studio");
+  it("secondary button uses message action with '服務' keyword", () => {
+    const msg = welcomeMessage({
+      shopName: "1008 Hair Studio",
+      liffUrl: "https://liff.line.me/test",
+    });
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("查看服務與價格");
+    // Message action triggers keyword-reply flow instead of opening LIFF
+    expect(bodyStr).toMatch(/"type":\s*"message".*"text":\s*"服務"/);
+  });
+
+  it("omits footer when liffUrl is not provided", () => {
+    const msg = welcomeMessage({ shopName: "1008 Hair Studio" });
     const content = msg.contents as Record<string, unknown>;
     expect(content.footer).toBeUndefined();
+  });
+
+  it("includes phone row when phone is provided", () => {
+    const msg = welcomeMessage({ shopName: "Test", phone: "02-2396-2306" });
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("02-2396-2306");
+    expect(bodyStr).toContain("電話");
+  });
+
+  it("omits phone row when phone is not provided", () => {
+    const msg = welcomeMessage({ shopName: "Test" });
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).not.toContain("電話");
   });
 });
 

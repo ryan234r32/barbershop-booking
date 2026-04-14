@@ -52,7 +52,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return Response.json({ error: "只能改期已確認的預約" }, { status: 400 });
     }
 
-    // Check reschedule policy — 4h before appointment (more lenient than cancel's 24h)
+    // Reschedule policy (industry-aligned, 2026-04):
+    //   ≥ 4h       → free online
+    //   2h–4h      → allowed, but only once per booking (lateRescheduleCount guards re-abuse)
+    //   < 2h       → allowed once, counts as a violation (same tier as no-show)
+    //   2nd attempt inside 4h → blocked, must call
     const bookingDateStr = booking.date.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
     const [bY, bM, bD] = bookingDateStr.split("-").map(Number);
     const [bH] = booking.startTime.split(":").map(Number);
@@ -60,9 +64,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const now = new Date();
     const hoursUntil = (appointmentTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-    if (hoursUntil < 4) {
+    const isLateReschedule = hoursUntil < 4;
+    const isVeryLateReschedule = hoursUntil < 2;
+
+    if (isLateReschedule && booking.lateRescheduleCount >= 1) {
       return Response.json(
-        { error: "4 小時內的改期，請致電店家", phoneNumber: booking.tenant.phone },
+        {
+          error: "這筆預約已經短時間改過一次，請致電店家協助",
+          phoneNumber: booking.tenant.phone,
+        },
         { status: 403 }
       );
     }
@@ -105,8 +115,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           date: newDateObj,
           startTime: input.startTime,
           endTime: newEndTime,
+          ...(isLateReschedule ? { lateRescheduleCount: { increment: 1 } } : {}),
         },
       });
+
+      if (isVeryLateReschedule) {
+        await prisma.user.update({
+          where: { id: booking.userId },
+          data: { violationCount: { increment: 1 } },
+        });
+      }
 
       // Cancel old notifications and schedule new ones
       cancelBookingNotifications(id).catch((err) =>

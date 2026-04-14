@@ -16,7 +16,12 @@ import {
   myBookingsFlexMessage,
   myBookingsEmptyMessage,
   paymentGuideMessage,
+  busyNoticeMessage,
 } from "@/lib/line/messages";
+import { MessageKind } from "@prisma/client";
+import { classifyIntent } from "./classify-intent";
+
+const BUSY_NOTICE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
 /** POST /api/webhook — LINE Webhook handler */
 export async function POST(request: NextRequest) {
@@ -76,15 +81,29 @@ async function handleEvent(
         create: { tenantId, lineUserId, displayName, pictureUrl },
       });
 
-      // Send welcome message with LIFF booking button
+      // Send welcome: plain-text greeting + Flex card
       const tenant = await prisma.tenant.findUnique({
         where: { id: tenantId },
-        select: { businessName: true, liffId: true },
+        select: { businessName: true, liffId: true, phone: true },
       });
 
+      const shopName = tenant?.businessName || "理髮廳";
       const liffUrl = `https://liff.line.me/${tenant?.liffId || process.env.NEXT_PUBLIC_LIFF_ID}`;
-      const msg = welcomeMessage(tenant?.businessName || "理髮廳", liffUrl);
-      await lineClient.pushMessage(lineUserId, msg);
+
+      const namePrefix = displayName ? `${displayName} 你好！🙌\n` : "";
+      const textGreeting = {
+        type: "text" as const,
+        text: `${namePrefix}歡迎加入 ${shopName} ✂️\n\n下方選單可直接預約、查看服務與價格 👇`,
+      };
+      const flexWelcome = welcomeMessage({
+        shopName,
+        phone: tenant?.phone ?? undefined,
+        liffUrl,
+      });
+
+      await lineClient.pushMessage(lineUserId, [textGreeting, flexWelcome]);
+      persistOutboundMessage({ tenantId, lineUserId, message: textGreeting, kind: MessageKind.WELCOME });
+      persistOutboundMessage({ tenantId, lineUserId, message: flexWelcome, kind: MessageKind.WELCOME });
       break;
     }
 
@@ -101,9 +120,14 @@ async function handleEvent(
       if (!event.replyToken) break;
       const lineUserId = event.source.userId || "";
 
-      if (event.message.type === "text") {
-        const reply = await buildKeywordReply(event.message.text, tenantId, lineUserId);
+      // Non-text messages (sticker/image/video/audio/location/file): stay silent.
+      // Keyword matching doesn't apply and auto-responding feels robotic.
+      // Admin can still see the inbound message in the admin console.
+      if (event.message.type !== "text") break;
 
+      const reply = await buildKeywordReply(event.message.text, tenantId, lineUserId);
+
+      if (reply) {
         if (reply.usePush && lineUserId) {
           // Dynamic replies (DB queries) use pushMessage to avoid 1s webhook timeout
           lineClient.pushMessage(lineUserId, reply.message).catch((err) =>
@@ -112,25 +136,42 @@ async function handleEvent(
         } else {
           await lineClient.replyMessage(event.replyToken, reply.message);
         }
-
         if (lineUserId) {
-          persistOutboundMessage({ tenantId, lineUserId, message: reply.message });
+          persistOutboundMessage({
+            tenantId,
+            lineUserId,
+            message: reply.message,
+            kind: MessageKind.KEYWORD_REPLY,
+          });
         }
-      } else if (
-        event.message.type === "sticker" ||
-        event.message.type === "image" ||
-        event.message.type === "video" ||
-        event.message.type === "audio"
-      ) {
-        const fallback = {
-          type: "text" as const,
-          text: "謝謝您的訊息！請輸入文字或點擊下方選單操作 😊",
-        };
-        await lineClient.replyMessage(event.replyToken, fallback);
-        if (lineUserId) {
-          persistOutboundMessage({ tenantId, lineUserId, message: fallback });
-        }
+        break;
       }
+
+      // No keyword matched → maybe send busy notice (once per 6h per user).
+      if (!lineUserId) break;
+
+      const cutoff = new Date(Date.now() - BUSY_NOTICE_COOLDOWN_MS);
+      const recentBusyNotice = await prisma.message.findFirst({
+        where: {
+          tenantId,
+          lineUserId,
+          direction: "OUTBOUND",
+          kind: MessageKind.BUSY_NOTICE,
+          createdAt: { gte: cutoff },
+        },
+        select: { id: true },
+      });
+
+      if (recentBusyNotice) break; // silent — cooldown active
+
+      const busy = busyNoticeMessage();
+      await lineClient.replyMessage(event.replyToken, busy);
+      persistOutboundMessage({
+        tenantId,
+        lineUserId,
+        message: busy,
+        kind: MessageKind.BUSY_NOTICE,
+      });
       break;
     }
 
@@ -148,8 +189,18 @@ interface KeywordReplyResult {
   usePush: boolean;
 }
 
-async function buildKeywordReply(text: string, tenantId: string, lineUserId: string): Promise<KeywordReplyResult> {
-  const lowerText = text.toLowerCase();
+// classifyIntent / KeywordIntent moved to ./classify-intent.ts so tests and the
+// admin keyword-preview dev tool can import them — Next.js forbids re-exporting
+// non-handler symbols from `route.ts`.
+
+/**
+ * Build a keyword reply. Returns null when no intent matched — caller decides
+ * whether to send a busy notice (cooldown-gated) or stay silent.
+ */
+async function buildKeywordReply(text: string, tenantId: string, lineUserId: string): Promise<KeywordReplyResult | null> {
+  const intent = classifyIntent(text);
+  if (intent === "none") return null;
+
   const reply = (message: Message, usePush = false): KeywordReplyResult => ({ message, usePush });
 
   const tenant = await prisma.tenant.findUnique({
@@ -170,7 +221,7 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
   const shopName = tenant?.businessName || "理髮廳";
 
   // Priority 1: My bookings — dynamic query, uses pushMessage
-  if (matchKeywords(lowerText, ["我的預約", "查詢", "紀錄", "記錄"])) {
+  if (intent === "my-bookings") {
     if (!lineUserId) return reply(myBookingsGuideMessage(liffUrl));
 
     const user = await prisma.user.findUnique({
@@ -237,13 +288,13 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
     );
   }
 
-  // Priority 2: Booking keywords
-  if (matchKeywords(lowerText, ["預約", "我要預約", "訂位", "book"])) {
+  // Priority 2: Booking
+  if (intent === "booking") {
     return reply(bookingGuideMessage(liffUrl));
   }
 
-  // Priority 3: Pricing keywords
-  if (matchKeywords(lowerText, ["服務", "價格", "價目表", "多少錢", "price"])) {
+  // Priority 3: Pricing
+  if (intent === "pricing") {
     const services = await prisma.service.findMany({
       where: { tenantId, isActive: true },
       orderBy: { sortOrder: "asc" },
@@ -252,8 +303,8 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
     return reply(pricingCarouselMessage(services, liffUrl));
   }
 
-  // Priority 4: Payment / transfer keywords
-  if (matchKeywords(lowerText, ["付款", "轉帳", "匯款"])) {
+  // Priority 4: Payment / transfer
+  if (intent === "payment") {
     return reply(paymentGuideMessage({
       bankName: tenant?.bankInfo || "請洽店家",
       bankAccountName: tenant?.bankAccountName || "請洽店家",
@@ -262,8 +313,8 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
     }));
   }
 
-  // Priority 5: Business hours / location keywords
-  if (matchKeywords(lowerText, ["時間", "營業時間", "幾點", "地址", "在哪", "怎麼去"])) {
+  // Priority 5: Business hours / location
+  if (intent === "business-info" || intent === "phone") {
     const googleMapsUrl = tenant?.address
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tenant.address)}`
       : undefined;
@@ -276,23 +327,8 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
     }));
   }
 
-  // Priority 6: Phone / contact keywords
-  if (matchKeywords(lowerText, ["電話", "聯絡", "打電話"])) {
-    const phone = tenant?.phone || "請洽店家";
-    const googleMapsUrl = tenant?.address
-      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tenant.address)}`
-      : undefined;
-    return reply(businessInfoMessage({
-      shopName,
-      address: tenant?.address || "請洽店家",
-      phone,
-      hours: "週二至週日 11:00-20:00（週一公休）",
-      googleMapsUrl,
-    }));
-  }
-
-  // Priority 7: Cancellation / booking management keywords — same as "我的預約", dynamic
-  if (matchKeywords(lowerText, ["取消", "改時間", "更改", "cancel", "改期"])) {
+  // Priority 6: Cancellation / reschedule — show upcoming bookings
+  if (intent === "cancel-reschedule") {
     if (!lineUserId) return reply(myBookingsGuideMessage(liffUrl));
 
     const user7 = await prisma.user.findUnique({
@@ -349,29 +385,24 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
     );
   }
 
-  // Priority 8: Thank you keywords
-  if (matchKeywords(lowerText, ["謝謝", "感謝", "thanks", "thank you"])) {
+  // Priority 7: Thank you
+  if (intent === "thanks") {
     return reply({
       type: "text",
       text: `不客氣！有任何需要隨時告訴我們 😊\n${shopName} 隨時為您服務！`,
     });
   }
 
-  // Priority 9: Greeting keywords
-  if (matchKeywords(lowerText, ["你好", "哈囉", "hi", "hello", "嗨"])) {
-    return reply({
-      type: "text",
-      text: `${shopName} 您好！👋\n\n很高興為您服務，請點擊下方按鈕快速操作：`,
-    });
+  // Priority 8: Greeting — return welcome Flex for richer intro
+  if (intent === "greeting") {
+    return reply(welcomeMessage({
+      shopName,
+      phone: tenant?.phone ?? undefined,
+      liffUrl,
+    }));
   }
 
-  // Fallback: no match
-  return reply({
-    type: "text",
-    text: `感謝您的訊息！您可以試試以下操作：\n\n📅 輸入「預約」開始預約\n💰 輸入「服務」查看價目表\n🕐 輸入「營業時間」查看店家資訊`,
-  });
+  // Unreachable (classifyIntent exhausts all non-"none" cases above)
+  return null;
 }
 
-function matchKeywords(text: string, keywords: string[]): boolean {
-  return keywords.some((kw) => text.includes(kw));
-}

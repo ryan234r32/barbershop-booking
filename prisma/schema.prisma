@@ -41,7 +41,6 @@ model Tenant {
   holidays          Holiday[]
   adminUsers        AdminUser[]
   notifications     Notification[]
-  pushSubscriptions PushSubscription[]
   messages          Message[]
 
   quickReplies      Json?              @map("quick_replies")
@@ -71,34 +70,40 @@ model AdminUser {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
-  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
   pushSubscriptions PushSubscription[]
 
   @@unique([tenantId, email])
   @@map("admin_users")
 }
 
+/// Web Push subscription for a PWA device an admin has opted in.
+/// endpoint is the natural dedup key — each device's FCM/APNs URL is unique.
+/// failureCount + lastFailedAt track transient failures; 410/404/401 auto-delete
+/// (see sendWebPushToAdmin in src/lib/push/web-push.ts).
+model PushSubscription {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  adminUserId  String    @map("admin_user_id")
+  endpoint     String    @unique
+  p256dh       String
+  auth         String
+  userAgent    String?   @map("user_agent")
+  failureCount Int       @default(0) @map("failure_count")
+  lastFailedAt DateTime? @map("last_failed_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([adminUserId])
+  @@map("push_subscriptions")
+}
+
 enum AdminRole {
   OWNER
   STAFF
-}
-
-model PushSubscription {
-  id          String   @id @default(uuid())
-  tenantId    String   @map("tenant_id")
-  adminUserId String   @map("admin_user_id")
-  endpoint    String   @unique
-  p256dh      String
-  auth        String
-  userAgent   String?  @map("user_agent")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  tenant    Tenant    @relation(fields: [tenantId], references: [id])
-  adminUser AdminUser @relation(fields: [adminUserId], references: [id])
-
-  @@index([tenantId, adminUserId])
-  @@map("push_subscriptions")
 }
 
 // ============================================
@@ -235,6 +240,8 @@ model Booking {
   status        BookingStatus @default(CONFIRMED)
   source        BookingSource @default(LIFF)
   notes         String?
+
+  lateRescheduleCount Int     @default(0) @map("late_reschedule_count")
 
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
@@ -386,6 +393,7 @@ model Message {
   clientMessageId String?          @map("client_message_id")
   direction       MessageDirection
   type            MessageType
+  kind            MessageKind      @default(STANDARD)
   content         String?          @db.Text
 
   // raw: LINE event payload. Debug/sticker metadata only.
@@ -403,6 +411,7 @@ model Message {
   @@unique([tenantId, clientMessageId])
   @@index([tenantId, lineUserId, createdAt(sort: Desc)])
   @@index([tenantId, isRead])
+  @@index([tenantId, lineUserId, kind, createdAt(sort: Desc)])
   @@map("messages")
 }
 
@@ -420,4 +429,11 @@ enum MessageType {
   LOCATION
   FILE
   OTHER
+}
+
+enum MessageKind {
+  STANDARD
+  BUSY_NOTICE
+  WELCOME
+  KEYWORD_REPLY
 }

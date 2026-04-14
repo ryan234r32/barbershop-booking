@@ -4,11 +4,13 @@ import { sendWebPushToAdmin } from "@/lib/push/web-push";
 import { logger } from "@/lib/utils/logger";
 
 /**
- * Send notifications to admin when a new booking is created.
- * Two channels (either or both):
- *  - Web Push: always attempted if tenantId is provided and admin subscribed
- *  - LINE push: only if ADMIN_LINE_USER_ID env is set (opt-in backup channel)
- * Fire-and-forget — must never block booking creation.
+ * Send admin notifications when a new booking is created.
+ *
+ * Dual-channel strategy:
+ * - Web Push → PWA on admin's phone (primary — instant lock-screen pop)
+ * - LINE push → admin's personal LINE (backup — survives PWA subscription churn)
+ *
+ * Both fire-and-forget. Missing env just silently skips that channel.
  */
 export async function notifyAdminNewBooking(params: {
   tenantId?: string;
@@ -21,7 +23,7 @@ export async function notifyAdminNewBooking(params: {
 }): Promise<void> {
   const { tenantId, displayName, serviceName, date, startTime } = params;
 
-  // Channel 1: Web Push (primary — PWA on admin's phone)
+  // Channel 1: Web Push (PWA)
   if (tenantId) {
     sendWebPushToAdmin(tenantId, {
       title: "新預約",
@@ -31,7 +33,7 @@ export async function notifyAdminNewBooking(params: {
     }).catch((err) => logger.error("Web Push new-booking failed", err, "admin-notify"));
   }
 
-  // Channel 2: LINE push (optional backup — only if env configured)
+  // Channel 2: LINE push to admin's personal LINE
   const adminLineUserId = process.env.ADMIN_LINE_USER_ID;
   if (adminLineUserId) {
     try {
@@ -45,7 +47,7 @@ export async function notifyAdminNewBooking(params: {
 }
 
 /**
- * Send notifications to admin when a booking is cancelled.
+ * Send admin notifications when a booking is cancelled.
  * Same dual-channel approach as notifyAdminNewBooking.
  */
 export async function notifyAdminCancellation(params: {

@@ -29,14 +29,18 @@ export function UserInfoSheet({
   const [birthdayDay, setBirthdayDay] = useState("");
   const [errors, setErrors] = useState<{ name?: string; phone?: string; birthday?: string }>({});
 
-  // Sync defaults when they change (e.g. after LIFF init loads)
+  // Sync defaults when they change (e.g. after LIFF init loads async).
+  // setState-in-effect is the correct pattern here because the source is an
+  // async external event (LIFF profile fetch) rather than a derivable value.
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => {
     if (defaultName && !name) setName(defaultName);
-  }, [defaultName]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [defaultName]);
 
   useEffect(() => {
     if (defaultPhone && !phone) setPhone(defaultPhone);
-  }, [defaultPhone]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [defaultPhone]);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   const validate = (): boolean => {
     const newErrors: { name?: string; phone?: string; birthday?: string } = {};
