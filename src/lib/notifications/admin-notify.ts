@@ -16,6 +16,8 @@ import { logger } from "@/lib/utils/logger";
  */
 export async function notifyAdminNewBooking(params: {
   tenantId?: string;
+  /** Used to drive the admin acknowledge flow — tap-to-confirm in calendar. */
+  bookingId?: string;
   displayName: string;
   serviceName: string;
   date: string;
@@ -23,7 +25,15 @@ export async function notifyAdminNewBooking(params: {
   endTime: string;
   price: number;
 }): Promise<void> {
-  const { tenantId, displayName, serviceName, date, startTime } = params;
+  const { tenantId, bookingId, displayName, serviceName, date, startTime } = params;
+
+  // Notification URL drives the post-tap behaviour:
+  //   /calendar?date=YYYY-MM-DD&ack=<bookingId>
+  // The calendar page reads `date` to switch view, and `ack` to auto-open the
+  // BookingDetailSheet with a "✓ 已確認" button. Falls back to /calendar if no id.
+  const url = bookingId
+    ? `/calendar?date=${encodeURIComponent(date)}&ack=${encodeURIComponent(bookingId)}`
+    : "/calendar";
 
   // Channel 1: Web Push (PWA)
   let webPushSent = 0;
@@ -32,7 +42,7 @@ export async function notifyAdminNewBooking(params: {
       const result = await sendWebPushToAdmin(tenantId, {
         title: "新預約",
         body: `${displayName} · ${serviceName} · ${date} ${startTime}`,
-        url: "/calendar",
+        url,
         tag: `booking-new-${date}-${startTime}`,
       });
       webPushSent = result.sent;

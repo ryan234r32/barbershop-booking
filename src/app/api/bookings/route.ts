@@ -203,6 +203,9 @@ export async function POST(request: NextRequest) {
           // choose PHONE or WALK_IN (default WALK_IN if omitted).
           source: auth.type === "liff" ? "LIFF" : (input.source || "WALK_IN"),
           notes: input.notes,
+          // Admin-created bookings are pre-acknowledged — admin obviously knows,
+          // they just typed it in. Customer LIFF bookings start unacked → queue.
+          adminAcknowledgedAt: auth.type === "admin" ? new Date() : null,
         },
         include: {
           service: true,
@@ -262,6 +265,7 @@ export async function POST(request: NextRequest) {
       // 10. Notify admin (fire-and-forget)
       notifyAdminNewBooking({
         tenantId,
+        bookingId: booking.id,
         displayName: user.displayName || input.displayName || "未知顧客",
         serviceName: service.name,
         date: input.date,

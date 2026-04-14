@@ -108,6 +108,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           date: newDateObj,
           startTime: input.startTime,
           endTime: newEndTime,
+          // Reset admin ack: the time/day moved, so the prior confirmation
+          // doesn't carry over to the new slot. Admin re-acks via the push notif.
+          adminAcknowledgedAt: null,
         },
       });
 
@@ -155,8 +158,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         logger.error("Failed to send reschedule LINE message", lineError, "reschedule");
       }
 
-      // Notify admin
+      // Notify admin (also re-acks via the new bookingId on the new date/time)
       notifyAdminNewBooking({
+        tenantId: booking.tenantId,
+        bookingId: id,
         displayName: booking.user.displayName || "未知顧客",
         serviceName: booking.service.name,
         date: input.date,

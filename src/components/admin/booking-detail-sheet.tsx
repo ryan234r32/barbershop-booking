@@ -21,6 +21,8 @@ interface BookingDetail {
   startTime: string;
   endTime: string;
   status: string;
+  /** ISO timestamp when admin clicked "I've seen this", or null if not yet. */
+  adminAcknowledgedAt?: string | null;
   service: { name: string; price: number; slotsNeeded: number };
   user: BookingUser;
 }
@@ -182,6 +184,45 @@ export function BookingDetailSheet({ booking, open, onOpenChange, onAction }: Pr
                       {booking.user.notes}
                     </p>
                   </div>
+                )}
+
+                {/* Acknowledge button — shown only for unacked CONFIRMED bookings.
+                    Once clicked, it disappears (replaced by quiet "已確認" badge below). */}
+                {booking.status === "CONFIRMED" && !booking.adminAcknowledgedAt && (
+                  <button
+                    onClick={async () => {
+                      setLoading(true);
+                      try {
+                        await fetch(`/api/bookings/${booking.id}/acknowledge`, {
+                          method: "POST",
+                          headers: adminHeaders(),
+                        });
+                        toast({ type: "success", message: "已確認" });
+                        onAction(); // refresh calendar so red dot disappears
+                      } catch {
+                        toast({ type: "error", message: "確認失敗，請重試" });
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className="w-full mb-3 py-3 bg-[var(--color-brand)]/10 border border-[var(--color-brand)] text-[var(--color-brand)] font-semibold rounded-lg text-sm hover:bg-[var(--color-brand)]/20 transition-colors disabled:opacity-50"
+                  >
+                    ✓ 我已確認知道
+                  </button>
+                )}
+
+                {/* Quiet "已確認" badge once acked */}
+                {booking.adminAcknowledgedAt && (
+                  <p className="text-xs text-[var(--color-success)] mb-3 flex items-center gap-1">
+                    ✓ 已確認 ·{" "}
+                    {new Date(booking.adminAcknowledgedAt).toLocaleString("zh-TW", {
+                      month: "numeric",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
                 )}
 
                 {/* Actions */}

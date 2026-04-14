@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import useSWR from "swr";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { BookingDetailSheet } from "@/components/admin/booking-detail-sheet";
 import { NewBookingSheet } from "@/components/admin/new-booking-sheet";
+import { UnacknowledgedModal } from "@/components/admin/unacknowledged-modal";
 import { useCalendarPolling } from "@/lib/hooks/use-calendar-polling";
+import { adminHeaders } from "@/lib/auth/admin-fetch";
 
 // ─── Types ───
 interface Booking {
@@ -219,6 +222,59 @@ export default function CalendarPage() {
     setSelectedBooking(b);
     setDetailSheetOpen(true);
   };
+
+  // ─── Unacknowledged-bookings queue ───
+  // Fetched on mount; when non-empty the UnacknowledgedModal pops and forces the
+  // admin to click "✓ 已確認知道" once per booking before they can use the calendar.
+  // SWR with refreshInterval handles cross-device sync (another tab acks → list shrinks).
+  const { data: unackData, mutate: refreshUnack } = useSWR(
+    "/api/bookings/unacknowledged",
+    (url) => fetch(url, { headers: adminHeaders() }).then((r) => r.json()),
+    { refreshInterval: 30_000, revalidateOnFocus: true }
+  );
+  const unackBookings = unackData?.bookings || [];
+
+  // ─── Notification deep-link ───
+  // sw.ts opens /calendar?date=2026-05-15&ack=<bookingId> when a new-booking
+  // notification is tapped. We honor `date` to switch the day view, and `ack`
+  // to auto-open the BookingDetailSheet for that booking. URL is then cleaned
+  // so back/refresh don't re-trigger.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [deepLinkHandled, setDeepLinkHandled] = useState(false);
+  useEffect(() => {
+    if (deepLinkHandled) return;
+    const dateParam = searchParams.get("date");
+    const ackParam = searchParams.get("ack");
+    if (!dateParam && !ackParam) {
+      setDeepLinkHandled(true);
+      return;
+    }
+    if (dateParam) {
+      const d = new Date(dateParam + "T00:00:00+08:00");
+      if (!Number.isNaN(d.getTime())) {
+        setCurrentDate(d);
+        setView("day");
+      }
+    }
+    if (ackParam) {
+      // Fetch the specific booking so the sheet has full detail.
+      fetch(`/api/bookings/${ackParam}`, { headers: adminHeaders() })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.booking) {
+            openBookingDetail(data.booking);
+          }
+        })
+        .catch(() => {
+          /* booking might be cancelled — ignore */
+        });
+    }
+    // Clean URL so refresh doesn't re-pop the sheet.
+    router.replace(pathname);
+    setDeepLinkHandled(true);
+  }, [searchParams, deepLinkHandled, router, pathname]);
 
   const openNewBooking = (date: string, time: string, duration: number = 1) => {
     setNewBookingDate(date);
@@ -1072,6 +1128,18 @@ export default function CalendarPage() {
         onOpenChange={setNewSheetOpen}
         onCreated={() => mutateBookings()}
       />
+      {/* Forced queue: every unacked CONFIRMED future booking gets a modal until
+          admin clicks "✓ 我已確認知道". Suppressed while another sheet is open
+          (deep-link from notification) so we don't stack two layers. */}
+      {!detailSheetOpen && !newSheetOpen && unackBookings.length > 0 && (
+        <UnacknowledgedModal
+          bookings={unackBookings}
+          onAllAcknowledged={() => {
+            refreshUnack();
+            mutateBookings();
+          }}
+        />
+      )}
     </div>
   );
 }

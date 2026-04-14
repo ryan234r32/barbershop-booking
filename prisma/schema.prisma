@@ -243,6 +243,13 @@ model Booking {
 
   lateRescheduleCount Int     @default(0) @map("late_reschedule_count")
 
+  /// When the shop owner clicked "I've seen this" in the unacknowledged-bookings
+  /// queue (or by opening the BookingDetailSheet from a notification). NULL means
+  /// the admin hasn't confirmed awareness yet — used to drive the queue modal in
+  /// /calendar. Idempotent: re-acking does nothing. See UnacknowledgedModal +
+  /// /api/bookings/unacknowledged.
+  adminAcknowledgedAt DateTime? @map("admin_acknowledged_at")
+
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
@@ -256,6 +263,7 @@ model Booking {
   @@index([tenantId, date, status])
   @@index([tenantId, userId])
   @@index([tenantId, date, startTime])
+  @@index([tenantId, status, adminAcknowledgedAt])
   @@map("bookings")
 }
 
