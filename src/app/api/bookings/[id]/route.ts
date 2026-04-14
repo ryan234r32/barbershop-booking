@@ -24,7 +24,15 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
         user: { select: { displayName: true, lineUserId: true, phone: true, realName: true } },
         payment: true,
         cancellation: true,
-        tenant: { select: { businessName: true, phone: true } },
+        tenant: {
+          select: {
+            businessName: true,
+            phone: true,
+            bankInfo: true,
+            bankAccountName: true,
+            bankAccountNumber: true,
+          },
+        },
       },
     });
 
@@ -181,6 +189,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       const paymentMethod: "CASH" | "BANK_TRANSFER" | null =
         rawMethod === "CASH" || rawMethod === "BANK_TRANSFER" ? rawMethod : null;
 
+      // Fetch existing payment to decide auto-promotion rules:
+      //   VERIFYING  → admin clicking 已收款 in past-due modal = confirm the reported transfer
+      //                auto-promote to RECEIVED (preserve method=BANK_TRANSFER, keep transferLastFive)
+      //   PENDING    → if admin didn't specify method, default to CASH RECEIVED (walk-in)
+      //   RECEIVED   → no-op (idempotent)
+      //   none       → create as CASH RECEIVED (walk-in default when past-due modal fires)
+      const existingPayment = await prisma.payment.findUnique({ where: { bookingId: id } });
+
       const updated = await prisma.$transaction(async (tx) => {
         const b = await tx.booking.update({
           where: { id },
@@ -197,19 +213,26 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           },
         });
 
-        // If admin specified payment method, upsert payment record as RECEIVED
-        if (paymentMethod) {
+        const shouldWritePayment =
+          existingPayment?.status !== "RECEIVED" && existingPayment?.status !== "WAIVED";
+
+        if (shouldWritePayment) {
+          // Priority: explicit paymentMethod > preserve VERIFYING's method > default CASH
+          const finalMethod: "CASH" | "BANK_TRANSFER" =
+            paymentMethod ??
+            (existingPayment?.status === "VERIFYING" ? existingPayment.method : "CASH");
+
           await tx.payment.upsert({
             where: { bookingId: id },
             create: {
               bookingId: id,
               amount: booking.service.price,
-              method: paymentMethod,
+              method: finalMethod,
               status: "RECEIVED",
               receivedAt: new Date(),
             },
             update: {
-              method: paymentMethod,
+              method: finalMethod,
               status: "RECEIVED",
               receivedAt: new Date(),
             },

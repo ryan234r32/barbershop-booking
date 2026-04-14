@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: "/services", label: "服務項目", icon: "💇" },
   { href: "/analytics", label: "數據分析", icon: "📈" },
   { href: "/campaigns", label: "行銷推播", icon: "📣" },
+  { href: "/payments", label: "付款對帳", icon: "💰" },
   { href: "/settings", label: "設定", icon: "⚙️" },
 ];
 

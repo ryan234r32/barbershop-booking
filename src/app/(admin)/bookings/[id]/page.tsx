@@ -31,7 +31,7 @@ interface BookingDetail {
     amount: number;
     method: string | null;
     screenshotUrl: string | null;
-    confirmedAt: string | null;
+    receivedAt: string | null;
   } | null;
 }
 
@@ -56,8 +56,10 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
-  PENDING: "待確認",
-  CONFIRMED: "已確認",
+  PENDING: "待付款",
+  VERIFYING: "待對帳",
+  RECEIVED: "已收款",
+  WAIVED: "免收",
 };
 
 const SEGMENT_LABELS: Record<string, string> = {
@@ -294,7 +296,7 @@ export default function BookingDetailPage() {
                 <span className="text-muted-foreground">付款狀態</span>
                 <span
                   className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    booking.payment.status === "CONFIRMED"
+                    booking.payment.status === "RECEIVED"
                       ? "bg-[var(--color-success)]/15 text-[var(--color-success)]"
                       : "bg-[var(--color-warning)]/15 text-[var(--color-warning)]"
                   }`}
@@ -317,11 +319,11 @@ export default function BookingDetailPage() {
                   </span>
                 </div>
               )}
-              {booking.payment.status === "CONFIRMED" &&
-                booking.payment.confirmedAt && (
+              {booking.payment.status === "RECEIVED" &&
+                booking.payment.receivedAt && (
                   <div className="mt-2 pt-3 border-t border-border/50">
                     <p className="text-xs text-muted-foreground">
-                      確認時間：{formatDateTime(booking.payment.confirmedAt)}
+                      確認時間：{formatDateTime(booking.payment.receivedAt)}
                     </p>
                   </div>
                 )}
@@ -381,13 +383,13 @@ export default function BookingDetailPage() {
               </div>
             )}
             {booking.payment?.status === "CONFIRMED" &&
-              booking.payment.confirmedAt && (
+              booking.payment.receivedAt && (
                 <div className="flex items-start gap-3">
                   <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5 shrink-0" />
                   <div>
                     <p className="text-sm text-foreground/80">付款已確認</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatDateTime(booking.payment.confirmedAt)}
+                      {formatDateTime(booking.payment.receivedAt)}
                     </p>
                   </div>
                 </div>

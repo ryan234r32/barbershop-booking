@@ -11,6 +11,11 @@ interface PastDueBooking {
   endTime: string;
   service: { name: string; price: number };
   user: { displayName: string | null };
+  payment?: {
+    status: "PENDING" | "VERIFYING" | "RECEIVED" | "WAIVED";
+    method: "CASH" | "BANK_TRANSFER";
+    transferLastFive: string | null;
+  } | null;
 }
 
 interface PastDueModalProps {
@@ -87,6 +92,16 @@ export function PastDueModal({ bookings, onProcessed }: PastDueModalProps) {
             </p>
           </div>
         </div>
+
+        {/* Payment context: show VERIFYING transfer last-5 so admin can cross-check with bank app */}
+        {current.payment?.status === "VERIFYING" && current.payment.transferLastFive && (
+          <div className="bg-[var(--color-brand)]/5 border border-[var(--color-brand)]/20 rounded-lg px-3 py-2.5">
+            <p className="text-xs text-muted-foreground">客戶已回報轉帳</p>
+            <p className="text-sm font-bold text-foreground mt-0.5">
+              末 5 碼：<span className="font-mono tracking-widest">{current.payment.transferLastFive}</span>
+            </p>
+          </div>
+        )}
 
         {/* Action buttons */}
         <div className="flex gap-3 pt-2">

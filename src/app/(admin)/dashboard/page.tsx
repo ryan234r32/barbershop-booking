@@ -13,7 +13,11 @@ interface Booking {
   status: string;
   service: { name: string; duration: number; price: number };
   user: { displayName: string | null; phone: string | null };
-  payment: { status: string } | null;
+  payment: {
+    status: "PENDING" | "VERIFYING" | "RECEIVED" | "WAIVED";
+    method: "CASH" | "BANK_TRANSFER";
+    transferLastFive: string | null;
+  } | null;
 }
 
 interface Analytics {

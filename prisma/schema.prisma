@@ -310,22 +310,29 @@ model CancellationRecord {
 // ============================================
 
 model Payment {
-  id            String        @id @default(uuid())
-  bookingId     String        @unique @map("booking_id")
+  id               String        @id @default(uuid())
+  bookingId        String        @unique @map("booking_id")
 
-  amount        Int
-  method        PaymentMethod @default(CASH)
-  status        PaymentStatus @default(PENDING)
+  amount           Int
+  method           PaymentMethod @default(CASH)
+  status           PaymentStatus @default(PENDING)
 
-  screenshotUrl String?       @map("screenshot_url")
-  receivedAt    DateTime?     @map("received_at")
-  notes         String?
+  // 轉帳對帳：客戶回報的轉出帳號末 5 碼
+  transferLastFive String?       @map("transfer_last_five")
+  // 客戶回報末五碼的時間（進入 VERIFYING 狀態的時間戳）
+  verifiedAt       DateTime?     @map("verified_at")
 
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  /// @deprecated 2026-04 末五碼對帳取代；僅保留舊資料，新流程不寫入
+  screenshotUrl    String?       @map("screenshot_url")
+  receivedAt       DateTime?     @map("received_at")
+  notes            String?
 
-  booking       Booking       @relation(fields: [bookingId], references: [id])
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
 
+  booking          Booking       @relation(fields: [bookingId], references: [id])
+
+  @@index([status, verifiedAt])
   @@map("payments")
 }
 
@@ -335,9 +342,10 @@ enum PaymentMethod {
 }
 
 enum PaymentStatus {
-  PENDING
-  RECEIVED
-  WAIVED
+  PENDING    // 待付款：客戶尚未回報
+  VERIFYING  // 待對帳：客戶已回報末五碼，等老闆確認
+  RECEIVED   // 已收款
+  WAIVED     // 免收（admin 豁免）
 }
 
 // ============================================

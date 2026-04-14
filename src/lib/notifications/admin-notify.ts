@@ -115,3 +115,48 @@ export async function notifyAdminCancellation(params: {
     }
   }
 }
+
+/**
+ * Notify admin that a customer has reported a bank-transfer last-5-digit.
+ * Dual-channel with the same mutex pattern.
+ */
+export async function notifyAdminTransferReported(params: {
+  tenantId?: string;
+  bookingId: string;
+  displayName: string;
+  serviceName: string;
+  date: string;
+  startTime: string;
+  amount: number;
+  transferLastFive: string;
+}): Promise<void> {
+  const { tenantId, bookingId, displayName, serviceName, date, startTime, amount, transferLastFive } = params;
+
+  let webPushSent = 0;
+  if (tenantId) {
+    try {
+      const result = await sendWebPushToAdmin(tenantId, {
+        title: "待對帳轉帳",
+        body: `${displayName} · 末5碼 ${transferLastFive} · NT$${amount}`,
+        url: `/payments?q=${encodeURIComponent(transferLastFive)}`,
+        tag: `payment-verify-${bookingId}`,
+      });
+      webPushSent = result.sent;
+    } catch (err) {
+      logger.error("Web Push transfer-reported failed", err, "admin-notify");
+    }
+  }
+
+  const adminLineUserId = process.env.ADMIN_LINE_USER_ID;
+  if (webPushSent === 0 && adminLineUserId) {
+    try {
+      const lineClient = getLineClient();
+      await lineClient.pushMessage(adminLineUserId, {
+        type: "text",
+        text: `💳 待對帳\n${displayName} · ${serviceName}\n${date} ${startTime}\n金額：NT$${amount.toLocaleString()}\n末五碼：${transferLastFive}`,
+      });
+    } catch (err) {
+      logger.error("LINE push transfer-reported failed", err, "admin-notify");
+    }
+  }
+}

@@ -49,6 +49,14 @@ export const adminLoginSchema = z.object({
   password: z.string().min(6),
 });
 
+export const transferLastFiveSchema = z
+  .string()
+  .regex(/^\d{5}$/, "末五碼必須為 5 位數字");
+
+export const reportTransferSchema = z.object({
+  transferLastFive: transferLastFiveSchema,
+});
+
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type CancelBookingInput = z.infer<typeof cancelBookingSchema>;
 export type CreateServiceInput = z.infer<typeof createServiceSchema>;

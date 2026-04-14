@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
       include: {
         service: { select: { name: true, price: true } },
         user: { select: { displayName: true } },
+        payment: { select: { status: true, method: true, transferLastFive: true } },
       },
       orderBy: [{ date: "asc" }, { startTime: "asc" }],
     });

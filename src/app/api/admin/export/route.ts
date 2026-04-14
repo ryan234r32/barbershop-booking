@@ -13,6 +13,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const PAYMENT_LABELS: Record<string, string> = {
   PENDING: "待付款",
+  VERIFYING: "待對帳",
   RECEIVED: "已收款",
   WAIVED: "免收",
 };

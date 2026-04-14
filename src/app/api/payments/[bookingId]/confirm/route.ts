@@ -54,7 +54,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const methodLabel = method === "CASH" ? "到店現金付款" : "銀行轉帳";
       const description = method === "CASH"
         ? "到店時直接付款即可，我們期待為您服務！"
-        : "截圖已上傳，等待店家確認中。";
+        : "請依付款頁指示完成轉帳並回填末 5 碼。";
 
       await lineClient.pushMessage(booking.user.lineUserId, {
         type: "flex",
