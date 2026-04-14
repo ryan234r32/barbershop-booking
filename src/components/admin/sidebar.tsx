@@ -4,18 +4,29 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAdmin } from "@/lib/admin/auth-context";
 import { useState, useEffect } from "react";
+import {
+  LayoutDashboard,
+  Calendar,
+  Plus,
+  Users,
+  Scissors,
+  BarChart3,
+  Megaphone,
+  Wallet,
+  Settings,
+} from "lucide-react";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "儀表板", icon: "📊" },
-  { href: "/calendar", label: "行事曆", icon: "📅" },
-  { href: "/bookings/new", label: "新增預約", icon: "➕" },
-  { href: "/customers", label: "顧客管理", icon: "👥" },
-  { href: "/services", label: "服務項目", icon: "💇" },
-  { href: "/analytics", label: "數據分析", icon: "📈" },
-  { href: "/campaigns", label: "行銷推播", icon: "📣" },
-  { href: "/payments", label: "付款對帳", icon: "💰" },
-  { href: "/settings", label: "設定", icon: "⚙️" },
-];
+  { href: "/dashboard", label: "儀表板", Icon: LayoutDashboard },
+  { href: "/calendar", label: "行事曆", Icon: Calendar },
+  { href: "/bookings/new", label: "新增預約", Icon: Plus },
+  { href: "/customers", label: "顧客管理", Icon: Users },
+  { href: "/services", label: "服務項目", Icon: Scissors },
+  { href: "/analytics", label: "數據分析", Icon: BarChart3 },
+  { href: "/campaigns", label: "行銷推播", Icon: Megaphone },
+  { href: "/payments", label: "付款對帳", Icon: Wallet },
+  { href: "/settings", label: "設定", Icon: Settings },
+] as const;
 
 export function AdminSidebar() {
   const pathname = usePathname();
@@ -40,6 +51,7 @@ export function AdminSidebar() {
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+          const Icon = item.Icon;
           return (
             <Link
               key={item.href}
@@ -52,7 +64,7 @@ export function AdminSidebar() {
                 }
               `}
             >
-              <span>{item.icon}</span>
+              <Icon size={18} strokeWidth={isActive ? 2.2 : 1.7} />
               <span>{item.label}</span>
             </Link>
           );
