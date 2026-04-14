@@ -17,11 +17,13 @@ import { logger } from "@/lib/utils/logger";
 /** GET /api/bookings — list bookings */
 export async function GET(request: NextRequest) {
   try {
+    // Auth required — previously open, leaked entire customer DB (names, LINE IDs,
+    // phones, payments). Admin → full tenant visibility. LIFF → own bookings only.
+    const auth = await requireBookingAuth(request);
+
     const { searchParams } = request.nextUrl;
-    const tenantId = searchParams.get("tenantId") || process.env.DEFAULT_TENANT_ID!;
+    const tenantId = auth.tenantId;
     const date = searchParams.get("date");
-    const userId = searchParams.get("userId");
-    const lineUserId = searchParams.get("lineUserId");
     const status = searchParams.get("status");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "50");
@@ -38,17 +40,31 @@ export async function GET(request: NextRequest) {
     } else if (date) {
       where.date = new Date(date + "T00:00:00+08:00");
     }
-    if (userId) where.userId = userId;
     if (status) where.status = status;
 
-    // If lineUserId provided, find user first
-    if (lineUserId) {
+    if (auth.type === "liff") {
+      // LIFF callers can ONLY see their own bookings. Query params userId /
+      // lineUserId are ignored — caller identity always comes from the verified
+      // ID token, never from URL params.
       const user = await prisma.user.findUnique({
-        where: { tenantId_lineUserId: { tenantId, lineUserId } },
+        where: { tenantId_lineUserId: { tenantId, lineUserId: auth.lineUserId } },
         select: { id: true },
       });
-      if (user) where.userId = user.id;
-      else return Response.json({ bookings: [], total: 0 });
+      if (!user) return Response.json({ bookings: [], total: 0, page, limit });
+      where.userId = user.id;
+    } else {
+      // Admin can optionally filter by userId or lineUserId.
+      const userId = searchParams.get("userId");
+      const lineUserId = searchParams.get("lineUserId");
+      if (userId) where.userId = userId;
+      if (lineUserId) {
+        const user = await prisma.user.findUnique({
+          where: { tenantId_lineUserId: { tenantId, lineUserId } },
+          select: { id: true },
+        });
+        if (user) where.userId = user.id;
+        else return Response.json({ bookings: [], total: 0, page, limit });
+      }
     }
 
     const [bookings, total] = await Promise.all([

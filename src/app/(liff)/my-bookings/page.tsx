@@ -54,12 +54,15 @@ export default function MyBookingsPage() {
   useEffect(() => {
     if (!isReady || !userId) return;
 
-    fetch(`/api/bookings?lineUserId=${userId}`)
+    const idToken = liff?.getIDToken?.() || "";
+    fetch(`/api/bookings`, {
+      headers: idToken ? { "X-LIFF-ID-Token": idToken } : {},
+    })
       .then((r) => r.json())
       .then((data) => setBookings(data.bookings || []))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [isReady, userId]);
+  }, [isReady, userId, liff]);
 
   const liffBaseUrl = typeof window !== "undefined"
     ? `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}`
