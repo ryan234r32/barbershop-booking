@@ -48,7 +48,10 @@ export default function CancelPage({
   useEffect(() => {
     if (!isReady) return;
 
-    fetch(`/api/bookings/${bookingId}`)
+    const idToken = liff?.getIDToken?.() || "";
+    fetch(`/api/bookings/${bookingId}`, {
+      headers: idToken ? { "X-LIFF-ID-Token": idToken } : {},
+    })
       .then((r) => r.json())
       .then((data) => {
         if (!data.booking) {

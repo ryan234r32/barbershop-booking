@@ -54,11 +54,14 @@ export default function PaymentPage({
   const cellRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const fetchBooking = useCallback(async () => {
-    const r = await fetch(`/api/bookings/${bookingId}`);
+    const idToken = liff?.getIDToken?.() || "";
+    const r = await fetch(`/api/bookings/${bookingId}`, {
+      headers: idToken ? { "X-LIFF-ID-Token": idToken } : {},
+    });
     const data = await r.json();
     setBooking(data.booking);
     return data.booking as BookingDetail | null;
-  }, [bookingId]);
+  }, [bookingId, liff]);
 
   useEffect(() => {
     if (!isReady) return;

@@ -87,7 +87,7 @@ export default function BookingDetailPage() {
   const fetchBooking = useCallback(async () => {
     try {
       setError(null);
-      const res = await fetch(`/api/bookings/${bookingId}`);
+      const res = await fetch(`/api/bookings/${bookingId}`, { headers: adminHeaders() });
       if (!res.ok) {
         throw new Error(res.status === 404 ? "找不到此預約" : "載入預約資料失敗");
       }

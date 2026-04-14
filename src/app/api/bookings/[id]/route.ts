@@ -13,8 +13,14 @@ import { requireBookingAuth, requireBookingOwnership, requireAdmin } from "@/lib
 type RouteParams = { params: Promise<{ id: string }> };
 
 /** GET /api/bookings/[id] — get single booking */
-export async function GET(_request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    // Auth required — previously open, leaked bank account numbers + customer
+    // PII for any booking ID. Admin → any booking in their tenant. LIFF → their
+    // own bookings only. Unknown ID returns 404 not 401 so attackers can't
+    // probe ID existence before authenticating.
+    const auth = await requireBookingAuth(request);
+
     const { id } = await params;
 
     const booking = await prisma.booking.findUnique({
@@ -39,6 +45,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     if (!booking) {
       return Response.json({ error: "Booking not found" }, { status: 404 });
     }
+
+    requireBookingOwnership(auth, booking);
 
     return Response.json({ booking });
   } catch (error) {

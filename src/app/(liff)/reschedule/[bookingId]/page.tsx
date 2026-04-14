@@ -55,12 +55,15 @@ export default function ReschedulePage({
 
   useEffect(() => {
     if (!isReady) return;
-    fetch(`/api/bookings/${bookingId}`)
+    const idToken = liff?.getIDToken?.() || "";
+    fetch(`/api/bookings/${bookingId}`, {
+      headers: idToken ? { "X-LIFF-ID-Token": idToken } : {},
+    })
       .then((r) => r.json())
       .then((data) => setBooking(data.booking || null))
       .catch(() => setBooking(null))
       .finally(() => setLoading(false));
-  }, [isReady, bookingId]);
+  }, [isReady, bookingId, liff]);
 
   const loadSlots = useCallback(
     async (date: string, serviceId: string) => {
