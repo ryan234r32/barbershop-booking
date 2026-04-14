@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Upstash Redis — distributed booking locks (`@upstash/lock`)
 - LINE: @line/bot-sdk v10 (legacy Client API) + @line/liff v2
 - Vercel deployment + Cron Jobs
-- Auth: custom JWT with httpOnly cookies (`admin_token`)
+- Auth: admin via custom JWT cookie (`admin_token`) + Authorization Bearer fallback for iOS PWA; LIFF customers via LINE ID token verified server-side against `api.line.me/oauth2/v2.1/verify`
 
 ## Commands
 ```bash
@@ -38,7 +38,9 @@ npm run db:migrate       # Create migration
 - `src/lib/line/` — LINE client singleton, Flex Message builders, webhook signature verification
 - `src/lib/notifications/` — DB-based scheduler (creates records picked up by cron)
 - `src/lib/auth/jwt.ts` — `signAdminToken()`, `verifyAdminToken()`, `getAdminFromCookie(request)`
-- `src/lib/utils/errors.ts` — `AppError`, `SlotUnavailableError`, `BookingRestrictedError`, `CancellationNotAllowedError`
+- `src/lib/auth/line-liff.ts` — `verifyLiffIdToken(token, channelId)` calls LINE verify endpoint; throws `LiffTokenVerificationError` with reason `invalid|expired|wrong_audience|network`
+- `src/lib/auth/booking-auth.ts` — `requireBookingAuth(request)` returns `{type:"admin",adminId,tenantId} | {type:"liff",lineUserId,displayName?,tenantId}`; admin wins if both present; throws `UnauthorizedError` otherwise
+- `src/lib/utils/errors.ts` — `AppError`, `SlotUnavailableError`, `BookingRestrictedError`, `CancellationNotAllowedError`, `UnauthorizedError`; `errorResponse()` handles `AppError`, `ZodError` (→ 400 with field-level issues), and unknown errors (→ generic 500)
 - `src/lib/utils/time.ts` — `nowTaipei()`, `isSameDay()`, `formatDateToISO()` — all timezone-aware
 - `src/lib/utils/validation.ts` — Zod schemas for all inputs
 - `src/lib/utils/constants.ts` — Business constants (`MAX_VIOLATIONS=3`, `BOOKING_LOCK_TTL_MS=10000`, etc.)
@@ -67,8 +69,17 @@ npm run db:migrate       # Create migration
 - `src/components/ui/modal.tsx` — Reusable modal (supports non-dismissible mode)
 - `src/components/admin/past-due-modal.tsx` — Forces admin to confirm 已收款/未到 for each past-due booking
 
+### V1.3 Security Hardening (2026-04)
+- `src/lib/auth/line-liff.ts` + `src/lib/auth/booking-auth.ts` — dual-path auth guard; killed body-supplied `lineUserId` impersonation
+- `POST /api/bookings` no longer leaks tenant secrets — tenant include uses `select` white-list
+- `errorResponse()` adds `ZodError` → 400 branch (previously surfaced as generic 500 "系統錯誤")
+- Server-side validation: past-date rejection, business-hours window check (startHour + slotsNeeded ≤ closeHour)
+- **Deferred TODOs:** apply `requireBookingAuth()` to `/api/bookings/[id]/reschedule` + `/cancel` (same impersonation risk); add rate limit to booking creation
+
 ### Booking Creation Flow (critical path)
-1. Validate input with Zod → 2. Fetch service → 3. Upsert user → 4. Check `user.bookingRestricted` → 5. **Acquire Redis lock** → 6. **Double-check slot availability** inside lock → 7. Create booking in DB → 8. Schedule reminders (async) → 9. Send LINE confirmation (async) → 10. **Notify admin via LINE** (async) → 11. **Release lock in finally block**
+0. **`requireBookingAuth(request)`** → 1. Validate input with Zod → 2. Fetch service → 2b. **Reject past dates** (Taipei TZ) + **enforce business hours** (startHour + slotsNeeded ≤ 20) → 3. Upsert user (lineUserId from auth; admin path synthesizes `manual-{adminId}-{uuid}`) → 4. Check `user.bookingRestricted` → 5. **Acquire Redis lock** → 6. **Double-check slot availability** inside lock → 7. Create booking in DB (tenant include uses `select` white-list — never returns `lineAccessToken`/`lineChannelSecret`/`bankAccountNumber`) → 8. Schedule reminders + 9. LINE confirmation (both skipped for admin-created bookings) → 10. **Notify admin via LINE** (async) → 11. **Release lock in finally block**
+
+Body-supplied `lineUserId` is **ignored** — caller identity always comes from verified auth. LIFF clients send `X-LIFF-ID-Token: <idToken>` header; admin clients send admin JWT cookie or `Authorization: Bearer <token>`.
 
 ### Cron Jobs (vercel.json, times in UTC → +8 for Taipei)
 - `/api/cron/reminders` — hourly, sends pending notification records via LINE
@@ -81,8 +92,10 @@ npm run db:migrate       # Create migration
 - All dates use **Asia/Taipei** timezone — always use `nowTaipei()` for current time
 - Slot times are always `"HH:00"` format (hourly slots)
 - `tenantId` is on every table and every DB query (multi-tenant)
-- Use `getAdminFromCookie(request)` for admin auth — takes `NextRequest` param
-- Use `errorResponse(error)` for all API error responses — handles custom error classes + generic 500
+- Use `getAdminFromCookie(request)` for admin-only endpoints — takes `NextRequest` param; checks cookie first, falls back to `Authorization: Bearer`
+- Use `requireBookingAuth(request)` for endpoints that create/modify bookings or customer data — accepts both admin JWT and LIFF ID token, never trusts body-supplied user IDs
+- Use `errorResponse(error)` for all API error responses — handles `AppError`/`ZodError` (→ 400 with issues) + generic 500
+- When including `tenant` in Prisma queries, always use `select` white-list (`id, businessName, address, phone, liffId`) — never `tenant: true`, which leaks `lineAccessToken` + `lineChannelSecret` to clients
 - Use `verifyCronSecret(request)` for cron auth — from `src/lib/utils/cron-auth.ts`
 - Use `logger.info/warn/error()` for structured logging — from `src/lib/utils/logger.ts`
 - Use `useToast()` for user-facing notifications — NOT `alert()` — from `src/components/ui/toast.tsx`
