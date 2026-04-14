@@ -45,7 +45,7 @@ export default async function Home() {
           <div className="pt-4">
             <a
               href="/login"
-              className="text-sm text-muted-foreground transition hover:text-foreground"
+              className="inline-block border-b border-muted-foreground/40 pb-0.5 text-sm text-muted-foreground transition hover:border-foreground hover:text-foreground"
             >
               店家管理後台
             </a>
