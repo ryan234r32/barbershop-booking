@@ -150,9 +150,12 @@ export default function CalendarPage() {
     if (view === "week") {
       return { from: formatDate(weekDates[0]), to: formatDate(weekDates[6]) };
     }
-    // month: fetch summary
-    return null;
-  }, [view, currentDate, weekDates]);
+    // month: fetch full month of bookings (for mini time bars)
+    const { year, month } = monthYear;
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    return { from: formatDate(firstDay), to: formatDate(lastDay) };
+  }, [view, currentDate, weekDates, monthYear]);
 
   const { data: bookingsData, isLoading, mutate: mutateBookings } = useSWR(
     dateRange ? `/api/bookings?from=${dateRange.from}&to=${dateRange.to}` : null,
@@ -466,6 +469,49 @@ export default function CalendarPage() {
       {/* ═══ DAY VIEW ═══ */}
       {view === "day" && !isLoading && (
         <>
+          {/* Horizontal date strip — 7 days centered on current */}
+          <div className="flex items-center gap-1 mb-3 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
+            {(() => {
+              const strip: Date[] = [];
+              for (let offset = -3; offset <= 3; offset++) {
+                const d = new Date(currentDate);
+                d.setDate(d.getDate() + offset);
+                strip.push(d);
+              }
+              return strip.map((d) => {
+                const selected = formatDate(d) === formatDate(currentDate);
+                const wdIndex = d.getDay();
+                const isWeekend = wdIndex === 0 || wdIndex === 6;
+                return (
+                  <button
+                    key={formatDate(d)}
+                    onClick={() => setCurrentDate(d)}
+                    className={`shrink-0 flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-colors ${
+                      selected
+                        ? "bg-[var(--color-brand)] text-[var(--color-bg)]"
+                        : "hover:bg-[var(--color-surface)]"
+                    }`}
+                  >
+                    <span className={`text-[10px] leading-none ${
+                      selected
+                        ? "text-[var(--color-bg)]/80"
+                        : isWeekend ? "text-[var(--color-danger)]" : "text-[var(--color-text-muted)]"
+                    }`}>
+                      {WEEKDAYS[wdIndex]}
+                    </span>
+                    <span className={`text-[15px] font-semibold leading-tight ${
+                      selected
+                        ? "text-[var(--color-bg)]"
+                        : isWeekend ? "text-[var(--color-danger)]" : "text-[var(--color-text-primary)]"
+                    }`}>
+                      {d.getDate()}
+                    </span>
+                  </button>
+                );
+              });
+            })()}
+          </div>
+
           {/* Near-End Banner */}
           {(() => {
             const nearEndList = todayBookings.filter((b) => nearEndBookings.has(b.id) && b.status === "CONFIRMED");
@@ -633,27 +679,27 @@ export default function CalendarPage() {
             </span>
           </div>
 
-          {/* Compact grid — fits in one viewport */}
-          <div className="rounded-lg">
-            <table className="w-full border-collapse text-center" style={{ tableLayout: "fixed" }}>
-              <thead>
+          {/* Scrollable grid — Fresha/夯客 style */}
+          <div className="rounded-lg overflow-y-auto relative" style={{ maxHeight: "calc(100vh - 260px)" }}>
+            <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
+              <thead className="sticky top-0 bg-[var(--color-bg)] z-10 shadow-sm">
                 <tr>
-                  <th className="w-6 p-0 text-[9px] text-[var(--color-text-muted)]" />
+                  <th className="w-8 p-0" />
                   {weekDates.map((d) => {
                     const today = isToday(d);
                     const wdIndex = d.getDay();
                     const isWeekend = wdIndex === 0 || wdIndex === 6;
                     return (
-                      <th key={formatDate(d)} className="p-1 pb-1.5">
+                      <th key={formatDate(d)} className="p-1 pb-1.5 text-center">
                         <button
                           onClick={() => { setCurrentDate(d); setView("day"); }}
                           className="flex flex-col items-center gap-0.5 w-full"
                         >
-                          <span className={`text-[9px] leading-none ${isWeekend ? "text-[var(--color-danger)]" : "text-[var(--color-text-muted)]"}`}>
+                          <span className={`text-[10px] leading-none ${isWeekend ? "text-[var(--color-danger)]" : "text-[var(--color-text-muted)]"}`}>
                             {WEEKDAYS[wdIndex]}
                           </span>
                           <span
-                            className={`text-[11px] font-semibold w-5 h-5 rounded-full inline-flex items-center justify-center transition-colors ${
+                            className={`text-[12px] font-semibold w-6 h-6 rounded-full inline-flex items-center justify-center transition-colors ${
                               today
                                 ? "bg-[var(--color-brand)] text-[var(--color-bg)]"
                                 : isWeekend ? "text-[var(--color-danger)]" : "text-[var(--color-text-primary)]"
@@ -669,8 +715,8 @@ export default function CalendarPage() {
               </thead>
               <tbody>
                 {HOURS.map((hour) => (
-                  <tr key={hour} style={{ height: 42 }}>
-                    <td className="p-0 text-[9px] text-[var(--color-text-muted)] font-mono align-top pt-0.5 pr-0.5">
+                  <tr key={hour} style={{ height: 70 }}>
+                    <td className="p-0 text-[11px] text-[var(--color-text-muted)] font-mono align-top pt-1 text-center border-t border-[var(--color-surface)]/60">
                       {hour.slice(0, 2)}
                     </td>
                     {weekDates.map((d) => {
@@ -684,23 +730,33 @@ export default function CalendarPage() {
                       if (booking) {
                         const paid = isPaid(booking);
                         const cellBg = paid
-                          ? "bg-[var(--color-success)]/25 hover:bg-[var(--color-success)]/35"
-                          : "bg-[var(--color-brand)]/20 hover:bg-[var(--color-brand)]/30";
-                        const name = booking.user.displayName || "客";
-                        // Show max 3 characters (Chinese or alphanumeric)
-                        const displayName = name.length > 3 ? name.slice(0, 3) : name;
+                          ? "bg-[var(--color-success)]/20 hover:bg-[var(--color-success)]/30"
+                          : "bg-[var(--color-brand)]/10 hover:bg-[var(--color-brand)]/20";
+                        const name = booking.user.displayName || "顧客";
+                        const serviceShort = booking.service.name.length > 4
+                          ? booking.service.name.slice(0, 4)
+                          : booking.service.name;
                         return (
                           <td
                             key={dateStr + hour}
                             rowSpan={booking.slotsOccupied > 1 ? booking.slotsOccupied : 1}
-                            className="p-0.5 align-top"
+                            className="p-0.5 align-top border-t border-[var(--color-surface)]/60"
                           >
                             <div
                               onClick={() => openBookingDetail(booking)}
-                              className={`w-full h-full rounded p-0.5 cursor-pointer transition-colors flex items-center justify-center overflow-hidden ${cellBg}`}
+                              className={`w-full h-full rounded p-1 cursor-pointer transition-colors flex flex-col overflow-hidden ${cellBg}`}
                             >
-                              <span className="text-[10px] font-semibold text-[var(--color-text-primary)] leading-none truncate">
-                                {displayName}
+                              {/* Time range */}
+                              <p className="text-[8px] text-[var(--color-text-muted)] font-mono leading-none mb-0.5 truncate">
+                                {booking.startTime.slice(0, 5)}
+                              </p>
+                              {/* Customer name */}
+                              <p className="text-[11px] font-semibold text-[var(--color-text-primary)] leading-tight truncate">
+                                {name.length > 4 ? name.slice(0, 4) : name}
+                              </p>
+                              {/* Service pill */}
+                              <span className="mt-auto inline-block px-1 py-px rounded bg-[var(--color-bg)]/70 text-[9px] text-[var(--color-text-body)] leading-tight truncate">
+                                {serviceShort}
                               </span>
                             </div>
                           </td>
@@ -708,9 +764,9 @@ export default function CalendarPage() {
                       }
 
                       return (
-                        <td key={dateStr + hour} className="p-0.5">
+                        <td key={dateStr + hour} className="p-0.5 border-t border-[var(--color-surface)]/60">
                           <div
-                            className="w-full h-full rounded transition-colors cursor-pointer bg-[var(--color-bg)] border border-[var(--color-surface)] hover:bg-[var(--color-surface)]"
+                            className="w-full h-full rounded transition-colors cursor-pointer hover:bg-[var(--color-surface)]/50"
                             onClick={() => { setCurrentDate(d); setView("day"); }}
                           />
                         </td>
@@ -720,6 +776,27 @@ export default function CalendarPage() {
                 ))}
               </tbody>
             </table>
+
+            {/* Current time indicator (red line across all columns) */}
+            {(() => {
+              const h = now.getHours();
+              const m = now.getMinutes();
+              if (h < 11 || h >= 20) return null;
+              if (!weekDates.some((d) => isToday(d))) return null;
+              // 34 = thead height, 70 = week row height
+              const top = 34 + (h - 11 + m / 60) * 70;
+              return (
+                <div
+                  className="absolute left-0 right-0 pointer-events-none z-20 flex items-center"
+                  style={{ top }}
+                >
+                  <span className="text-[9px] font-semibold text-[var(--color-danger)] font-mono w-8 text-center">
+                    {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}
+                  </span>
+                  <div className="flex-1 h-[1.5px] bg-[var(--color-danger)]" />
+                </div>
+              );
+            })()}
           </div>
         </>
       )}
@@ -748,7 +825,7 @@ export default function CalendarPage() {
 
                 // Empty cells before first day
                 for (let i = 0; i < firstDay; i++) {
-                  cells.push(<div key={`empty-${i}`} className="h-14" />);
+                  cells.push(<div key={`empty-${i}`} className="h-[72px]" />);
                 }
 
                 // Day cells
@@ -758,29 +835,56 @@ export default function CalendarPage() {
                   const count = summary?.count || 0;
                   const today = dateStr === todayStr;
 
-                  // Busy bar opacity
-                  const barOpacity = count === 0 ? 0 : count <= 3 ? 0.2 : count <= 6 ? 0.5 : 0.8;
+                  // Get first 2 bookings for mini time bars
+                  const dayBookings = bookings
+                    .filter((b) =>
+                      b.date.startsWith(dateStr) &&
+                      b.status !== "CANCELLED" &&
+                      b.status !== "CANCELLED_BY_ADMIN"
+                    )
+                    .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                    .slice(0, 2);
 
                   cells.push(
                     <button
                       key={day}
                       onClick={() => { setCurrentDate(new Date(year, month, day)); setView("day"); }}
-                      className={`h-14 rounded-lg flex flex-col items-center justify-center relative transition-colors hover:bg-[var(--color-surface)] ${
+                      className={`h-[72px] rounded-lg flex flex-col items-stretch p-1 relative transition-colors hover:bg-[var(--color-surface)] ${
                         today ? "ring-2 ring-[var(--color-brand)]" : ""
                       }`}
                     >
-                      <span className={`text-sm font-semibold ${today ? "text-[var(--color-brand)]" : "text-[var(--color-text-primary)]"}`}>
-                        {day}
-                      </span>
-                      {count > 0 && (
-                        <span className="text-[10px] text-[var(--color-text-body)]">{count}</span>
-                      )}
-                      {barOpacity > 0 && (
-                        <div
-                          className="absolute bottom-1 left-2 right-2 h-1 rounded-full bg-[var(--color-brand)]"
-                          style={{ opacity: barOpacity }}
-                        />
-                      )}
+                      {/* Date + count */}
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className={`text-[13px] font-semibold leading-none ${today ? "text-[var(--color-brand)]" : "text-[var(--color-text-primary)]"}`}>
+                          {day}
+                        </span>
+                        {count > 0 && (
+                          <span className="text-[9px] text-[var(--color-text-muted)] leading-none">
+                            合計 {count}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Mini time bars (first 2 bookings) */}
+                      <div className="flex-1 flex flex-col gap-0.5 items-start">
+                        {dayBookings.map((b) => {
+                          const paid = isPaid(b);
+                          const barBg = paid
+                            ? "bg-[var(--color-success)]/30 text-[var(--color-success)]"
+                            : "bg-[var(--color-brand)]/15 text-[var(--color-brand)]";
+                          return (
+                            <div
+                              key={b.id}
+                              className={`w-full px-1 py-px rounded text-[8px] font-mono leading-none truncate ${barBg}`}
+                            >
+                              {b.startTime.slice(0, 5)}
+                            </div>
+                          );
+                        })}
+                        {count > 2 && (
+                          <span className="text-[8px] text-[var(--color-text-muted)] leading-none">+{count - 2}</span>
+                        )}
+                      </div>
                     </button>
                   );
                 }
