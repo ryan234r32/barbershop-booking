@@ -266,15 +266,30 @@ export default function CalendarPage() {
     return Math.max(11, Math.min(20, 11 + row));
   }, []);
 
+  // Track if pointer moved significantly (distinguishes tap vs drag-to-scroll attempt)
+  const dragModeActiveRef = useRef(false);
+
   const handleSlotPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>, startHour: number) => {
       const dateStr = formatDate(currentDate);
       const hourStr = `${String(startHour).padStart(2, "0")}:00`;
       if (isSlotOccupied(dateStr, hourStr)) return;
 
-      dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+      // Capture pointer to this element — all subsequent pointer events
+      // will fire on this element even if finger moves outside.
+      const target = e.currentTarget;
+      try {
+        target.setPointerCapture(e.pointerId);
+      } catch {
+        // silent — some browsers may reject
+      }
 
+      dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+      dragModeActiveRef.current = false;
+
+      // Long-press timer (350ms): enter drag mode
       longPressTimerRef.current = setTimeout(() => {
+        dragModeActiveRef.current = true;
         setDragState({ startHour, endHour: startHour + 1, active: true });
         if ("vibrate" in navigator) navigator.vibrate?.(30);
       }, 350);
@@ -282,57 +297,81 @@ export default function CalendarPage() {
     [currentDate, isSlotOccupied]
   );
 
-  const handleTimelinePointerMove = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (longPressTimerRef.current && dragStartPosRef.current && !dragState) {
-        const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
-        const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
-        if (dx > 10 || dy > 10) {
-          clearTimeout(longPressTimerRef.current);
-          longPressTimerRef.current = null;
+  const handleSlotPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>, startHour: number) => {
+      // Before long-press fires: if finger moves > 10px, cancel (user is trying to scroll — but we already prevented that with touch-action: none, so this just cancels drag intent)
+      if (!dragModeActiveRef.current) {
+        if (longPressTimerRef.current && dragStartPosRef.current) {
+          const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
+          const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
+          if (dx > 10 || dy > 10) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+          }
         }
         return;
       }
 
-      if (dragState && dragState.active && timelineRef.current) {
+      // Drag mode active: update endHour based on finger Y position
+      if (timelineRef.current) {
         e.preventDefault();
         const rect = timelineRef.current.getBoundingClientRect();
         const y = e.clientY - rect.top + timelineRef.current.scrollTop;
         const hour = yToHour(y);
-        const maxEnd = findMaxEndHour(dragState.startHour);
-        const newEnd = Math.max(dragState.startHour + 1, Math.min(maxEnd, hour + 1));
-        if (newEnd !== dragState.endHour) {
-          setDragState({ ...dragState, endHour: newEnd });
-        }
+        const maxEnd = findMaxEndHour(startHour);
+        const newEnd = Math.max(startHour + 1, Math.min(maxEnd, hour + 1));
+        setDragState((prev) => {
+          if (!prev || prev.endHour === newEnd) return prev;
+          return { ...prev, endHour: newEnd };
+        });
       }
     },
-    [dragState, findMaxEndHour, yToHour]
+    [findMaxEndHour, yToHour]
   );
 
-  const handleTimelinePointerUp = useCallback(
-    (_e: React.PointerEvent<HTMLDivElement>, fallbackHour?: number) => {
+  const handleSlotPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>, startHour: number) => {
+      // Release pointer capture
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        // silent
+      }
+
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
       dragStartPosRef.current = null;
 
-      if (dragState && dragState.active) {
+      // Drag mode completed → open sheet with calculated duration
+      if (dragModeActiveRef.current && dragState?.active) {
         const duration = dragState.endHour - dragState.startHour;
         const timeStr = `${String(dragState.startHour).padStart(2, "0")}:00`;
+        dragModeActiveRef.current = false;
         setDragState(null);
         openNewBooking(formatDate(currentDate), timeStr, duration);
         return;
       }
 
-      if (fallbackHour !== undefined) {
-        const timeStr = `${String(fallbackHour).padStart(2, "0")}:00`;
-        openNewBooking(formatDate(currentDate), timeStr, 1);
-      }
+      // Quick tap → open sheet with 1h
+      dragModeActiveRef.current = false;
       setDragState(null);
+      const timeStr = `${String(startHour).padStart(2, "0")}:00`;
+      openNewBooking(formatDate(currentDate), timeStr, 1);
     },
     [dragState, currentDate]
   );
+
+  const handleSlotPointerCancel = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    dragStartPosRef.current = null;
+    dragModeActiveRef.current = false;
+    setDragState(null);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -464,8 +503,7 @@ export default function CalendarPage() {
           <div
             ref={timelineRef}
             className="relative overflow-y-auto"
-            style={{ maxHeight: "calc(100vh - 280px)", touchAction: dragState?.active ? "none" : "pan-y" }}
-            onPointerMove={handleTimelinePointerMove}
+            style={{ maxHeight: "calc(100vh - 280px)", touchAction: "pan-y" }}
           >
             {HOURS.map((hour) => {
               const dateStr = formatDate(currentDate);
@@ -519,7 +557,10 @@ export default function CalendarPage() {
                     ) : (
                       <div
                         onPointerDown={(e) => handleSlotPointerDown(e, parseInt(hour.split(":")[0]))}
-                        onPointerUp={(e) => handleTimelinePointerUp(e, parseInt(hour.split(":")[0]))}
+                        onPointerMove={(e) => handleSlotPointerMove(e, parseInt(hour.split(":")[0]))}
+                        onPointerUp={(e) => handleSlotPointerUp(e, parseInt(hour.split(":")[0]))}
+                        onPointerCancel={handleSlotPointerCancel}
+                        style={{ touchAction: "none" }}
                         className="h-full rounded-lg border border-dashed border-[var(--color-text-muted)]/20 flex items-center justify-center cursor-pointer hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-brand)]/5 transition-colors select-none"
                       >
                         <span className="text-xs text-[var(--color-text-muted)]">點擊新增・長按拖拉</span>
