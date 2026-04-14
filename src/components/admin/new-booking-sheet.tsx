@@ -86,7 +86,6 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          tenantId: process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID || "",
           lineUserId: `admin-${Date.now()}`,
           displayName: customerName.trim(),
           phone: phone.trim() || undefined,

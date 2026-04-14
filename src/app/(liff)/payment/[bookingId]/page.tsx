@@ -42,7 +42,7 @@ export default function PaymentPage({
   params: Promise<{ bookingId: string }>;
 }) {
   const { bookingId } = use(params);
-  const { isReady } = useLiff();
+  const { isReady, liff } = useLiff();
   const { toast } = useToast();
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,12 +71,20 @@ export default function PaymentPage({
 
     setUploading(true);
     try {
+      const idToken = liff?.getIDToken();
+      if (!idToken) {
+        toast({ message: "請先登入 LINE", type: "error" });
+        setUploading(false);
+        return;
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       formData.append("bookingId", bookingId);
 
       const res = await fetch("/api/payments/upload", {
         method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
         body: formData,
       });
 
@@ -115,9 +123,17 @@ export default function PaymentPage({
     if (paymentMethod === "cash") {
       // Notify backend so it can record method + send LINE push
       try {
+        const idToken = liff?.getIDToken();
+        if (!idToken) {
+          toast({ message: "請先登入 LINE", type: "error" });
+          return;
+        }
         await fetch(`/api/payments/${bookingId}/confirm`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
           body: JSON.stringify({ method: "CASH" }),
         });
       } catch { /* non-blocking */ }

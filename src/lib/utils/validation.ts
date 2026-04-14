@@ -8,8 +8,10 @@ export const createBookingSchema = z.object({
   lineUserId: z.string().min(1),
   notes: z.string().optional(),
   realName: z.string().optional(),
+  displayName: z.string().optional(),
   phone: z.string().optional(),
   birthday: z.string().optional(), // "MM-DD" format
+  source: z.enum(["LIFF", "PHONE", "WALK_IN"]).optional(),
 });
 
 export const cancelBookingSchema = z.object({

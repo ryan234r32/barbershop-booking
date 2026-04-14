@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getLineClient } from "@/lib/line/client";
 import { verifyLineSignature } from "@/lib/line/webhook";
 import { logger } from "@/lib/utils/logger";
+import { persistInboundMessage, persistOutboundMessage } from "@/lib/messages/persist";
 import { nowTaipei, formatTime } from "@/lib/utils/time";
 import { TIMEZONE } from "@/lib/utils/constants";
 import {
@@ -94,10 +95,13 @@ async function handleEvent(
     }
 
     case "message": {
+      // Persist inbound first (fire-and-forget, does not block webhook response)
+      persistInboundMessage(event, tenantId);
+
       if (!event.replyToken) break;
+      const lineUserId = event.source.userId || "";
 
       if (event.message.type === "text") {
-        const lineUserId = event.source.userId || "";
         const reply = await buildKeywordReply(event.message.text, tenantId, lineUserId);
 
         if (reply.usePush && lineUserId) {
@@ -108,17 +112,24 @@ async function handleEvent(
         } else {
           await lineClient.replyMessage(event.replyToken, reply.message);
         }
+
+        if (lineUserId) {
+          persistOutboundMessage({ tenantId, lineUserId, message: reply.message });
+        }
       } else if (
         event.message.type === "sticker" ||
         event.message.type === "image" ||
         event.message.type === "video" ||
         event.message.type === "audio"
       ) {
-        // Non-text messages: friendly redirect to text menu
-        await lineClient.replyMessage(event.replyToken, {
-          type: "text",
+        const fallback = {
+          type: "text" as const,
           text: "謝謝您的訊息！請輸入文字或點擊下方選單操作 😊",
-        });
+        };
+        await lineClient.replyMessage(event.replyToken, fallback);
+        if (lineUserId) {
+          persistOutboundMessage({ tenantId, lineUserId, message: fallback });
+        }
       }
       break;
     }

@@ -161,6 +161,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // --- Mark as completed ---
     if (action === "complete") {
+      // Optional paymentMethod from admin's "完成(現金)" / "完成(轉帳)" quick actions
+      const rawMethod = body.paymentMethod as string | undefined;
+      const paymentMethod: "CASH" | "BANK_TRANSFER" | null =
+        rawMethod === "CASH" || rawMethod === "BANK_TRANSFER" ? rawMethod : null;
+
       const updated = await prisma.$transaction(async (tx) => {
         const b = await tx.booking.update({
           where: { id },
@@ -176,6 +181,25 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
             firstVisitAt: booking.user.firstVisitAt || new Date(),
           },
         });
+
+        // If admin specified payment method, upsert payment record as RECEIVED
+        if (paymentMethod) {
+          await tx.payment.upsert({
+            where: { bookingId: id },
+            create: {
+              bookingId: id,
+              amount: booking.service.price,
+              method: paymentMethod,
+              status: "RECEIVED",
+              receivedAt: new Date(),
+            },
+            update: {
+              method: paymentMethod,
+              status: "RECEIVED",
+              receivedAt: new Date(),
+            },
+          });
+        }
 
         return b;
       });

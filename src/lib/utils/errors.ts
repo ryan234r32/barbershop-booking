@@ -1,3 +1,5 @@
+import { ZodError } from "zod";
+
 export class AppError extends Error {
   constructor(
     message: string,
@@ -41,6 +43,18 @@ export function errorResponse(error: unknown) {
     return Response.json(
       { error: error.message, code: error.code },
       { status: error.statusCode }
+    );
+  }
+  if (error instanceof ZodError) {
+    const firstIssue = error.issues[0];
+    const fieldPath = firstIssue?.path.join(".") || "input";
+    return Response.json(
+      {
+        error: `輸入格式錯誤：${fieldPath}`,
+        code: "VALIDATION_ERROR",
+        issues: error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
+      },
+      { status: 400 }
     );
   }
   console.error("Unexpected error:", error);

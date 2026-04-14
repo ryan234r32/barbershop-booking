@@ -42,6 +42,9 @@ model Tenant {
   adminUsers        AdminUser[]
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
+  messages          Message[]
+
+  quickReplies      Json?              @map("quick_replies")
 
   @@map("tenants")
 }
@@ -138,6 +141,7 @@ model User {
   tenant            Tenant          @relation(fields: [tenantId], references: [id])
   bookings          Booking[]
   cancellationRecords CancellationRecord[]
+  messages          Message[]
 
   @@unique([tenantId, lineUserId])
   @@index([tenantId, segment])
@@ -367,4 +371,53 @@ enum NotificationStatus {
   SENT
   FAILED
   CANCELLED
+}
+
+// ============================================
+// MESSAGES (LINE Chat Inbox)
+// ============================================
+
+model Message {
+  id              String           @id @default(uuid())
+  tenantId        String           @map("tenant_id")
+  userId          String?          @map("user_id")
+  lineUserId      String           @map("line_user_id")
+  lineMessageId   String?          @map("line_message_id")
+  clientMessageId String?          @map("client_message_id")
+  direction       MessageDirection
+  type            MessageType
+  content         String?          @db.Text
+
+  // raw: LINE event payload. Debug/sticker metadata only.
+  // Do NOT query into this column (no JSON where clauses); add a dedicated
+  // column if a new query need emerges.
+  raw             Json?
+
+  isRead          Boolean          @default(false) @map("is_read")
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+
+  @@unique([lineUserId, lineMessageId])
+  @@unique([tenantId, clientMessageId])
+  @@index([tenantId, lineUserId, createdAt(sort: Desc)])
+  @@index([tenantId, isRead])
+  @@map("messages")
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageType {
+  TEXT
+  STICKER
+  IMAGE
+  VIDEO
+  AUDIO
+  LOCATION
+  FILE
+  OTHER
 }

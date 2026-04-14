@@ -1,7 +1,10 @@
 import jwt from "jsonwebtoken";
 import { NextRequest } from "next/server";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is required");
+}
+const JWT_SECRET: string = process.env.JWT_SECRET;
 const COOKIE_NAME = "admin_token";
 
 export interface AdminJwtPayload {

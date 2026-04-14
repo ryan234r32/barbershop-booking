@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getLineClient } from "@/lib/line/client";
 import { errorResponse } from "@/lib/utils/errors";
 import { logger } from "@/lib/utils/logger";
+import { getLineUserIdFromRequest } from "@/lib/liff/verify-id-token";
 
 type RouteParams = { params: Promise<{ bookingId: string }> };
 
@@ -10,6 +11,12 @@ type RouteParams = { params: Promise<{ bookingId: string }> };
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { bookingId } = await params;
+
+    const lineUserId = await getLineUserIdFromRequest(request);
+    if (!lineUserId) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const method = body.method as "CASH" | "BANK_TRANSFER";
 
@@ -23,6 +30,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (!booking) {
       return Response.json({ error: "Booking not found" }, { status: 404 });
+    }
+
+    if (booking.user.lineUserId !== lineUserId) {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Upsert payment record with chosen method

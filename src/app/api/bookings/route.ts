@@ -7,8 +7,9 @@ import { getLineClient } from "@/lib/line/client";
 import { bookingConfirmationMessage } from "@/lib/line/messages";
 import { notifyAdminNewBooking } from "@/lib/notifications/admin-notify";
 import { createBookingSchema } from "@/lib/utils/validation";
-import { errorResponse, SlotUnavailableError, BookingRestrictedError } from "@/lib/utils/errors";
-import { addHours } from "@/lib/utils/time";
+import { errorResponse, AppError, SlotUnavailableError, BookingRestrictedError } from "@/lib/utils/errors";
+import { addHours, parseTimeToHour, nowTaipei } from "@/lib/utils/time";
+import { DEFAULT_BUSINESS_HOURS } from "@/lib/utils/constants";
 import { logger } from "@/lib/utils/logger";
 
 /** GET /api/bookings — list bookings */
@@ -84,6 +85,24 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Service not found" }, { status: 404 });
     }
 
+    // 1b. Validate date is not in the past (Taipei timezone)
+    const today = nowTaipei().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+    if (input.date < today) {
+      throw new AppError("預約日期不可為過去", 400, "PAST_DATE");
+    }
+
+    // 1c. Validate startTime + slotsNeeded fits within business hours
+    const startHour = parseTimeToHour(input.startTime);
+    const openHour = parseTimeToHour(DEFAULT_BUSINESS_HOURS.startTime);
+    const closeHour = parseTimeToHour(DEFAULT_BUSINESS_HOURS.endTime);
+    if (startHour < openHour || startHour + service.slotsNeeded > closeHour) {
+      throw new AppError(
+        `預約時段須在營業時間內（${DEFAULT_BUSINESS_HOURS.startTime}–${DEFAULT_BUSINESS_HOURS.endTime}）`,
+        400,
+        "OUTSIDE_BUSINESS_HOURS"
+      );
+    }
+
     // 2. Get or create user
     let user = await prisma.user.findUnique({
       where: {
@@ -103,9 +122,10 @@ export async function POST(request: NextRequest) {
     }
 
     // 2b. Update user profile if provided
-    if (input.realName || input.phone || input.birthday) {
+    if (input.realName || input.displayName || input.phone || input.birthday) {
       const profileUpdate: Record<string, unknown> = {};
       if (input.realName) profileUpdate.realName = input.realName;
+      if (input.displayName) profileUpdate.displayName = input.displayName;
       if (input.phone) profileUpdate.phone = input.phone;
       if (input.birthday) {
         // birthday comes as "YYYY-MM-DD" from frontend (western year)
@@ -164,50 +184,67 @@ export async function POST(request: NextRequest) {
           startTime: input.startTime,
           endTime,
           slotsOccupied: service.slotsNeeded,
-          source: "LIFF",
+          source: input.source || "LIFF",
           notes: input.notes,
         },
         include: {
           service: true,
-          tenant: true,
+          // Only safe, client-visible tenant fields — never include lineAccessToken,
+          // lineChannelSecret, or bankAccountNumber in API responses.
+          tenant: {
+            select: {
+              id: true,
+              businessName: true,
+              address: true,
+              phone: true,
+              liffId: true,
+            },
+          },
         },
       });
 
+      // Admin-created bookings use synthetic lineUserId (e.g. "admin-<ts>") — skip LINE push & reminders
+      const isRealLineUser = !input.lineUserId.startsWith("admin-");
+
       // 8. Schedule reminders (async, don't block response)
-      scheduleReminders({
-        tenantId,
-        bookingId: booking.id,
-        lineUserId: input.lineUserId,
-        bookingDate: dateObj,
-        startTime: input.startTime,
-      }).catch((err) => logger.error("Failed to schedule reminders", err, "bookings", { bookingId: booking.id }));
+      if (isRealLineUser) {
+        scheduleReminders({
+          tenantId,
+          bookingId: booking.id,
+          lineUserId: input.lineUserId,
+          bookingDate: dateObj,
+          startTime: input.startTime,
+        }).catch((err) => logger.error("Failed to schedule reminders", err, "bookings", { bookingId: booking.id }));
+      }
 
       // 9. Send LINE confirmation (async)
-      try {
-        const lineClient = getLineClient();
-        const liffBaseUrl = booking.tenant.liffId
-          ? `https://liff.line.me/${booking.tenant.liffId}`
-          : undefined;
-        const message = bookingConfirmationMessage({
-          serviceName: service.name,
-          date: input.date,
-          startTime: input.startTime,
-          endTime,
-          shopName: booking.tenant.businessName,
-          shopAddress: booking.tenant.address || undefined,
-          price: service.price,
-          bookingId: booking.id,
-          liffBaseUrl,
-        });
-        await lineClient.pushMessage(input.lineUserId, message);
-      } catch (lineError) {
-        logger.error("Failed to send LINE confirmation", lineError, "bookings", { lineUserId: input.lineUserId });
+      if (isRealLineUser) {
+        try {
+          const lineClient = getLineClient();
+          const liffBaseUrl = booking.tenant.liffId
+            ? `https://liff.line.me/${booking.tenant.liffId}`
+            : undefined;
+          const message = bookingConfirmationMessage({
+            serviceName: service.name,
+            date: input.date,
+            startTime: input.startTime,
+            endTime,
+            shopName: booking.tenant.businessName,
+            shopAddress: booking.tenant.address || undefined,
+            price: service.price,
+            bookingId: booking.id,
+            liffBaseUrl,
+          });
+          await lineClient.pushMessage(input.lineUserId, message);
+        } catch (lineError) {
+          logger.error("Failed to send LINE confirmation", lineError, "bookings", { lineUserId: input.lineUserId });
+        }
       }
 
       // 10. Notify admin (fire-and-forget)
       notifyAdminNewBooking({
-        tenantId: input.tenantId,
-        displayName: user.displayName || "未知顧客",
+        tenantId,
+        displayName: user.displayName || input.displayName || "未知顧客",
         serviceName: service.name,
         date: input.date,
         startTime: input.startTime,

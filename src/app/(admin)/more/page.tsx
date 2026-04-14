@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAdmin } from "@/lib/admin/auth-context";
+import { NotificationToggle } from "@/components/admin/notification-toggle";
 import {
   Users,
   Scissors,
@@ -46,6 +47,11 @@ export default function MorePage() {
             {admin?.email}
           </p>
         </div>
+      </div>
+
+      {/* Notifications */}
+      <div className="mb-4">
+        <NotificationToggle />
       </div>
 
       {/* Menu items */}

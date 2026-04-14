@@ -3,12 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/utils/logger";
 import { nowTaipei } from "@/lib/utils/time";
 
-webpush.setVapidDetails(
-  "mailto:admin@1008hairstudio.com",
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
-
 interface PushPayload {
   title: string;
   body: string;
@@ -17,8 +11,35 @@ interface PushPayload {
 }
 
 /**
+ * Lazy initialise VAPID on first use.
+ * Returns true when configured and ready; false when env is missing.
+ * Missing env must not crash module import — the feature just becomes inert.
+ */
+let vapidReady: boolean | null = null;
+function ensureVapidConfigured(): boolean {
+  if (vapidReady !== null) return vapidReady;
+  const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const priv = process.env.VAPID_PRIVATE_KEY;
+  const subject = process.env.VAPID_SUBJECT || "mailto:admin@1008hairstudio.com";
+  if (!pub || !priv) {
+    logger.warn("Web Push disabled — VAPID keys not configured", "web-push");
+    vapidReady = false;
+    return false;
+  }
+  try {
+    webpush.setVapidDetails(subject, pub, priv);
+    vapidReady = true;
+    return true;
+  } catch (err) {
+    logger.error("Web Push VAPID configuration failed", err as Error, "web-push");
+    vapidReady = false;
+    return false;
+  }
+}
+
+/**
  * Send Web Push to all subscriptions for a tenant's admin users.
- * Respects quiet hours (20:00-11:00 Taipei time).
+ * Respects quiet hours (20:00-08:00 Taipei time).
  * Fire-and-forget — never throws.
  */
 export async function sendWebPushToAdmin(
@@ -26,7 +47,8 @@ export async function sendWebPushToAdmin(
   payload: PushPayload
 ) {
   try {
-    // 安靜時段：20:00 後不推播
+    if (!ensureVapidConfigured()) return;
+
     const now = nowTaipei();
     const hour = now.getHours();
     if (hour >= 20 || hour < 8) {

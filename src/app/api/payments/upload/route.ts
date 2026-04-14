@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
 import { errorResponse } from "@/lib/utils/errors";
+import { getLineUserIdFromRequest } from "@/lib/liff/verify-id-token";
 
 function getSupabase() {
   return createClient(
@@ -13,12 +14,32 @@ function getSupabase() {
 /** POST /api/payments/upload — upload transfer screenshot */
 export async function POST(request: NextRequest) {
   try {
+    const lineUserId = await getLineUserIdFromRequest(request);
+    if (!lineUserId) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     const bookingId = formData.get("bookingId") as string | null;
 
     if (!file || !bookingId) {
       return Response.json({ error: "Missing file or bookingId" }, { status: 400 });
+    }
+
+    // Verify the booking belongs to this LINE user (fetched once, reused below)
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        user: { select: { lineUserId: true } },
+        service: { select: { price: true } },
+      },
+    });
+    if (!booking) {
+      return Response.json({ error: "Booking not found" }, { status: 404 });
+    }
+    if (booking.user.lineUserId !== lineUserId) {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Validate file type
@@ -53,11 +74,6 @@ export async function POST(request: NextRequest) {
       .getPublicUrl(filePath);
 
     // Upsert payment record with screenshot URL
-    const booking = await prisma.booking.findUnique({
-      where: { id: bookingId },
-      select: { service: { select: { price: true } } },
-    });
-
     const payment = await prisma.payment.upsert({
       where: { bookingId },
       update: {
@@ -66,7 +82,7 @@ export async function POST(request: NextRequest) {
       },
       create: {
         bookingId,
-        amount: booking?.service.price || 0,
+        amount: booking.service.price,
         method: "BANK_TRANSFER",
         status: "PENDING",
         screenshotUrl: urlData.publicUrl,

@@ -2,16 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calendar, BarChart3, MoreHorizontal } from "lucide-react";
+import useSWR from "swr";
+import { Calendar, MessageSquare, BarChart3, MoreHorizontal } from "lucide-react";
 
 const TABS = [
   { href: "/calendar", label: "日曆", icon: Calendar },
+  { href: "/messages", label: "訊息", icon: MessageSquare },
   { href: "/analytics", label: "報表", icon: BarChart3 },
   { href: "/more", label: "更多", icon: MoreHorizontal },
 ] as const;
 
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
 export function AdminTabBar() {
   const pathname = usePathname();
+  // Poll infrequently (30s) purely as a safety net. Push + focus handle real-time.
+  const { data } = useSWR<{ totalUnread: number }>(
+    "/api/admin/messages",
+    fetcher,
+    { refreshInterval: 30000, revalidateOnFocus: true },
+  );
+  const unread = data?.totalUnread ?? 0;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 lg:hidden border-t border-[var(--color-surface)] bg-[var(--color-bg)] safe-area-bottom">
@@ -37,7 +48,14 @@ export function AdminTabBar() {
               {isActive && (
                 <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-[var(--color-brand)] rounded-full" />
               )}
-              <Icon size={20} strokeWidth={isActive ? 2.2 : 1.5} />
+              <div className="relative">
+                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.5} />
+                {tab.href === "/messages" && unread > 0 && (
+                  <span className="absolute -top-1.5 -right-2 min-w-[16px] h-[16px] px-1 rounded-full bg-[var(--color-danger)] text-white text-[9px] font-bold leading-[16px] text-center">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
+              </div>
               <span className="text-[10px] font-medium tracking-wide">
                 {tab.label}
               </span>
