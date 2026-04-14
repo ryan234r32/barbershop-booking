@@ -103,9 +103,9 @@ const icons: Record<ToastType, ReactNode> = {
 
 const colorMap: Record<ToastType, string> = {
   success:
-    "bg-primary/10 text-primary border-primary/30 shadow-primary/10",
-  error: "bg-destructive/10 text-destructive border-destructive/30 shadow-destructive/10",
-  info: "bg-[var(--color-brand)]/8 text-[var(--color-brand)] border-[var(--color-brand)]/20 shadow-[var(--color-brand)]/10",
+    "bg-[var(--color-success)] text-[var(--color-bg)] border-[var(--color-success)]",
+  error: "bg-[var(--color-danger)] text-[var(--color-bg)] border-[var(--color-danger)]",
+  info: "bg-[var(--color-brand)] text-[var(--color-bg)] border-[var(--color-brand)]",
 };
 
 /* ------------------------------------------------------------------ */
@@ -201,11 +201,12 @@ function ToastItem({
     <div
       role="alert"
       className={`
-        pointer-events-auto flex items-center gap-2 px-4 py-3 rounded-lg border
-        shadow-lg text-sm font-medium transition-all duration-300 ease-out
+        pointer-events-auto flex items-center gap-2 px-4 py-3 rounded-lg
+        shadow-xl text-sm font-medium transition-all duration-300 ease-out
         ${colorMap[item.type]}
         ${visible && !item.leaving ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-3"}
       `}
+      style={{ boxShadow: "0 10px 25px rgba(0, 61, 43, 0.25)" }}
     >
       {icons[item.type]}
       <span className="flex-1 leading-snug">{item.message}</span>
