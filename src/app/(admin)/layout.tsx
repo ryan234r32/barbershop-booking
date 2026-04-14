@@ -24,8 +24,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         {/* Desktop: sidebar */}
         <AdminSidebar />
 
-        {/* Content area */}
-        <main className="flex-1 pt-14 lg:pt-0 lg:ml-64 pb-16 lg:pb-0 p-4 lg:p-6">
+        {/* Content area — min-w-0 prevents intrinsic-width flex child from overflowing viewport */}
+        <main className="flex-1 min-w-0 pt-14 lg:pt-0 lg:ml-64 pb-16 lg:pb-0 p-4 lg:p-6">
           {children}
         </main>
 
