@@ -387,8 +387,25 @@ export default function CalendarPage() {
     return Math.max(11, Math.min(20, 11 + row));
   }, []);
 
-  // Track if pointer moved significantly (distinguishes tap vs drag-to-scroll attempt)
+  // Gesture state: three exclusive modes on empty slots — tap, scroll-forward, drag-to-extend.
+  // Slot keeps touch-action: none permanently (iOS Safari ignores mid-gesture changes),
+  // so we forward vertical movement to the timeline's scrollTop ourselves.
   const dragModeActiveRef = useRef(false);
+  const scrollModeActiveRef = useRef(false);
+  const lastPointerYRef = useRef<number>(0);
+  // Simple velocity tracker for scroll momentum after release
+  const velocitySamplesRef = useRef<Array<{ y: number; t: number }>>([]);
+  const momentumRafRef = useRef<number | null>(null);
+
+  const LONG_PRESS_MS = 500;
+  const MOVE_THRESHOLD_PX = 15;
+
+  const cancelMomentum = useCallback(() => {
+    if (momentumRafRef.current !== null) {
+      cancelAnimationFrame(momentumRafRef.current);
+      momentumRafRef.current = null;
+    }
+  }, []);
 
   const handleSlotPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>, startHour: number) => {
@@ -396,93 +413,128 @@ export default function CalendarPage() {
       const hourStr = `${String(startHour).padStart(2, "0")}:00`;
       if (isSlotOccupied(dateStr, hourStr)) return;
 
-      // Capture pointer to this element — all subsequent pointer events
-      // will fire on this element even if finger moves outside.
+      cancelMomentum();
+
       const target = e.currentTarget;
       try {
         target.setPointerCapture(e.pointerId);
       } catch {
-        // silent — some browsers may reject
+        // silent
       }
 
       dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+      lastPointerYRef.current = e.clientY;
+      velocitySamplesRef.current = [{ y: e.clientY, t: performance.now() }];
       dragModeActiveRef.current = false;
+      scrollModeActiveRef.current = false;
 
-      // Long-press timer (350ms): enter drag mode
       longPressTimerRef.current = setTimeout(() => {
         dragModeActiveRef.current = true;
-        // Switch to touch-action: none so subsequent vertical movement becomes
-        // drag-to-extend instead of browser scroll. Before this point we stay
-        // pan-y so casual vertical swipes scroll the timeline as expected.
-        target.style.touchAction = "none";
         setDragState({ startHour, endHour: startHour + 1, active: true });
         if ("vibrate" in navigator) navigator.vibrate?.(30);
-      }, 350);
+      }, LONG_PRESS_MS);
     },
-    [currentDate, isSlotOccupied]
+    [currentDate, isSlotOccupied, cancelMomentum]
   );
 
   const handleSlotPointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>, startHour: number) => {
-      // Before long-press fires: if finger moves > 10px, cancel (user is trying to scroll — but we already prevented that with touch-action: none, so this just cancels drag intent)
-      if (!dragModeActiveRef.current) {
-        if (longPressTimerRef.current && dragStartPosRef.current) {
-          const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
-          const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
-          if (dx > 10 || dy > 10) {
-            clearTimeout(longPressTimerRef.current);
-            longPressTimerRef.current = null;
-          }
+      // Drag mode: extend duration
+      if (dragModeActiveRef.current) {
+        if (timelineRef.current) {
+          e.preventDefault();
+          const rect = timelineRef.current.getBoundingClientRect();
+          const y = e.clientY - rect.top + timelineRef.current.scrollTop;
+          const hour = yToHour(y);
+          const maxEnd = findMaxEndHour(startHour);
+          const newEnd = Math.max(startHour + 1, Math.min(maxEnd, hour + 1));
+          setDragState((prev) => {
+            if (!prev || prev.endHour === newEnd) return prev;
+            return { ...prev, endHour: newEnd };
+          });
         }
         return;
       }
 
-      // Drag mode active: update endHour based on finger Y position
-      if (timelineRef.current) {
-        e.preventDefault();
-        const rect = timelineRef.current.getBoundingClientRect();
-        const y = e.clientY - rect.top + timelineRef.current.scrollTop;
-        const hour = yToHour(y);
-        const maxEnd = findMaxEndHour(startHour);
-        const newEnd = Math.max(startHour + 1, Math.min(maxEnd, hour + 1));
-        setDragState((prev) => {
-          if (!prev || prev.endHour === newEnd) return prev;
-          return { ...prev, endHour: newEnd };
-        });
+      // Scroll forwarding mode: translate finger delta into timeline scrollTop
+      if (scrollModeActiveRef.current) {
+        if (timelineRef.current) {
+          const dy = e.clientY - lastPointerYRef.current;
+          timelineRef.current.scrollTop -= dy;
+          lastPointerYRef.current = e.clientY;
+          // Track velocity (keep last 100ms of samples)
+          const now = performance.now();
+          velocitySamplesRef.current.push({ y: e.clientY, t: now });
+          velocitySamplesRef.current = velocitySamplesRef.current.filter((s) => now - s.t <= 100);
+        }
+        return;
+      }
+
+      // Pre-decision: exceeded move threshold → enter scroll mode
+      if (longPressTimerRef.current && dragStartPosRef.current) {
+        const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
+        const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
+        if (dx > MOVE_THRESHOLD_PX || dy > MOVE_THRESHOLD_PX) {
+          clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+          scrollModeActiveRef.current = true;
+          lastPointerYRef.current = e.clientY;
+        }
       }
     },
     [findMaxEndHour, yToHour]
   );
 
+  const runMomentum = useCallback(() => {
+    const samples = velocitySamplesRef.current;
+    if (samples.length < 2 || !timelineRef.current) return;
+    const first = samples[0];
+    const last = samples[samples.length - 1];
+    const dt = last.t - first.t;
+    if (dt <= 0) return;
+    let velocity = -(last.y - first.y) / dt; // px per ms, positive = scroll down
+    if (Math.abs(velocity) < 0.3) return; // below noise floor
+
+    const friction = 0.95;
+    let lastTime = performance.now();
+    const tick = () => {
+      if (!timelineRef.current) return;
+      const now = performance.now();
+      const frameDt = now - lastTime;
+      lastTime = now;
+      timelineRef.current.scrollTop += velocity * frameDt;
+      velocity *= Math.pow(friction, frameDt / 16);
+      if (Math.abs(velocity) > 0.05) {
+        momentumRafRef.current = requestAnimationFrame(tick);
+      } else {
+        momentumRafRef.current = null;
+      }
+    };
+    momentumRafRef.current = requestAnimationFrame(tick);
+  }, []);
+
   const handleSlotPointerUp = useCallback(
     (e: React.PointerEvent<HTMLDivElement>, startHour: number) => {
-      // Release pointer capture + restore touch-action so next gesture can scroll
       try {
         e.currentTarget.releasePointerCapture(e.pointerId);
       } catch {
         // silent
       }
-      e.currentTarget.style.touchAction = "pan-y";
 
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
-
-      // If finger moved >10px without triggering long-press, treat as scroll — don't open sheet
-      const movedFarBeforeRelease =
-        dragStartPosRef.current !== null &&
-        (Math.abs(e.clientX - dragStartPosRef.current.x) > 10 ||
-          Math.abs(e.clientY - dragStartPosRef.current.y) > 10);
       dragStartPosRef.current = null;
 
-      if (movedFarBeforeRelease && !dragModeActiveRef.current) {
-        dragModeActiveRef.current = false;
-        setDragState(null);
+      // Scroll mode: add momentum, don't open sheet
+      if (scrollModeActiveRef.current) {
+        scrollModeActiveRef.current = false;
+        runMomentum();
         return;
       }
 
-      // Drag mode completed → open sheet with calculated duration
+      // Drag mode: open sheet with extended duration
       if (dragModeActiveRef.current && dragState?.active) {
         const duration = dragState.endHour - dragState.startHour;
         const timeStr = `${String(dragState.startHour).padStart(2, "0")}:00`;
@@ -492,29 +544,30 @@ export default function CalendarPage() {
         return;
       }
 
-      // Quick tap → open sheet with 1h
+      // Quick tap → 1h
       dragModeActiveRef.current = false;
       setDragState(null);
       const timeStr = `${String(startHour).padStart(2, "0")}:00`;
       openNewBooking(formatDate(currentDate), timeStr, 1);
     },
-    [dragState, currentDate]
+    [dragState, currentDate, runMomentum]
   );
 
-  const handleSlotPointerCancel = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    e.currentTarget.style.touchAction = "pan-y";
+  const handleSlotPointerCancel = useCallback(() => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
     dragStartPosRef.current = null;
     dragModeActiveRef.current = false;
+    scrollModeActiveRef.current = false;
     setDragState(null);
   }, []);
 
   useEffect(() => {
     return () => {
       if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      if (momentumRafRef.current !== null) cancelAnimationFrame(momentumRafRef.current);
     };
   }, []);
 
@@ -705,7 +758,7 @@ export default function CalendarPage() {
                         onPointerMove={(e) => handleSlotPointerMove(e, parseInt(hour.split(":")[0]))}
                         onPointerUp={(e) => handleSlotPointerUp(e, parseInt(hour.split(":")[0]))}
                         onPointerCancel={handleSlotPointerCancel}
-                        style={{ touchAction: "pan-y" }}
+                        style={{ touchAction: "none" }}
                         className="h-full rounded-lg border border-dashed border-[var(--color-text-muted)]/20 flex items-center justify-center cursor-pointer hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-brand)]/5 transition-colors select-none"
                       >
                         <span className="text-xs text-[var(--color-text-muted)]">點擊新增・長按拖拉</span>
