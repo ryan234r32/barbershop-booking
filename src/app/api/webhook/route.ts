@@ -93,7 +93,7 @@ async function handleEvent(
       const namePrefix = displayName ? `${displayName} 你好！🙌\n` : "";
       const textGreeting = {
         type: "text" as const,
-        text: `${namePrefix}歡迎加入 ${shopName} ✂️\n\n下方選單可直接預約、查看服務與價格 👇`,
+        text: `${namePrefix}歡迎加入 ${shopName} ✂️\n\n下方選單可直接預約、查看服務與價格 👇\n（如果看不到選單，請退出聊天室再重新進入）`,
       };
       const flexWelcome = welcomeMessage({
         shopName,
