@@ -350,16 +350,9 @@ export default function CalendarPage() {
               const occupied = isSlotOccupied(dateStr, hour);
               const isMultiSlotContinuation = occupied && !booking;
 
-              if (isMultiSlotContinuation) {
-                return (
-                  <div key={hour} className="flex" style={{ height: SLOT_HEIGHT }}>
-                    <div className="w-14 shrink-0 pr-2 pt-2 text-right">
-                      <span className="text-xs text-[var(--color-text-muted)] font-mono">{hour}</span>
-                    </div>
-                    <div className="flex-1 border-t border-[var(--color-surface)]/50" />
-                  </div>
-                );
-              }
+              // Skip rendering continuation slots — the parent booking's card
+              // already extends visually to cover those rows via its height.
+              if (isMultiSlotContinuation) return null;
 
               return (
                 <div key={hour} className="flex" style={{ height: booking && booking.slotsOccupied > 1 ? SLOT_HEIGHT * booking.slotsOccupied : SLOT_HEIGHT }}>
