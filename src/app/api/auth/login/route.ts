@@ -31,6 +31,7 @@ export async function POST(request: Request) {
     });
 
     const response = Response.json({
+      token, // for localStorage storage (iOS PWA survives cookie purge)
       admin: {
         id: admin.id,
         email: admin.email,

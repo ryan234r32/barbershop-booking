@@ -29,7 +29,12 @@ export default function LoginPage() {
         return;
       }
 
-      router.replace("/dashboard");
+      // Store token in localStorage for iOS PWA (cookie may be purged by ITP)
+      if (data.token && typeof window !== "undefined") {
+        localStorage.setItem("admin_token", data.token);
+      }
+
+      router.replace("/calendar");
     } catch {
       setError("網路錯誤，請稍後再試");
     } finally {

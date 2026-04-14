@@ -25,6 +25,17 @@ export function verifyAdminToken(token: string): AdminJwtPayload | null {
 export async function getAdminFromCookie(
   request: NextRequest
 ): Promise<AdminJwtPayload | null> {
+  // 1. Prefer Authorization: Bearer <token> (works in iOS PWA where cookies may be purged)
+  const authHeader = request.headers.get("authorization") || request.headers.get("Authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.slice(7).trim();
+    if (token) {
+      const payload = verifyAdminToken(token);
+      if (payload) return payload;
+    }
+  }
+
+  // 2. Fallback to cookie (regular browser usage)
   const token = request.cookies.get(COOKIE_NAME)?.value;
   if (!token) return null;
   return verifyAdminToken(token);
