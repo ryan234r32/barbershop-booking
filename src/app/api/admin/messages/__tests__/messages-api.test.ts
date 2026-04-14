@@ -43,12 +43,12 @@ import { PATCH as readHandler } from "../[lineUserId]/read/route";
 
 const ADMIN_T1 = { adminId: "a1", tenantId: "t1", role: "OWNER" };
 
-function req(url: string, init?: RequestInit) {
+function req(url: string, init?: { method?: string; body?: string }) {
   return new NextRequest(url, init);
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
 });
 
 describe("GET /api/admin/messages (list)", () => {
@@ -237,10 +237,10 @@ describe("POST /api/admin/messages/[lineUserId]/reply", () => {
   });
 
   it("returns stored message on clientMessageId replay (idempotent)", async () => {
-    mockAdmin.mockResolvedValueOnce(ADMIN_T1);
-    findFirstUser.mockResolvedValueOnce({ id: "user-1" });
+    mockAdmin.mockResolvedValue(ADMIN_T1);
+    findFirstUser.mockResolvedValue({ id: "user-1" });
     const existing = { id: "old-msg", direction: "OUTBOUND", content: "original" };
-    findFirstMessage.mockResolvedValueOnce(existing);
+    findFirstMessage.mockResolvedValue(existing);
 
     const res = await replyHandler(
       req("http://x", {
@@ -249,8 +249,8 @@ describe("POST /api/admin/messages/[lineUserId]/reply", () => {
       }),
       { params: Promise.resolve({ lineUserId: "U1" }) },
     );
-    expect(res.status).toBe(200);
     const body = await res.json();
+    expect(res.status).toBe(200);
     expect(body.message).toEqual(existing);
     expect(mockPushMessage).not.toHaveBeenCalled();
     expect(createMessage).not.toHaveBeenCalled();
