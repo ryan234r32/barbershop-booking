@@ -54,7 +54,7 @@ export function CancelPolicySheet({
                   </span>
                 </div>
                 <p className="text-sm text-[#404944] leading-relaxed">
-                  想換時間優先選改期，不用取消重訂。預約 4 小時內的改期，每筆預約僅限一次。
+                  想換時間優先選改期，不用取消重訂。
                 </p>
               </div>
             </div>

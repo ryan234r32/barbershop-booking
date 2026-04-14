@@ -800,7 +800,7 @@ export function myBookingsFlexMessage(params: {
   const bubbles: FlexBubble[] = bookings.map((b) => {
     const isPaid = b.paymentStatus === "RECEIVED";
     const hours = b.hoursUntilAppointment ?? 999;
-    const canReschedule = hours >= 4;   // 4h for reschedule
+    const canReschedule = hours > 0;    // Reschedule anytime before appointment (< 2h adds violation)
     const canCancel = hours >= 24;       // 24h for cancel
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buttons: any[] = [];

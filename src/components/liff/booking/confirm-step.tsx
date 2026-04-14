@@ -87,7 +87,7 @@ export function ConfirmStep({
 
         {policyExpanded && (
           <div className="mt-4 space-y-3 animate-fadeIn">
-            {/* Block 1 — Free */}
+            {/* Block 1 — Cancel ≥ 24h free */}
             <div className="rounded-xl bg-[#E8F1EC] p-4">
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 bg-[#003D2B] rounded-full flex items-center justify-center shrink-0">
@@ -95,19 +95,19 @@ export function ConfirmStep({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-0.5">
-                    <span className="font-bold text-[#003D2B] text-sm">前一天取消</span>
+                    <span className="font-bold text-[#003D2B] text-sm">24 小時前取消</span>
                     <span className="bg-[#003D2B] text-white rounded-full text-[10px] px-2 py-0.5 font-medium">
                       免費
                     </span>
                   </div>
                   <p className="text-xs text-[#404944] leading-relaxed">
-                    預約前一日 23:59 前取消，不收任何費用。
+                    預約 24 小時前可線上免費取消。
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Block 2 — Phone */}
+            {/* Block 2 — Cancel < 24h must call */}
             <div className="rounded-xl bg-[#FBF1E6] p-4">
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 bg-[#8A6A4D] rounded-full flex items-center justify-center shrink-0">
@@ -115,19 +115,39 @@ export function ConfirmStep({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-0.5">
-                    <span className="font-bold text-[#5C4633] text-sm">當天營業時間內</span>
+                    <span className="font-bold text-[#5C4633] text-sm">24 小時內取消</span>
                     <span className="bg-[#8A6A4D] text-white rounded-full text-[10px] px-2 py-0.5 font-medium">
                       電話聯繫
                     </span>
                   </div>
                   <p className="text-xs text-[#404944] leading-relaxed">
-                    請直接撥打電話與店家聯繫。
+                    請於營業時間致電店家。
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Block 3 — Violation */}
+            {/* Block 3 — Reschedule anytime online */}
+            <div className="rounded-xl bg-[#E8F1EC] p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-[#003D2B] rounded-full flex items-center justify-center shrink-0">
+                  <IconEventAvailable className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="font-bold text-[#003D2B] text-sm">改期</span>
+                    <span className="bg-[#003D2B] text-white rounded-full text-[10px] px-2 py-0.5 font-medium">
+                      隨時可線上改
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#404944] leading-relaxed">
+                    想換時間優先選改期，不用取消重訂。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Block 4 — Violation conditions */}
             <div className="rounded-xl bg-[#FDEEEF] p-4">
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 bg-[#A84A3B] rounded-full flex items-center justify-center shrink-0">
@@ -135,13 +155,13 @@ export function ConfirmStep({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-0.5">
-                    <span className="font-bold text-[#93000A] text-sm">當天非營業時間</span>
+                    <span className="font-bold text-[#93000A] text-sm">違規條件</span>
                     <span className="bg-[#A84A3B] text-white rounded-full text-[10px] px-2 py-0.5 font-medium">
                       記違規一次
                     </span>
                   </div>
                   <p className="text-xs text-[#404944] leading-relaxed">
-                    線上取消將自動記錄違規一次。
+                    2 小時內改期、未到店未通知，各計違規一次。
                   </p>
                 </div>
               </div>

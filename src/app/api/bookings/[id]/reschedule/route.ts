@@ -52,11 +52,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return Response.json({ error: "只能改期已確認的預約" }, { status: 400 });
     }
 
-    // Reschedule policy (industry-aligned, 2026-04):
-    //   ≥ 4h       → free online
-    //   2h–4h      → allowed, but only once per booking (lateRescheduleCount guards re-abuse)
-    //   < 2h       → allowed once, counts as a violation (same tier as no-show)
-    //   2nd attempt inside 4h → blocked, must call
+    // Reschedule policy: line reschedule allowed any time before appointment;
+    // < 2h adds a violation to the user's record (same tier as no-show).
     const bookingDateStr = booking.date.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
     const [bY, bM, bD] = bookingDateStr.split("-").map(Number);
     const [bH] = booking.startTime.split(":").map(Number);
@@ -64,18 +61,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const now = new Date();
     const hoursUntil = (appointmentTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-    const isLateReschedule = hoursUntil < 4;
-    const isVeryLateReschedule = hoursUntil < 2;
-
-    if (isLateReschedule && booking.lateRescheduleCount >= 1) {
+    if (hoursUntil <= 0) {
       return Response.json(
-        {
-          error: "這筆預約已經短時間改過一次，請致電店家協助",
-          phoneNumber: booking.tenant.phone,
-        },
-        { status: 403 }
+        { error: "預約已結束，無法改期" },
+        { status: 400 }
       );
     }
+
+    const isVeryLateReschedule = hoursUntil < 2;
 
     // Calculate new end time
     const newEndTime = addHours(input.startTime, booking.service.slotsNeeded);
@@ -115,7 +108,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           date: newDateObj,
           startTime: input.startTime,
           endTime: newEndTime,
-          ...(isLateReschedule ? { lateRescheduleCount: { increment: 1 } } : {}),
         },
       });
 
