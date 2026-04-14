@@ -82,7 +82,7 @@ function SegmentBadge({ segment }: { segment: string }) {
   };
   return (
     <span
-      className={`inline-block px-2 py-0.5 rounded text-[10px] font-medium tracking-wider ${styles[segment] || styles.NEW}`}
+      className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium tracking-wider ${styles[segment] || styles.NEW}`}
     >
       {labels[segment] || segment}
     </span>
@@ -153,7 +153,7 @@ function HorizontalDateStrip({
             }}
           >
             <span
-              className={`text-[10px] leading-none ${
+              className={`text-[11px] leading-none ${
                 selected
                   ? "text-[var(--color-bg)]/80"
                   : isWeekend
@@ -266,7 +266,13 @@ export default function CalendarPage() {
     { refreshInterval: 60000 }
   );
 
-  const bookings: Booking[] = bookingsData?.bookings || [];
+  // Memoize the bookings array so downstream useCallback dependencies don't
+  // change identity on every render. Without this, getBookingsForDate/Time/etc
+  // re-allocate every render, cascading grid re-renders and feeling janky.
+  const bookings: Booking[] = useMemo(
+    () => bookingsData?.bookings || [],
+    [bookingsData]
+  );
   const monthlySummary: MonthlySummary = monthData?.days || {};
 
   // ─── Polling: new booking toast + near-end detection ───
@@ -650,7 +656,7 @@ export default function CalendarPage() {
                             {booking.service.name}
                           </span>
                           {isPaid(booking) && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-[var(--color-success)]">
+                            <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[var(--color-success)]">
                               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                 <polyline points="20 6 9 17 4 12"/>
                               </svg>
@@ -690,7 +696,7 @@ export default function CalendarPage() {
                 </div>
                 {/* Red horizontal line */}
                 <div
-                  className="absolute left-14 right-0 h-[1.5px] bg-[var(--color-danger)] pointer-events-none z-10"
+                  className="absolute left-14 right-0 h-px bg-[var(--color-danger)] pointer-events-none z-10"
                   style={{ top: timeIndicatorTop }}
                 />
               </>
@@ -754,7 +760,7 @@ export default function CalendarPage() {
                           onClick={() => { setCurrentDate(d); setView("day"); }}
                           className="flex flex-col items-center gap-0.5 w-full"
                         >
-                          <span className={`text-[10px] leading-none ${isWeekend ? "text-[var(--color-danger)]" : "text-[var(--color-text-muted)]"}`}>
+                          <span className={`text-[11px] leading-none ${isWeekend ? "text-[var(--color-danger)]" : "text-[var(--color-text-muted)]"}`}>
                             {WEEKDAYS[wdIndex]}
                           </span>
                           <span
@@ -806,7 +812,7 @@ export default function CalendarPage() {
                               className={`w-full h-full rounded p-1 cursor-pointer transition-colors flex flex-col overflow-hidden ${cellBg}`}
                             >
                               {/* Time range */}
-                              <p className="text-[8px] text-[var(--color-text-muted)] font-mono leading-none mb-0.5 truncate">
+                              <p className="text-[11px] text-[var(--color-text-muted)] font-mono leading-none mb-0.5 truncate">
                                 {booking.startTime.slice(0, 5)}
                               </p>
                               {/* Customer name */}
@@ -814,7 +820,7 @@ export default function CalendarPage() {
                                 {name.length > 4 ? name.slice(0, 4) : name}
                               </p>
                               {/* Service pill */}
-                              <span className="mt-auto inline-block px-1 py-px rounded bg-[var(--color-bg)]/70 text-[9px] text-[var(--color-text-body)] leading-tight truncate">
+                              <span className="mt-auto inline-block px-1 py-px rounded bg-[var(--color-bg)]/70 text-[11px] text-[var(--color-text-body)] leading-tight truncate">
                                 {serviceShort}
                               </span>
                             </div>
@@ -849,10 +855,10 @@ export default function CalendarPage() {
                   className="absolute left-0 right-0 pointer-events-none z-20 flex items-center"
                   style={{ top }}
                 >
-                  <span className="text-[9px] font-semibold text-[var(--color-danger)] font-mono w-8 text-center">
+                  <span className="text-[11px] font-semibold text-[var(--color-danger)] font-mono w-8 text-center">
                     {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}
                   </span>
-                  <div className="flex-1 h-[1.5px] bg-[var(--color-danger)]" />
+                  <div className="flex-1 h-px bg-[var(--color-danger)]" />
                 </div>
               );
             })()}
@@ -918,7 +924,7 @@ export default function CalendarPage() {
                           {day}
                         </span>
                         {count > 0 && (
-                          <span className="text-[9px] text-[var(--color-text-muted)] leading-none">
+                          <span className="text-[11px] text-[var(--color-text-muted)] leading-none">
                             合計 {count}
                           </span>
                         )}
@@ -934,14 +940,14 @@ export default function CalendarPage() {
                           return (
                             <div
                               key={b.id}
-                              className={`w-full px-1 py-px rounded text-[8px] font-mono leading-none truncate ${barBg}`}
+                              className={`w-full px-1 py-px rounded text-[11px] font-mono leading-none truncate ${barBg}`}
                             >
                               {b.startTime.slice(0, 5)}
                             </div>
                           );
                         })}
                         {count > 2 && (
-                          <span className="text-[8px] text-[var(--color-text-muted)] leading-none">+{count - 2}</span>
+                          <span className="text-[11px] text-[var(--color-text-muted)] leading-none">+{count - 2}</span>
                         )}
                       </div>
                     </button>
