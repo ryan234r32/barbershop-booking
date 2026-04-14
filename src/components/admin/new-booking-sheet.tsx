@@ -8,6 +8,7 @@ import useSWR from "swr";
 interface Props {
   date: string; // YYYY-MM-DD
   time: string; // HH:00
+  duration?: number; // in hours (slotsNeeded), default 1
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
@@ -33,7 +34,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
-export function NewBookingSheet({ date, time, open, onOpenChange, onCreated }: Props) {
+export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, onCreated }: Props) {
   const [source, setSource] = useState<"PHONE" | "WALK_IN">("PHONE");
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
@@ -44,7 +45,16 @@ export function NewBookingSheet({ date, time, open, onOpenChange, onCreated }: P
   const { toast } = useToast();
 
   const { data: servicesData } = useSWR("/api/services", fetcher);
-  const services: Service[] = servicesData?.services || [];
+  const allServices: Service[] = servicesData?.services || [];
+  // Filter by slotsNeeded matching duration
+  const services = allServices.filter((s) => s.slotsNeeded === duration);
+
+  // Reset serviceId if the duration changed and current selection no longer valid
+  useEffect(() => {
+    if (serviceId && !services.some((s) => s.id === serviceId)) {
+      setServiceId("");
+    }
+  }, [duration, services, serviceId]);
 
   // Customer search
   useEffect(() => {
@@ -107,7 +117,11 @@ export function NewBookingSheet({ date, time, open, onOpenChange, onCreated }: P
   };
 
   const dateObj = new Date(date + "T00:00:00+08:00");
-  const dateDisplay = `${dateObj.getMonth() + 1}/${dateObj.getDate()} (${WEEKDAYS[dateObj.getDay()]}) ${time}`;
+  const startHour = parseInt(time.split(":")[0]);
+  const endTime = `${String(startHour + duration).padStart(2, "0")}:00`;
+  const dateDisplay = duration > 1
+    ? `${dateObj.getMonth() + 1}/${dateObj.getDate()} (${WEEKDAYS[dateObj.getDay()]}) ${time} — ${endTime}（${duration} 小時）`
+    : `${dateObj.getMonth() + 1}/${dateObj.getDate()} (${WEEKDAYS[dateObj.getDay()]}) ${time}（1 小時）`;
 
   const segmentLabels: Record<string, string> = {
     VIP: "VIP", REGULAR: "常客", NEW: "新客", AT_RISK: "流失中",
@@ -180,19 +194,27 @@ export function NewBookingSheet({ date, time, open, onOpenChange, onCreated }: P
 
             {/* Service */}
             <div className="mb-3">
-              <label className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider block mb-1">選擇服務</label>
-              <select
-                value={serviceId}
-                onChange={(e) => setServiceId(e.target.value)}
-                className="w-full border-b border-[var(--color-brand)] bg-transparent py-2 text-sm text-[var(--color-text-body)] outline-none"
-              >
-                <option value="">請選擇</option>
-                {services.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} · {s.duration}分 · NT${s.price.toLocaleString()}
-                  </option>
-                ))}
-              </select>
+              <label className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider block mb-1">
+                選擇服務（{duration} 小時）
+              </label>
+              {services.length === 0 ? (
+                <p className="text-xs text-[var(--color-danger)] py-2">
+                  沒有符合 {duration} 小時的服務，請調整時長。
+                </p>
+              ) : (
+                <select
+                  value={serviceId}
+                  onChange={(e) => setServiceId(e.target.value)}
+                  className="w-full border-b border-[var(--color-brand)] bg-transparent py-2 text-sm text-[var(--color-text-body)] outline-none"
+                >
+                  <option value="">請選擇</option>
+                  {services.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} · {s.duration}分 · NT${s.price.toLocaleString()}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Notes */}

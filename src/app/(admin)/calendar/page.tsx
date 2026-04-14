@@ -84,6 +84,7 @@ export default function CalendarPage() {
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
   const [newBookingDate, setNewBookingDate] = useState("");
   const [newBookingTime, setNewBookingTime] = useState("");
+  const [newBookingDuration, setNewBookingDuration] = useState(1);
   const [newSheetOpen, setNewSheetOpen] = useState(false);
 
   const openBookingDetail = (b: Booking) => {
@@ -91,14 +92,22 @@ export default function CalendarPage() {
     setDetailSheetOpen(true);
   };
 
-  const openNewBooking = (date: string, time: string) => {
+  const openNewBooking = (date: string, time: string, duration: number = 1) => {
     setNewBookingDate(date);
     setNewBookingTime(time);
+    setNewBookingDuration(duration);
     setNewSheetOpen(true);
   };
 
   // Near-end bookings state
   const [nearEndBookings, setNearEndBookings] = useState<Set<string>>(new Set());
+
+  // Drag-to-create state
+  const [dragState, setDragState] = useState<{
+    startHour: number;
+    endHour: number; // exclusive — end time shown to user
+    active: boolean;
+  } | null>(null);
 
   // ─── Date Calculations ───
   const weekDates = useMemo(() => {
@@ -178,6 +187,7 @@ export default function CalendarPage() {
     }
   }, [view, now, currentDate]);
 
+
   // ─── Helpers ───
   const getBookingsForDate = useCallback(
     (dateStr: string) => {
@@ -217,6 +227,102 @@ export default function CalendarPage() {
     },
     [bookings]
   );
+
+  // ─── Drag-to-create logic ───
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  const findMaxEndHour = useCallback(
+    (startHour: number): number => {
+      const dateStr = formatDate(currentDate);
+      for (let h = startHour + 1; h <= 20; h++) {
+        if (h === 20) return 20;
+        const hourStr = `${String(h).padStart(2, "0")}:00`;
+        if (isSlotOccupied(dateStr, hourStr)) return h;
+      }
+      return 20;
+    },
+    [currentDate, isSlotOccupied]
+  );
+
+  const yToHour = useCallback((y: number): number => {
+    const row = Math.floor(y / SLOT_HEIGHT);
+    return Math.max(11, Math.min(20, 11 + row));
+  }, []);
+
+  const handleSlotPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>, startHour: number) => {
+      const dateStr = formatDate(currentDate);
+      const hourStr = `${String(startHour).padStart(2, "0")}:00`;
+      if (isSlotOccupied(dateStr, hourStr)) return;
+
+      dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+
+      longPressTimerRef.current = setTimeout(() => {
+        setDragState({ startHour, endHour: startHour + 1, active: true });
+        if ("vibrate" in navigator) navigator.vibrate?.(30);
+      }, 350);
+    },
+    [currentDate, isSlotOccupied]
+  );
+
+  const handleTimelinePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (longPressTimerRef.current && dragStartPosRef.current && !dragState) {
+        const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
+        const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
+        if (dx > 10 || dy > 10) {
+          clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+        }
+        return;
+      }
+
+      if (dragState && dragState.active && timelineRef.current) {
+        e.preventDefault();
+        const rect = timelineRef.current.getBoundingClientRect();
+        const y = e.clientY - rect.top + timelineRef.current.scrollTop;
+        const hour = yToHour(y);
+        const maxEnd = findMaxEndHour(dragState.startHour);
+        const newEnd = Math.max(dragState.startHour + 1, Math.min(maxEnd, hour + 1));
+        if (newEnd !== dragState.endHour) {
+          setDragState({ ...dragState, endHour: newEnd });
+        }
+      }
+    },
+    [dragState, findMaxEndHour, yToHour]
+  );
+
+  const handleTimelinePointerUp = useCallback(
+    (_e: React.PointerEvent<HTMLDivElement>, fallbackHour?: number) => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+      dragStartPosRef.current = null;
+
+      if (dragState && dragState.active) {
+        const duration = dragState.endHour - dragState.startHour;
+        const timeStr = `${String(dragState.startHour).padStart(2, "0")}:00`;
+        setDragState(null);
+        openNewBooking(formatDate(currentDate), timeStr, duration);
+        return;
+      }
+
+      if (fallbackHour !== undefined) {
+        const timeStr = `${String(fallbackHour).padStart(2, "0")}:00`;
+        openNewBooking(formatDate(currentDate), timeStr, 1);
+      }
+      setDragState(null);
+    },
+    [dragState, currentDate]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    };
+  }, []);
 
   const navigate = (delta: number) => {
     const d = new Date(currentDate);
@@ -342,7 +448,8 @@ export default function CalendarPage() {
           <div
             ref={timelineRef}
             className="relative overflow-y-auto"
-            style={{ maxHeight: "calc(100vh - 280px)" }}
+            style={{ maxHeight: "calc(100vh - 280px)", touchAction: dragState?.active ? "none" : "pan-y" }}
+            onPointerMove={handleTimelinePointerMove}
           >
             {HOURS.map((hour) => {
               const dateStr = formatDate(currentDate);
@@ -383,10 +490,11 @@ export default function CalendarPage() {
                       </div>
                     ) : (
                       <div
-                        onClick={() => openNewBooking(formatDate(currentDate), hour)}
-                        className="h-full rounded-lg border border-dashed border-[var(--color-text-muted)]/20 flex items-center justify-center cursor-pointer hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-brand)]/5 transition-colors"
+                        onPointerDown={(e) => handleSlotPointerDown(e, parseInt(hour.split(":")[0]))}
+                        onPointerUp={(e) => handleTimelinePointerUp(e, parseInt(hour.split(":")[0]))}
+                        className="h-full rounded-lg border border-dashed border-[var(--color-text-muted)]/20 flex items-center justify-center cursor-pointer hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-brand)]/5 transition-colors select-none"
                       >
-                        <span className="text-xs text-[var(--color-text-muted)]">點擊新增預約</span>
+                        <span className="text-xs text-[var(--color-text-muted)]">點擊新增・長按拖拉</span>
                       </div>
                     )}
                   </div>
@@ -402,6 +510,21 @@ export default function CalendarPage() {
               >
                 <div className="w-2.5 h-2.5 rounded-full bg-[var(--color-danger)] ml-[42px] -mr-1.5 shrink-0" />
                 <div className="flex-1 h-[2px] bg-[var(--color-danger)]" />
+              </div>
+            )}
+
+            {/* Drag Preview Overlay */}
+            {dragState?.active && (
+              <div
+                className="absolute left-[56px] right-1 pointer-events-none z-20 rounded-lg bg-[var(--color-brand)]/30 border-2 border-[var(--color-brand)] flex items-center justify-center"
+                style={{
+                  top: (dragState.startHour - 11) * SLOT_HEIGHT,
+                  height: (dragState.endHour - dragState.startHour) * SLOT_HEIGHT,
+                }}
+              >
+                <span className="text-sm font-bold text-[var(--color-brand)] bg-[var(--color-bg)] px-3 py-1 rounded-full shadow-md">
+                  {dragState.endHour - dragState.startHour} 小時
+                </span>
               </div>
             )}
           </div>
@@ -573,6 +696,7 @@ export default function CalendarPage() {
       <NewBookingSheet
         date={newBookingDate}
         time={newBookingTime}
+        duration={newBookingDuration}
         open={newSheetOpen}
         onOpenChange={setNewSheetOpen}
         onCreated={() => mutateBookings()}

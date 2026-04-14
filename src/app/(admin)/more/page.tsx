@@ -11,6 +11,7 @@ import {
   Settings,
   LogOut,
   ChevronRight,
+  Lock,
 } from "lucide-react";
 
 const MENU_ITEMS = [
@@ -20,6 +21,7 @@ const MENU_ITEMS = [
   { href: "/more/schedule", label: "營業時間與公休", icon: CalendarClock },
   { href: "/more/export", label: "匯出資料", icon: Download },
   { href: "/settings", label: "店鋪設定", icon: Settings },
+  { href: "/more/password", label: "修改密碼", icon: Lock },
 ];
 
 export default function MorePage() {
