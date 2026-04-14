@@ -114,6 +114,14 @@ Body-supplied `lineUserId` is **ignored** — caller identity always comes from 
 - Payment: cash or bank transfer only (no online payment)
 - CRM segments: NEW → REGULAR → VIP, or AT_RISK (60d inactive) → LAPSED (120d)
 
+## Health Stack
+Used by `/health`. Update if the toolchain changes.
+- typecheck: `npx tsc --noEmit`
+- lint: `npm run lint`
+- test: `npm run test`
+- deadcode: (not installed — consider adding `knip`)
+- shell: (no shell scripts in repo)
+
 ## Environment Variables
 Required: `DATABASE_URL`, `JWT_SECRET`, `DEFAULT_TENANT_ID`
 LINE: `LINE_CHANNEL_ID`, `LINE_CHANNEL_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN`, `NEXT_PUBLIC_LIFF_ID`

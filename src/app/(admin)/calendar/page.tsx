@@ -469,9 +469,45 @@ export default function CalendarPage() {
       {/* ═══ DAY VIEW ═══ */}
       {view === "day" && !isLoading && (
         <>
-          {/* Horizontal date strip — 7 days centered on current */}
-          <div className="flex items-center gap-1 mb-3 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
+          {/* Horizontal date strip — 7 days, evenly distributed, swipeable */}
+          <div
+            className="flex items-stretch mb-3 select-none"
+            style={{ touchAction: "pan-y" }}
+            onPointerDown={(e) => {
+              const target = e.currentTarget;
+              const startX = e.clientX;
+              const startY = e.clientY;
+              let isHorizontal: boolean | null = null;
+
+              const onMove = (ev: PointerEvent) => {
+                if (isHorizontal === null) {
+                  const dx = Math.abs(ev.clientX - startX);
+                  const dy = Math.abs(ev.clientY - startY);
+                  if (dx > 10 || dy > 10) {
+                    isHorizontal = dx > dy;
+                  }
+                }
+              };
+              const onUp = (ev: PointerEvent) => {
+                target.removeEventListener("pointermove", onMove);
+                target.removeEventListener("pointerup", onUp);
+                target.removeEventListener("pointercancel", onUp);
+                if (isHorizontal) {
+                  const dx = ev.clientX - startX;
+                  if (Math.abs(dx) > 50) {
+                    const d = new Date(currentDate);
+                    d.setDate(d.getDate() + (dx < 0 ? 7 : -7));
+                    setCurrentDate(d);
+                  }
+                }
+              };
+              target.addEventListener("pointermove", onMove);
+              target.addEventListener("pointerup", onUp);
+              target.addEventListener("pointercancel", onUp);
+            }}
+          >
             {(() => {
+              // Show 7 days centered on current
               const strip: Date[] = [];
               for (let offset = -3; offset <= 3; offset++) {
                 const d = new Date(currentDate);
@@ -486,9 +522,9 @@ export default function CalendarPage() {
                   <button
                     key={formatDate(d)}
                     onClick={() => setCurrentDate(d)}
-                    className={`shrink-0 flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-colors ${
+                    className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-lg transition-colors ${
                       selected
-                        ? "bg-[var(--color-brand)] text-[var(--color-bg)]"
+                        ? "bg-[var(--color-brand)]"
                         : "hover:bg-[var(--color-surface)]"
                     }`}
                   >
