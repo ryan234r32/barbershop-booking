@@ -14,12 +14,15 @@ export interface AdminJwtPayload {
 }
 
 export function signAdminToken(payload: AdminJwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "30d" });
+  return jwt.sign(payload, JWT_SECRET, { algorithm: "HS256", expiresIn: "30d" });
 }
 
 export function verifyAdminToken(token: string): AdminJwtPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as AdminJwtPayload;
+    // Pin algorithms to block algorithm-confusion attacks. jsonwebtoken v9+
+    // mitigates the classic RS256→HS256 pivot, but explicit allowlisting is
+    // defense-in-depth and costs nothing.
+    return jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] }) as AdminJwtPayload;
   } catch {
     return null;
   }
