@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>1008 Hair Studio · 老闆管理台</title>
+<style>
+  /* ============================================
+     1008 Hair Studio - Admin Mobile Mockup
+     設計原則:
+     1. 老闆剪頭髮空檔用 → 一眼看完今天
+     2. 手機優先（375px 起）
+     3. Pull-to-refresh friendly
+     4. 一鍵操作（滑動標記完成）
+     5. 狀態色彩清楚（綠/黃/灰）
+     ============================================ */
+
+  :root {
+    --color-brand: #059669;
+    --color-brand-dark: #047857;
+    --color-brand-light: #ecfdf5;
+
+    --color-bg: #ffffff;
+    --color-surface: #f9fafb;
+    --color-surface-2: #f3f4f6;
+    --color-border: #e5e7eb;
+
+    --color-text: #111827;
+    --color-text-secondary: #6b7280;
+    --color-text-muted: #9ca3af;
+
+    --color-confirmed: #3b82f6;
+    --color-completed: #10b981;
+    --color-no-show: #ef4444;
+    --color-pending: #f59e0b;
+
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC",
+                 "Microsoft JhengHei", sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--color-text);
+    background: var(--color-surface);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    max-width: 430px;
+    margin: 0 auto;
+    min-height: 100vh;
+    padding-bottom: 80px;
+  }
+
+  /* ============================================
+     頁首 Header
+     ============================================ */
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--color-bg);
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-3);
+  }
+
+  .header-greeting {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  .header-name {
+    font-size: 18px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+
+  .header-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--color-brand-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-brand-dark);
+    border: 2px solid var(--color-brand);
+  }
+
+  /* ============================================
+     今日摘要卡片（三個數字）
+     ============================================ */
+  .summary-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  .summary-card {
+    background: var(--color-surface-2);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    text-align: center;
+  }
+
+  .summary-card.highlight {
+    background: var(--color-brand-light);
+  }
+
+  .summary-number {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--color-text);
+    line-height: 1;
+  }
+
+  .summary-card.highlight .summary-number {
+    color: var(--color-brand-dark);
+  }
+
+  .summary-label {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    margin-top: 4px;
+  }
+
+  /* ============================================
+     日期切換列
+     ============================================ */
+  .date-switcher {
+    background: var(--color-bg);
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 145px;
+    z-index: 9;
+  }
+
+  .date-switcher-title {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .date-switcher-subtitle {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-top: 2px;
+  }
+
+  .date-nav {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .date-nav button {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--color-surface-2);
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--color-text);
+  }
+
+  /* ============================================
+     時間軸 Timeline
+     ============================================ */
+  .timeline {
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .timeline-item {
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-4) 0;
+    position: relative;
+  }
+
+  .timeline-item + .timeline-item {
+    border-top: 1px dashed var(--color-border);
+  }
+
+  .timeline-time {
+    flex-shrink: 0;
+    width: 54px;
+    text-align: right;
+    padding-top: 4px;
+  }
+
+  .time-hour {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-text);
+    line-height: 1;
+  }
+
+  .time-duration {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    margin-top: 4px;
+  }
+
+  .timeline-connector {
+    flex-shrink: 0;
+    width: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 6px;
+  }
+
+  .timeline-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--color-confirmed);
+    border: 2px solid white;
+    box-shadow: 0 0 0 2px var(--color-confirmed);
+  }
+
+  .timeline-dot.completed {
+    background: var(--color-completed);
+    box-shadow: 0 0 0 2px var(--color-completed);
+  }
+
+  .timeline-dot.empty {
+    background: white;
+    box-shadow: 0 0 0 2px var(--color-border);
+  }
+
+  .timeline-line {
+    flex: 1;
+    width: 2px;
+    background: var(--color-border);
+    margin-top: var(--space-1);
+  }
+
+  .timeline-card {
+    flex: 1;
+    background: white;
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--color-border);
+  }
+
+  .timeline-card.completed {
+    background: var(--color-surface);
+    opacity: 0.75;
+  }
+
+  .timeline-card.empty {
+    background: transparent;
+    border: 1px dashed var(--color-border);
+    color: var(--color-text-muted);
+    text-align: center;
+    padding: var(--space-4);
+    font-size: 13px;
+    box-shadow: none;
+  }
+
+  .card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: var(--space-2);
+  }
+
+  .card-customer {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .customer-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--color-brand-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-brand-dark);
+  }
+
+  .customer-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .customer-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .customer-tag {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-top: 1px;
+  }
+
+  .customer-tag.vip {
+    color: var(--color-pending);
+    font-weight: 600;
+  }
+
+  .card-status {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+
+  .card-status.confirmed {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  .card-status.completed {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  .card-service {
+    font-size: 14px;
+    color: var(--color-text);
+    margin-top: var(--space-2);
+    padding-left: 40px;
+  }
+
+  .card-service strong {
+    color: var(--color-text);
+  }
+
+  .card-price {
+    color: var(--color-text-secondary);
+  }
+
+  .card-actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    padding-left: 40px;
+  }
+
+  .btn-action {
+    flex: 1;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid var(--color-border);
+    background: white;
+    color: var(--color-text);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .btn-action.primary {
+    background: var(--color-text);
+    color: white;
+    border-color: var(--color-text);
+  }
+
+  .btn-action:active {
+    transform: scale(0.97);
+  }
+
+  /* ============================================
+     底部 Tab Bar
+     ============================================ */
+  .tab-bar {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 430px;
+    background: white;
+    border-top: 1px solid var(--color-border);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    padding: var(--space-2) 0;
+    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0));
+    z-index: 20;
+  }
+
+  .tab-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: var(--space-2);
+    color: var(--color-text-muted);
+    text-decoration: none;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .tab-item.active {
+    color: var(--color-brand);
+  }
+
+  .tab-icon {
+    font-size: 22px;
+  }
+
+  /* ============================================
+     FAB 新增按鈕
+     ============================================ */
+  .fab {
+    position: fixed;
+    bottom: 88px;
+    right: calc(50% - 215px + 20px);
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--color-brand);
+    color: white;
+    border: none;
+    font-size: 24px;
+    font-weight: 400;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(5, 150, 105, 0.4);
+    z-index: 15;
+  }
+
+  @media (max-width: 430px) {
+    .fab {
+      right: 20px;
+    }
+  }
+
+  .dev-notes {
+    background: #fef3c7;
+    border: 1px dashed #f59e0b;
+    padding: var(--space-3);
+    margin: var(--space-4) var(--space-5);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: #78350f;
+  }
+</style>
+</head>
+<body>
+
+  <!-- 頁首：問候 + 今日摘要 -->
+  <header class="header">
+    <div class="header-top">
+      <div>
+        <div class="header-greeting">下午好</div>
+        <div class="header-name">1008 老闆</div>
+      </div>
+      <div class="header-avatar">1008</div>
+    </div>
+    <div class="summary-cards">
+      <div class="summary-card highlight">
+        <div class="summary-number">5</div>
+        <div class="summary-label">今日預約</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-number">2</div>
+        <div class="summary-label">已完成</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-number">$8.2K</div>
+        <div class="summary-label">預計收入</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="dev-notes">
+    <strong>⚡ 設計說明</strong>
+    老闆端手機版主畫面。核心情境：老闆剪頭髮空檔拿出手機，一眼看完今天。
+    時間軸設計讓過去/進行中/未來清楚分層。
+  </div>
+
+  <!-- 日期切換 -->
+  <div class="date-switcher">
+    <div>
+      <div class="date-switcher-title">4 月 11 日，週六</div>
+      <div class="date-switcher-subtitle">今天</div>
+    </div>
+    <div class="date-nav">
+      <button aria-label="前一天">‹</button>
+      <button aria-label="行事曆">📅</button>
+      <button aria-label="後一天">›</button>
+    </div>
+  </div>
+
+  <!-- 時間軸 -->
+  <div class="timeline">
+
+    <!-- 已完成 -->
+    <div class="timeline-item">
+      <div class="timeline-time">
+        <div class="time-hour">11:00</div>
+        <div class="time-duration">60 分鐘</div>
+      </div>
+      <div class="timeline-connector">
+        <div class="timeline-dot completed"></div>
+        <div class="timeline-line"></div>
+      </div>
+      <div class="timeline-card completed">
+        <div class="card-top">
+          <div class="card-customer">
+            <div class="customer-avatar">陳</div>
+            <div class="customer-info">
+              <div class="customer-name">陳先生</div>
+              <div class="customer-tag vip">VIP · 第 12 次</div>
+            </div>
+          </div>
+          <span class="card-status completed">✓ 已完成</span>
+        </div>
+        <div class="card-service"><strong>男士剪髮</strong> · <span class="card-price">NT$ 1,000</span></div>
+      </div>
+    </div>
+
+    <!-- 已完成 -->
+    <div class="timeline-item">
+      <div class="timeline-time">
+        <div class="time-hour">13:00</div>
+        <div class="time-duration">180 分鐘</div>
+      </div>
+      <div class="timeline-connector">
+        <div class="timeline-dot completed"></div>
+        <div class="timeline-line"></div>
+      </div>
+      <div class="timeline-card completed">
+        <div class="card-top">
+          <div class="card-customer">
+            <div class="customer-avatar">林</div>
+            <div class="customer-info">
+              <div class="customer-name">林小姐</div>
+              <div class="customer-tag">熟客 · 第 5 次</div>
+            </div>
+          </div>
+          <span class="card-status completed">✓ 已完成</span>
+        </div>
+        <div class="card-service"><strong>染髮</strong> · <span class="card-price">NT$ 2,600</span></div>
+      </div>
+    </div>
+
+    <!-- 即將到來 -->
+    <div class="timeline-item">
+      <div class="timeline-time">
+        <div class="time-hour">16:00</div>
+        <div class="time-duration">60 分鐘</div>
+      </div>
+      <div class="timeline-connector">
+        <div class="timeline-dot"></div>
+        <div class="timeline-line"></div>
+      </div>
+      <div class="timeline-card">
+        <div class="card-top">
+          <div class="card-customer">
+            <div class="customer-avatar">王</div>
+            <div class="customer-info">
+              <div class="customer-name">王先生</div>
+              <div class="customer-tag">新客 · 第 1 次</div>
+            </div>
+          </div>
+          <span class="card-status confirmed">即將到來</span>
+        </div>
+        <div class="card-service"><strong>男士剪髮</strong> · <span class="card-price">NT$ 1,000</span></div>
+        <div class="card-actions">
+          <button class="btn-action">客人資料</button>
+          <button class="btn-action primary">✓ 標記完成</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 空檔 -->
+    <div class="timeline-item">
+      <div class="timeline-time">
+        <div class="time-hour">17:00</div>
+        <div class="time-duration">空檔</div>
+      </div>
+      <div class="timeline-connector">
+        <div class="timeline-dot empty"></div>
+        <div class="timeline-line"></div>
+      </div>
+      <div class="timeline-card empty">
+        暫無預約
+      </div>
+    </div>
+
+    <!-- 晚間預約 -->
+    <div class="timeline-item">
+      <div class="timeline-time">
+        <div class="time-hour">18:00</div>
+        <div class="time-duration">60 分鐘</div>
+      </div>
+      <div class="timeline-connector">
+        <div class="timeline-dot"></div>
+        <div class="timeline-line"></div>
+      </div>
+      <div class="timeline-card">
+        <div class="card-top">
+          <div class="card-customer">
+            <div class="customer-avatar">張</div>
+            <div class="customer-info">
+              <div class="customer-name">張小姐</div>
+              <div class="customer-tag vip">VIP · 第 8 次</div>
+            </div>
+          </div>
+          <span class="card-status confirmed">即將到來</span>
+        </div>
+        <div class="card-service"><strong>女士剪髮</strong> · <span class="card-price">NT$ 1,100</span></div>
+      </div>
+    </div>
+
+    <!-- 晚間預約 -->
+    <div class="timeline-item">
+      <div class="timeline-time">
+        <div class="time-hour">19:00</div>
+        <div class="time-duration">60 分鐘</div>
+      </div>
+      <div class="timeline-connector">
+        <div class="timeline-dot"></div>
+      </div>
+      <div class="timeline-card">
+        <div class="card-top">
+          <div class="card-customer">
+            <div class="customer-avatar">李</div>
+            <div class="customer-info">
+              <div class="customer-name">李先生</div>
+              <div class="customer-tag">熟客 · 第 3 次</div>
+            </div>
+          </div>
+          <span class="card-status confirmed">即將到來</span>
+        </div>
+        <div class="card-service"><strong>男士剪髮</strong> · <span class="card-price">NT$ 1,000</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FAB 快速新增 -->
+  <button class="fab" aria-label="新增預約">+</button>
+
+  <!-- 底部 Tab Bar -->
+  <nav class="tab-bar">
+    <a class="tab-item active">
+      <div class="tab-icon">📋</div>
+      <span>今日</span>
+    </a>
+    <a class="tab-item">
+      <div class="tab-icon">📅</div>
+      <span>行事曆</span>
+    </a>
+    <a class="tab-item">
+      <div class="tab-icon">👥</div>
+      <span>客戶</span>
+    </a>
+    <a class="tab-item">
+      <div class="tab-icon">⚙️</div>
+      <span>設定</span>
+    </a>
+  </nav>
+
+</body>
+</html>

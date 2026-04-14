@@ -115,6 +115,7 @@ const colorMap: Record<ToastType, string> = {
 let nextId = 0;
 const AUTO_DISMISS_MS = 3500;
 const LEAVE_ANIMATION_MS = 300;
+const MAX_TOASTS = 3;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -140,7 +141,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         entering: true,
         leaving: false,
       };
-      setToasts((prev) => [...prev, item]);
+      setToasts((prev) => {
+        // Dedup: skip if identical message already showing
+        if (prev.some((t) => t.message === input.message && !t.leaving)) {
+          return prev;
+        }
+        // Cap at MAX_TOASTS — drop oldest
+        const capped = prev.length >= MAX_TOASTS ? prev.slice(prev.length - MAX_TOASTS + 1) : prev;
+        return [...capped, item];
+      });
 
       // end entering state after a tick so the animation class applies
       requestAnimationFrame(() => {

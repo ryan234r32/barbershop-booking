@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh-TW"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Noto+Sans+TC:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-dim": "#e0d9d1",
+                        "on-primary-fixed": "#002115",
+                        "on-surface": "#1e1b17",
+                        "secondary-fixed": "#b9efc5",
+                        "inverse-on-surface": "#f7f0e8",
+                        "outline-variant": "#c0c9c2",
+                        "on-primary": "#ffffff",
+                        "on-secondary-fixed-variant": "#1e5031",
+                        "on-secondary-container": "#3b6d4b",
+                        "on-primary-container": "#73a891",
+                        "surface-container-low": "#faf2ea",
+                        "on-secondary": "#ffffff",
+                        "background": "#fff8f1",
+                        "outline": "#707974",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#ffb4a7",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-variant": "#e8e1da",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed": "#ffdad4",
+                        "on-tertiary-fixed-variant": "#7e2b1e",
+                        "primary-fixed-dim": "#9cd2b9",
+                        "surface-tint": "#346853",
+                        "tertiary": "#470300",
+                        "surface-container-high": "#eee7df",
+                        "secondary": "#376847",
+                        "surface-container-highest": "#e8e1da",
+                        "inverse-primary": "#9cd2b9",
+                        "secondary-fixed-dim": "#9dd3aa",
+                        "surface-bright": "#fff8f1",
+                        "on-tertiary-fixed": "#400100",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-container": "#eb7e6c",
+                        "error": "#ba1a1a",
+                        "primary-fixed": "#b7efd4",
+                        "primary": "#002519",
+                        "on-primary-fixed-variant": "#1a503c",
+                        "on-background": "#1e1b17",
+                        "surface-container": "#f4ede5",
+                        "on-secondary-fixed": "#00210e",
+                        "tertiary-container": "#65190f",
+                        "surface": "#fff8f1",
+                        "inverse-surface": "#33302b",
+                        "primary-container": "#003d2b",
+                        "error-container": "#ffdad6",
+                        "secondary-container": "#b6edc2",
+                        "on-surface-variant": "#404944"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope", "Noto Sans TC"],
+                        "body": ["Manrope", "Noto Sans TC"],
+                        "label": ["Manrope", "Noto Sans TC"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Manrope', 'Noto Sans TC', sans-serif; }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+        }
+        .calendar-cell {
+            height: 56px;
+            border-bottom: 1px solid rgba(192, 201, 194, 0.4);
+            border-right: 1px solid rgba(192, 201, 194, 0.4);
+        }
+        .calendar-cell:nth-child(7n) { border-right: none; }
+        .calendar-cell:nth-last-child(-n+7) { border-bottom: none; }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col items-center">
+<div class="w-full max-w-[393px] min-h-screen bg-background relative flex flex-col overflow-hidden">
+<!-- Shared Component: TopAppBar -->
+<header class="sticky top-0 w-full bg-emerald-50/80 dark:bg-emerald-950/80 backdrop-blur-md z-50 border-b border-emerald-900/10 dark:border-emerald-100/10">
+<div class="flex items-center justify-between px-6 py-4 w-full">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-[10px] text-on-primary">
+                        S.L.
+                    </div>
+<span class="text-xl font-bold text-emerald-900 dark:text-emerald-100 font-manrope font-semibold tracking-tight">The Verdant Atelier</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-emerald-900 dark:text-emerald-50 cursor-pointer" data-icon="calendar_today">calendar_today</span>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col">
+<!-- Calendar Navigation & Filter -->
+<div class="px-6 py-4 space-y-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4 text-primary-container font-semibold">
+<span class="material-symbols-outlined text-sm">arrow_back_ios</span>
+<span class="text-base tracking-wide">2026 年 4 月</span>
+<span class="material-symbols-outlined text-sm">arrow_forward_ios</span>
+</div>
+<div class="flex bg-surface-container rounded-lg p-1">
+<button class="px-3 py-1 text-sm font-medium text-on-surface-variant">日</button>
+<button class="px-3 py-1 text-sm font-medium text-on-surface-variant">週</button>
+<button class="px-3 py-1 text-sm font-medium bg-primary-container text-on-primary rounded-md">月</button>
+</div>
+</div>
+</div>
+<!-- Weekday Headers -->
+<div class="calendar-grid px-2 mb-2">
+<div class="text-center text-[12px] font-medium text-primary-container py-1">日</div>
+<div class="text-center text-[12px] font-medium text-primary-container py-1">一</div>
+<div class="text-center text-[12px] font-medium text-primary-container py-1">二</div>
+<div class="text-center text-[12px] font-medium text-primary-container py-1">三</div>
+<div class="text-center text-[12px] font-medium text-primary-container py-1">四</div>
+<div class="text-center text-[12px] font-medium text-primary-container py-1">五</div>
+<div class="text-center text-[12px] font-medium text-primary-container py-1">六</div>
+</div>
+<!-- Monthly Grid -->
+<div class="calendar-grid border-t border-outline-variant/40 mx-2">
+<!-- Row 1: March overflow -->
+<div class="calendar-cell bg-surface-container-low/50"></div>
+<div class="calendar-cell bg-surface-container-low/50"></div>
+<div class="calendar-cell bg-surface-container-low/50"></div>
+<!-- April 1 -->
+<div class="calendar-cell relative flex flex-col items-center justify-center">
+<span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">1</span>
+<span class="text-[12px] text-outline font-medium">0</span>
+</div>
+<!-- April 2 -->
+<div class="calendar-cell relative flex flex-col items-center justify-center">
+<span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">2</span>
+<span class="text-[12px] text-on-surface font-medium">3</span>
+<div class="absolute bottom-0 left-0 w-full h-1 bg-primary-container opacity-20"></div>
+</div>
+<!-- April 3 -->
+<div class="calendar-cell relative flex flex-col items-center justify-center">
+<span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">3</span>
+<span class="text-[12px] text-on-surface font-medium">5</span>
+<div class="absolute bottom-0 left-0 w-full h-1 bg-primary-container opacity-50"></div>
+</div>
+<!-- April 4 -->
+<div class="calendar-cell relative flex flex-col items-center justify-center">
+<span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">4</span>
+<span class="text-[12px] text-on-surface font-medium">2</span>
+<div class="absolute bottom-0 left-0 w-full h-1 bg-primary-container opacity-20"></div>
+</div>
+<!-- Row 2 -->
+<div class="calendar-cell bg-surface-container relative flex flex-col items-center justify-center">
+<span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">5</span>
+<span class="text-[11px] text-outline font-bold tracking-tighter">休</span>
+</div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">6</span></div>
+<div class="calendar-cell relative flex flex-col items-center justify-center">
+<span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">7</span>
+<span class="text-[12px] text-on-surface font-medium">6</span>
+<div class="absolute bottom-0 left-0 w-full h-1 bg-primary-container opacity-50"></div>
+</div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">8</span></div>
+<div class="calendar-cell relative flex flex-col items-center justify-center">
+<span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">9</span>
+<span class="text-[12px] text-on-surface font-medium">8</span>
+<div class="absolute bottom-0 left-0 w-full h-1 bg-primary-container opacity-80"></div>
+</div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">10</span></div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">11</span></div>
+<!-- Row 3 -->
+<div class="calendar-cell bg-surface-container relative flex flex-col items-center justify-center">
+<span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">12</span>
+<span class="text-[11px] text-outline font-bold tracking-tighter">休</span>
+</div>
+<!-- TODAY: April 13 -->
+<div class="calendar-cell relative flex flex-col items-center justify-center">
+<div class="absolute top-1 left-1 w-6 h-6 bg-primary-container rounded-full flex items-center justify-center">
+<span class="text-[14px] font-semibold text-white">13</span>
+</div>
+<span class="text-[12px] text-on-surface font-medium mt-2">5</span>
+<div class="absolute bottom-0 left-0 w-full h-1 bg-primary-container opacity-50"></div>
+</div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">14</span></div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">15</span></div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">16</span></div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">17</span></div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">18</span></div>
+<!-- Row 4 -->
+<div class="calendar-cell bg-surface-container relative flex flex-col items-center justify-center">
+<span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">19</span>
+<span class="text-[11px] text-outline font-bold tracking-tighter">休</span>
+</div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">20</span></div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">21</span></div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">22</span></div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">23</span></div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">24</span></div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">25</span></div>
+<!-- Row 5 -->
+<div class="calendar-cell bg-surface-container relative flex flex-col items-center justify-center">
+<span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">26</span>
+<span class="text-[11px] text-outline font-bold tracking-tighter">休</span>
+</div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">27</span></div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">28</span></div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">29</span></div>
+<div class="calendar-cell relative"><span class="absolute top-1 left-1.5 text-[14px] font-semibold text-primary-container">30</span></div>
+<div class="calendar-cell bg-surface-container-low/50"></div>
+<div class="calendar-cell bg-surface-container-low/50"></div>
+<!-- Row 6 -->
+<div class="calendar-cell bg-surface-container-low/50"></div>
+<div class="calendar-cell bg-surface-container-low/50"></div>
+<div class="calendar-cell bg-surface-container-low/50"></div>
+<div class="calendar-cell bg-surface-container-low/50"></div>
+<div class="calendar-cell bg-surface-container-low/50"></div>
+<div class="calendar-cell bg-surface-container-low/50"></div>
+<div class="calendar-cell bg-surface-container-low/50"></div>
+</div>
+<!-- Monthly Summary Strip -->
+<div class="mt-4 px-6">
+<div class="bg-surface-container-low rounded-xl p-4 flex items-center justify-between border border-outline-variant/30">
+<div class="flex flex-col">
+<span class="text-[11px] text-on-surface-variant font-medium mb-1">本月統計 (4月)</span>
+<div class="flex items-baseline gap-1">
+<span class="text-sm font-semibold text-primary-container">預約 142</span>
+<span class="text-[11px] text-outline">|</span>
+<span class="text-sm font-semibold text-primary-container">營收 NT$156,800</span>
+</div>
+</div>
+<div class="w-10 h-10 rounded-full bg-primary-container/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary-container text-lg" data-weight="fill" style="font-variation-settings: 'FILL' 1;">analytics</span>
+</div>
+</div>
+</div>
+<!-- Stylist Quick Access Section (Bento style) -->
+<div class="mt-6 px-6 pb-24">
+<h3 class="text-xs font-bold text-primary-container uppercase tracking-widest mb-3">今日設計師狀態</h3>
+<div class="grid grid-cols-2 gap-3">
+<div class="bg-surface-container-highest p-3 rounded-xl flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="professional hair stylist with creative minimal aesthetic in bright natural lighting studio" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBwEuvWFMhdeW3VAIvx1TqaxZAYPf5yjbfvKd_h1wDgJID1DQp6MvYvndulC8e9Jb-tgONKNEUwtLgJfnhhOiGLKBXMX01gAfFz8xhuen5GCTfquoeKP5C97ZwF1nwgw-YQ0-xASJs4oHvrO4N8xyC8fEOyHX-btYjb1x-6xByhAyTix2zUz3cqGp5e4Fs9uIBqbgby3dNyRFUuM-akaOl78ZvwJ_0v7p5tto0v2AwkExyTZM9pUMKFtD6FmnOq92NPgAIZ_yBbE-86"/>
+</div>
+<div class="overflow-hidden">
+<p class="text-sm font-bold truncate">Aria</p>
+<span class="text-[10px] text-secondary font-medium px-1.5 bg-secondary-container rounded-full">忙碌中</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-3 rounded-xl flex items-center gap-3 border border-outline-variant/40">
+<div class="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
+<img data-alt="male master stylist in high-end botanical salon setting looking focused and professional" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpXSImWWsSY9CgE6nRnODMDFsjWy0LpMpZVSfYFLvw1yeE-MfpLlrwzLgvJmUUSAQRTevQWoF0bWNB6VeWdHwW_FM9J-E6RDnGJbW8eqbJJf_4co1hYiVd2aM5hnR7gH69zshjpMZ9V1H0cW7xGBizEbW3xdOA0myUAiYfosUm7DJtPhFhnDO4hkJZcEYITeeUhhNpCEptFC090leWVa1FmLpp8xTCN0fZolYhteU2AQXebstk4RWXOSTseQ0QFaTWnANwcPbSChQz"/>
+</div>
+<div class="overflow-hidden">
+<p class="text-sm font-bold truncate">Leo</p>
+<span class="text-[10px] text-primary-container font-medium px-1.5 bg-primary-fixed rounded-full">可預約</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Shared Component: BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe pt-2 bg-emerald-50/80 dark:bg-emerald-950/80 backdrop-blur-md border-t border-emerald-900/10 dark:border-emerald-100/10">
+<!-- 日曆 (Active) -->
+<div class="flex flex-col items-center justify-center bg-emerald-100/50 dark:bg-emerald-900/50 text-emerald-900 dark:text-emerald-100 rounded-lg py-1 px-3 active:scale-95 transition-transform cursor-pointer">
+<span class="material-symbols-outlined" data-icon="calendar_month">calendar_month</span>
+<span class="text-[11px] font-manrope font-semibold">日曆</span>
+</div>
+<!-- 報表 -->
+<div class="flex flex-col items-center justify-center text-emerald-800/60 dark:text-emerald-200/60 py-1 px-3 hover:text-emerald-900 dark:hover:text-emerald-100 active:scale-95 transition-transform cursor-pointer">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="text-[11px] font-manrope font-semibold">報表</span>
+</div>
+<!-- 更多 -->
+<div class="flex flex-col items-center justify-center text-emerald-800/60 dark:text-emerald-200/60 py-1 px-3 hover:text-emerald-900 dark:hover:text-emerald-100 active:scale-95 transition-transform cursor-pointer">
+<span class="material-symbols-outlined" data-icon="more_horiz">more_horiz</span>
+<span class="text-[11px] font-manrope font-semibold">更多</span>
+</div>
+</nav>
+<!-- Floating Action Button - Only for Calendar View -->
+<div class="fixed bottom-24 right-6">
+<button class="w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-white text-2xl" data-icon="add">add</span>
+</button>
+</div>
+</div>
+</body></html>

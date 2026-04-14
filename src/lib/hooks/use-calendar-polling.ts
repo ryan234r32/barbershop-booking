@@ -15,47 +15,82 @@ interface Booking {
 
 interface UseCalendarPollingOptions<T extends Booking = Booking> {
   bookings: T[];
+  isLoading: boolean;
   onNearingEnd: (booking: T) => void;
+}
+
+const SEEN_KEY = "admin-seen-booking-ids";
+const SEEN_MAX = 500; // keep last 500 IDs, prune old
+
+function loadSeen(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(SEEN_KEY);
+    if (!raw) return new Set();
+    const ids: string[] = JSON.parse(raw);
+    return new Set(ids);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveSeen(ids: Set<string>) {
+  if (typeof window === "undefined") return;
+  const arr = Array.from(ids);
+  const trimmed = arr.length > SEEN_MAX ? arr.slice(arr.length - SEEN_MAX) : arr;
+  try {
+    localStorage.setItem(SEEN_KEY, JSON.stringify(trimmed));
+  } catch {
+    // localStorage may be full; silent
+  }
 }
 
 /**
  * Detects new bookings (toast notification) and near-end bookings (callback).
- * Runs only on the calendar page. Pauses when page is hidden.
+ * Uses localStorage to persist "seen" booking IDs across sessions,
+ * so the same booking only triggers a toast once ever.
  */
-export function useCalendarPolling<T extends Booking>({ bookings, onNearingEnd }: UseCalendarPollingOptions<T>) {
+export function useCalendarPolling<T extends Booking>({
+  bookings,
+  isLoading,
+  onNearingEnd,
+}: UseCalendarPollingOptions<T>) {
   const { toast } = useToast();
-  const prevIdsRef = useRef<Set<string>>(new Set());
-  const initializedRef = useRef(false);
+  const seenRef = useRef<Set<string> | null>(null);
+  const firstLoadRef = useRef(true);
 
   // Detect new bookings
   useEffect(() => {
-    const currentIds = new Set(bookings.map((b) => b.id));
+    if (isLoading) return;
 
-    if (!initializedRef.current) {
-      prevIdsRef.current = currentIds;
-      initializedRef.current = true;
+    // First load: seed seenRef from localStorage, and mark all currently-visible
+    // bookings as seen without toasting (they already existed when user arrived).
+    if (firstLoadRef.current) {
+      const seen = loadSeen();
+      for (const b of bookings) seen.add(b.id);
+      saveSeen(seen);
+      seenRef.current = seen;
+      firstLoadRef.current = false;
       return;
     }
 
-    // Find new bookings (in current but not in previous)
-    for (const b of bookings) {
-      if (!prevIdsRef.current.has(b.id) && b.status === "CONFIRMED") {
-        // Check localStorage dedup (Web Push may have already notified)
-        const dedupKey = `push-${b.id}`;
-        const lastPush = localStorage.getItem(dedupKey);
-        if (lastPush && Date.now() - parseInt(lastPush) < 5 * 60 * 1000) {
-          continue; // Skip — Web Push already showed this within 5 min
-        }
+    if (!seenRef.current) return;
 
+    // Subsequent updates — toast only truly new bookings
+    let changed = false;
+    for (const b of bookings) {
+      if (!seenRef.current.has(b.id) && b.status === "CONFIRMED") {
         toast({
           type: "info",
           message: `新預約！${b.user.displayName || "顧客"} ${b.startTime} ${b.service.name}`,
         });
+        seenRef.current.add(b.id);
+        changed = true;
       }
     }
 
-    prevIdsRef.current = currentIds;
-  }, [bookings, toast]);
+    if (changed) saveSeen(seenRef.current);
+  }, [bookings, isLoading, toast]);
 
   // Detect near-end bookings (endTime - 10min <= now)
   const checkNearEnd = useCallback(() => {

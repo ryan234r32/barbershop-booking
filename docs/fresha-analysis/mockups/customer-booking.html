@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>1008 Hair Studio · 線上預約</title>
+<style>
+  /* ============================================
+     1008 Hair Studio - Customer Booking Mockup
+     設計原則（學自 Fresha）:
+     1. 極簡色彩（白底黑字 + 品牌綠 CTA）
+     2. 單頁三區（服務 / 日期+時段 / 確認）
+     3. Sticky 底部按鈕
+     4. 日曆與時段同頁（不跳轉）
+     5. 大留白 + 清晰層次
+     ============================================ */
+
+  :root {
+    /* 品牌色 - 1008 用 emerald green，對標 Fresha 的極簡黑白 */
+    --color-brand: #059669;
+    --color-brand-dark: #047857;
+    --color-brand-light: #ecfdf5;
+
+    /* 中性色 */
+    --color-bg: #ffffff;
+    --color-surface: #fafafa;
+    --color-border: #e5e7eb;
+    --color-border-strong: #d1d5db;
+
+    /* 文字 */
+    --color-text: #111827;
+    --color-text-secondary: #6b7280;
+    --color-text-muted: #9ca3af;
+
+    /* 狀態 */
+    --color-success: #10b981;
+    --color-warning: #f59e0b;
+    --color-error: #ef4444;
+
+    /* 間距 */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+
+    /* 圓角 */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+
+    /* 陰影 */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC",
+                 "Microsoft JhengHei", sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--color-text);
+    background: var(--color-bg);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    max-width: 430px;
+    margin: 0 auto;
+    min-height: 100vh;
+    padding-bottom: 100px; /* 留空間給 sticky footer */
+    background: var(--color-bg);
+  }
+
+  /* ============================================
+     頁首 Header
+     ============================================ */
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--color-bg);
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .header-brand {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .header-brand span {
+    color: var(--color-brand);
+  }
+
+  .header-close {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--color-surface);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--color-text-secondary);
+  }
+
+  /* ============================================
+     Section 區塊
+     ============================================ */
+  .section {
+    padding: var(--space-6) var(--space-5);
+    border-bottom: 8px solid var(--color-surface);
+  }
+
+  .section:last-of-type {
+    border-bottom: none;
+  }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-4);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .section-title-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--color-brand);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* ============================================
+     服務卡片（網格）
+     ============================================ */
+  .services {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
+
+  .service-card {
+    background: white;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+  }
+
+  .service-card:active {
+    transform: scale(0.97);
+  }
+
+  .service-card.selected {
+    border-color: var(--color-brand);
+    background: var(--color-brand-light);
+  }
+
+  .service-card.selected::before {
+    content: "✓";
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 22px;
+    height: 22px;
+    background: var(--color-brand);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .service-icon {
+    font-size: 28px;
+    margin-bottom: var(--space-2);
+  }
+
+  .service-name {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: var(--space-1);
+    line-height: 1.3;
+  }
+
+  .service-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .service-duration {
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+
+  .service-price {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  /* ============================================
+     月曆式日期選擇（HOTCAKE 風格）
+     ============================================ */
+  .calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-4);
+    padding: 0 var(--space-2);
+  }
+
+  .calendar-month-label {
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .calendar-nav-btn {
+    background: none;
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--color-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .calendar-nav-btn:active {
+    background: var(--color-surface);
+  }
+
+  .calendar-today-btn {
+    background: none;
+    border: none;
+    color: var(--color-brand);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: var(--space-2);
+  }
+
+  .calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: var(--space-2);
+  }
+
+  .calendar-weekday {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    text-align: center;
+    padding: var(--space-2) 0;
+    font-weight: 500;
+  }
+
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: var(--space-5);
+  }
+
+  .calendar-day {
+    aspect-ratio: 1;
+    border: none;
+    background: none;
+    border-radius: 50%;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    font-family: inherit;
+  }
+
+  .calendar-day:hover:not(.disabled):not(.empty) {
+    background: var(--color-surface);
+  }
+
+  .calendar-day:active:not(.disabled):not(.empty) {
+    transform: scale(0.92);
+  }
+
+  .calendar-day.empty {
+    cursor: default;
+  }
+
+  .calendar-day.disabled {
+    color: var(--color-text-muted);
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .calendar-day.today {
+    color: var(--color-brand);
+    font-weight: 800;
+  }
+
+  .calendar-day.selected {
+    background: var(--color-brand);
+    color: white;
+  }
+
+  .calendar-day.selected.today {
+    color: white;
+  }
+
+  /* 可預約時間區塊（選中日期下方） */
+  .time-panel {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    margin-top: var(--space-4);
+  }
+
+  .time-panel-label {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    font-weight: 600;
+    margin-bottom: var(--space-3);
+  }
+
+  /* 方案 B：選中時段後顯示結束時間 */
+  .duration-hint {
+    margin-top: var(--space-4);
+    padding: var(--space-3);
+    background: var(--color-brand-light);
+    border-left: 3px solid var(--color-brand);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--color-brand-dark);
+  }
+
+  .duration-hint strong {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 2px;
+  }
+
+  /* ============================================
+     時段選擇（3 欄網格，按上/下午分組）
+     ============================================ */
+  .time-group-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-3);
+    margin-top: var(--space-5);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .time-group-label:first-child {
+    margin-top: 0;
+  }
+
+  .time-group-label::before {
+    content: "";
+    display: inline-block;
+    width: 4px;
+    height: 16px;
+    background: var(--color-brand);
+    border-radius: 2px;
+  }
+
+  .time-slots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-2);
+  }
+
+  .time-slot {
+    padding: var(--space-3) var(--space-2);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: white;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+  }
+
+  .time-slot:active {
+    transform: scale(0.95);
+  }
+
+  .time-slot.recommended {
+    border-color: var(--color-brand);
+    background: var(--color-brand-light);
+    color: var(--color-brand-dark);
+  }
+
+  .time-slot.recommended::after {
+    content: "推薦";
+    position: absolute;
+    top: -6px;
+    right: -4px;
+    font-size: 9px;
+    background: var(--color-brand);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 700;
+  }
+
+  .time-slot.selected {
+    background: var(--color-text);
+    border-color: var(--color-text);
+    color: white;
+  }
+
+  .time-slot.selected::after {
+    background: white;
+    color: var(--color-text);
+  }
+
+  .time-slot.disabled {
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .time-slot.disabled:active {
+    transform: none;
+  }
+
+  /* ============================================
+     備註區
+     ============================================ */
+  .note-toggle {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: var(--space-3) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .note-textarea {
+    width: 100%;
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: 14px;
+    resize: none;
+    min-height: 80px;
+    margin-top: var(--space-2);
+  }
+
+  .note-textarea:focus {
+    outline: none;
+    border-color: var(--color-brand);
+  }
+
+  /* ============================================
+     取消政策連結
+     ============================================ */
+  .policy-link {
+    display: block;
+    text-align: center;
+    font-size: 12px;
+    color: var(--color-text-muted);
+    padding: var(--space-4);
+    text-decoration: underline;
+  }
+
+  /* ============================================
+     Sticky 底部確認列（學自 Fresha）
+     ============================================ */
+  .sticky-footer {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 430px;
+    background: white;
+    border-top: 1px solid var(--color-border);
+    padding: var(--space-4) var(--space-5);
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0));
+    box-shadow: var(--shadow-lg);
+    z-index: 20;
+  }
+
+  .footer-summary {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-3);
+    min-height: 18px;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .footer-summary strong {
+    color: var(--color-text);
+    font-weight: 600;
+  }
+
+  .footer-summary-divider {
+    color: var(--color-border-strong);
+  }
+
+  .btn-primary {
+    width: 100%;
+    padding: var(--space-4);
+    background: var(--color-text);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+  }
+
+  .btn-primary:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  .btn-primary:disabled {
+    background: var(--color-border-strong);
+    cursor: not-allowed;
+  }
+
+  .btn-primary.active {
+    background: var(--color-brand);
+  }
+
+  .btn-primary.active:active {
+    background: var(--color-brand-dark);
+  }
+
+  /* ============================================
+     Notes (dev only - 說明區塊)
+     ============================================ */
+  .dev-notes {
+    background: #fef3c7;
+    border: 1px dashed #f59e0b;
+    padding: var(--space-3);
+    margin: var(--space-4) var(--space-5);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: #78350f;
+  }
+
+  .dev-notes strong {
+    display: block;
+    margin-bottom: 4px;
+  }
+</style>
+</head>
+<body>
+
+  <!-- 頁首 -->
+  <header class="header">
+    <div class="header-brand">1008 <span>Hair Studio</span></div>
+    <button class="header-close" aria-label="關閉">✕</button>
+  </header>
+
+  <div class="dev-notes">
+    <strong>⚡ 設計說明（非正式內容）</strong>
+    這是 1008 Hair Studio 客人端預約頁的設計 mockup，應用 Fresha 的 3 步驟單頁結構。
+    核心原則：日曆+時段同頁、Sticky 底部按鈕、極簡色彩、Mobile-first。
+  </div>
+
+  <!-- Section 1: 選擇服務 -->
+  <section class="section">
+    <h2 class="section-title">
+      <span class="section-title-number">1</span>
+      選擇服務
+    </h2>
+    <div class="services">
+      <div class="service-card selected">
+        <div class="service-icon">✂️</div>
+        <div class="service-name">男士剪髮</div>
+        <div class="service-meta">
+          <div class="service-duration">約 60 分鐘</div>
+          <div class="service-price">NT$ 1,000</div>
+        </div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">💇</div>
+        <div class="service-name">女士剪髮</div>
+        <div class="service-meta">
+          <div class="service-duration">約 60 分鐘</div>
+          <div class="service-price">NT$ 1,100</div>
+        </div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🎨</div>
+        <div class="service-name">染髮</div>
+        <div class="service-meta">
+          <div class="service-duration">約 180 分鐘</div>
+          <div class="service-price">NT$ 2,600</div>
+        </div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🌀</div>
+        <div class="service-name">溫塑燙</div>
+        <div class="service-meta">
+          <div class="service-duration">約 240 分鐘</div>
+          <div class="service-price">NT$ 4,000</div>
+        </div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">✨</div>
+        <div class="service-name">縮毛矯正</div>
+        <div class="service-meta">
+          <div class="service-duration">約 240 分鐘</div>
+          <div class="service-price">NT$ 4,600</div>
+        </div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">💆</div>
+        <div class="service-name">護髮</div>
+        <div class="service-meta">
+          <div class="service-duration">約 60 分鐘</div>
+          <div class="service-price">NT$ 800</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 2: 選擇日期 + 時段（月曆式，HOTCAKE 風格） -->
+  <section class="section">
+    <h2 class="section-title">
+      <span class="section-title-number">2</span>
+      選擇日期與時段
+    </h2>
+
+    <!-- 月曆標題列 -->
+    <div class="calendar-header">
+      <div class="calendar-month-label">
+        <button class="calendar-nav-btn" aria-label="上一月">‹</button>
+        <span>4 月 2026</span>
+        <button class="calendar-nav-btn" aria-label="下一月">›</button>
+      </div>
+      <button class="calendar-today-btn">今天</button>
+    </div>
+
+    <!-- 星期標題 -->
+    <div class="calendar-weekdays">
+      <div class="calendar-weekday">一</div>
+      <div class="calendar-weekday">二</div>
+      <div class="calendar-weekday">三</div>
+      <div class="calendar-weekday">四</div>
+      <div class="calendar-weekday">五</div>
+      <div class="calendar-weekday">六</div>
+      <div class="calendar-weekday">日</div>
+    </div>
+
+    <!-- 月曆主體（7 欄網格） -->
+    <div class="calendar-grid">
+      <!-- 4 月 1 日是週三，所以前面補 2 個空格 -->
+      <button class="calendar-day empty"></button>
+      <button class="calendar-day empty"></button>
+      <button class="calendar-day disabled">1</button>
+      <button class="calendar-day disabled">2</button>
+      <button class="calendar-day disabled">3</button>
+      <button class="calendar-day disabled">4</button>
+      <button class="calendar-day disabled">5</button>
+
+      <button class="calendar-day disabled">6</button>
+      <button class="calendar-day disabled">7</button>
+      <button class="calendar-day disabled">8</button>
+      <button class="calendar-day disabled">9</button>
+      <button class="calendar-day disabled">10</button>
+      <button class="calendar-day today">11</button>
+      <button class="calendar-day">12</button>
+
+      <button class="calendar-day disabled">13</button>
+      <button class="calendar-day">14</button>
+      <button class="calendar-day">15</button>
+      <button class="calendar-day">16</button>
+      <button class="calendar-day">17</button>
+      <button class="calendar-day">18</button>
+      <button class="calendar-day">19</button>
+
+      <button class="calendar-day disabled">20</button>
+      <button class="calendar-day selected">21</button>
+      <button class="calendar-day">22</button>
+      <button class="calendar-day">23</button>
+      <button class="calendar-day">24</button>
+      <button class="calendar-day">25</button>
+      <button class="calendar-day">26</button>
+
+      <button class="calendar-day disabled">27</button>
+      <button class="calendar-day">28</button>
+      <button class="calendar-day">29</button>
+      <button class="calendar-day">30</button>
+    </div>
+
+    <!-- 時段區塊 -->
+    <div class="time-panel">
+      <div class="time-panel-label">04/21 可預約時間</div>
+
+      <div class="time-group-label">上午</div>
+      <div class="time-slots">
+        <button class="time-slot">11:00</button>
+        <button class="time-slot disabled">12:00</button>
+      </div>
+
+      <div class="time-group-label">下午</div>
+      <div class="time-slots">
+        <button class="time-slot recommended">13:00</button>
+        <button class="time-slot disabled">14:00</button>
+        <button class="time-slot selected">15:00</button>
+        <button class="time-slot">16:00</button>
+        <button class="time-slot disabled">17:00</button>
+        <button class="time-slot">18:00</button>
+        <button class="time-slot">19:00</button>
+      </div>
+
+      <!-- 方案 B：選中時段後顯示結束時間 -->
+      <div class="duration-hint">
+        <strong>💡 預約時長：60 分鐘</strong>
+        你的預約時間：15:00 - 16:00
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 3: 備註（可收合） -->
+  <section class="section">
+    <h2 class="section-title">
+      <span class="section-title-number">3</span>
+      備註（選填）
+    </h2>
+    <textarea class="note-textarea"
+      placeholder="想告訴設計師什麼嗎？（例如：想要修瀏海、有特殊需求）"></textarea>
+    <a href="#" class="policy-link">查看取消政策</a>
+  </section>
+
+  <!-- Sticky 底部確認列（學自 Fresha） -->
+  <div class="sticky-footer">
+    <div class="footer-summary">
+      <strong>男士剪髮</strong>
+      <span class="footer-summary-divider">·</span>
+      <strong>4/21 (二) 15:00</strong>
+      <span class="footer-summary-divider">·</span>
+      <strong>NT$1,000</strong>
+    </div>
+    <button class="btn-primary active">確認預約</button>
+  </div>
+
+</body>
+</html>

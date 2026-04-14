@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>1008 Hair Studio — Rich Menu</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --primary: #003d2b;
+    --primary-dark: #002519;
+    --surface: #fff8f1;
+    --surface-alt: #fbf3e6;
+    --surface-dark: #343028;
+    --divider: rgba(0, 61, 43, 0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: var(--surface);
+    font-family: 'Manrope', 'Noto Sans TC', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  .grid {
+    position: fixed;
+    top: 0; left: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+  .cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 4%;
+    text-align: center;
+  }
+  .cell .icon {
+    font-family: 'Material Symbols Outlined';
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 48;
+    font-size: 12vmin;
+    line-height: 1;
+    margin-bottom: 3.2vmin;
+  }
+  .cell .title {
+    font-family: 'Noto Sans TC', sans-serif;
+    font-weight: 700;
+    font-size: 6.2vmin;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+    margin-bottom: 1.6vmin;
+  }
+  .cell .subtitle {
+    font-family: 'Manrope', sans-serif;
+    font-size: 2.2vmin;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    opacity: 0.55;
+    font-weight: 500;
+  }
+
+  /* Top-left: BOOK NOW (active / primary) */
+  .cell.book {
+    background: var(--primary);
+    color: var(--surface);
+  }
+  /* Top-right: MY BOOKINGS */
+  .cell.my {
+    background: var(--surface-alt);
+    color: var(--primary);
+    border-left: 1px solid var(--divider);
+  }
+  /* Bottom-left: SERVICES */
+  .cell.services {
+    background: var(--surface-alt);
+    color: var(--primary);
+    border-top: 1px solid var(--divider);
+  }
+  /* Bottom-right: STORE INFO */
+  .cell.store {
+    background: var(--surface-dark);
+    color: var(--surface);
+    border-top: 1px solid var(--divider);
+    border-left: 1px solid var(--divider);
+  }
+
+  /* Aspect-ratio responsive tweaks for the wide/short (small) rich menu */
+  @media (min-aspect-ratio: 2/1) {
+    .cell .icon { font-size: 9vmin; margin-bottom: 2vmin; }
+    .cell .title { font-size: 4.6vmin; margin-bottom: 1vmin; }
+    .cell .subtitle { font-size: 1.8vmin; }
+  }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="cell book">
+      <span class="icon">calendar_month</span>
+      <div class="title">立即預約</div>
+      <div class="subtitle">Book Now</div>
+    </div>
+    <div class="cell my">
+      <span class="icon">event_note</span>
+      <div class="title">我的預約</div>
+      <div class="subtitle">My Bookings</div>
+    </div>
+    <div class="cell services">
+      <span class="icon">content_cut</span>
+      <div class="title">服務項目</div>
+      <div class="subtitle">Services</div>
+    </div>
+    <div class="cell store">
+      <span class="icon">location_on</span>
+      <div class="title">門市資訊</div>
+      <div class="subtitle">Store Info</div>
+    </div>
+  </div>
+<script>
+  (function() {
+    const params = new URLSearchParams(location.search);
+    const w = parseInt(params.get('w'), 10) || 2500;
+    const h = parseInt(params.get('h'), 10) || 1686;
+    const grid = document.querySelector('.grid');
+    grid.style.width = w + 'px';
+    grid.style.height = h + 'px';
+    // Scale typography off the shorter dimension (vmin substitute) so it
+    // stays consistent across window-vs-content-size discrepancies.
+    const vmin = Math.min(w, h);
+    document.querySelectorAll('.cell .icon').forEach(el => {
+      el.style.fontSize = (vmin * 0.12) + 'px';
+      el.style.marginBottom = (vmin * 0.032) + 'px';
+    });
+    const wide = (w / h) > 2;
+    document.querySelectorAll('.cell .title').forEach(el => {
+      el.style.fontSize = (vmin * (wide ? 0.092 : 0.062)) + 'px';
+    });
+    document.querySelectorAll('.cell .subtitle').forEach(el => {
+      el.style.fontSize = (vmin * (wide ? 0.036 : 0.022)) + 'px';
+    });
+  })();
+</script>
+</body>
+</html>

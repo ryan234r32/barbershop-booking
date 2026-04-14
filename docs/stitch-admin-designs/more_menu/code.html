@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>1008 Hair Studio - Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Noto+Sans+TC:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-surface": "#27332a",
+                        "secondary-container": "#b6edc2",
+                        "surface": "#eefdee",
+                        "on-tertiary-fixed": "#400100",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-container": "#eb7e6c",
+                        "on-tertiary-fixed-variant": "#7e2b1e",
+                        "surface-variant": "#d7e6d8",
+                        "on-secondary-fixed-variant": "#1e5031",
+                        "primary-fixed": "#b7efd4",
+                        "on-error-container": "#93000a",
+                        "inverse-primary": "#9cd2b9",
+                        "tertiary-fixed-dim": "#ffb4a7",
+                        "tertiary": "#470300",
+                        "on-secondary-container": "#3b6d4b",
+                        "primary-container": "#003d2b",
+                        "tertiary-container": "#65190f",
+                        "outline": "#707974",
+                        "surface-container-highest": "#d7e6d8",
+                        "on-surface": "#121e15",
+                        "outline-variant": "#c0c9c2",
+                        "surface-bright": "#eefdee",
+                        "on-secondary": "#ffffff",
+                        "on-primary-container": "#73a891",
+                        "on-error": "#ffffff",
+                        "error": "#ba1a1a",
+                        "surface-dim": "#cfded0",
+                        "primary-fixed-dim": "#9cd2b9",
+                        "on-tertiary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#9dd3aa",
+                        "background": "#eefdee",
+                        "on-primary": "#ffffff",
+                        "on-secondary-fixed": "#00210e",
+                        "on-background": "#121e15",
+                        "inverse-on-surface": "#e6f5e6",
+                        "surface-tint": "#346853",
+                        "primary": "#002519",
+                        "on-surface-variant": "#404944",
+                        "on-primary-fixed": "#002115",
+                        "surface-container-low": "#e8f8e9",
+                        "secondary": "#376847",
+                        "on-primary-fixed-variant": "#1a503c",
+                        "surface-container": "#e3f2e3",
+                        "surface-container-high": "#ddecde",
+                        "secondary-fixed": "#b9efc5",
+                        "tertiary-fixed": "#ffdad4"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope", "Noto Sans TC"],
+                        "body": ["Manrope", "Noto Sans TC"],
+                        "label": ["Manrope", "Noto Sans TC"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Manrope', 'Noto Sans TC', sans-serif; background-color: #FFF8F1; }
+        .glassmorphism { backdrop-filter: blur(12px); }
+        .tonal-shift-no-border { background-color: #F3ECE4; }
+        .material-symbols-outlined { font-size: 20px; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="min-h-screen text-on-surface select-none overflow-x-hidden">
+<!-- Top App Bar (Shared Component Strategy) -->
+<header class="w-full top-0 sticky z-40 bg-[#FFF8F1] dark:bg-stone-950">
+<div class="flex items-center justify-between px-6 py-6 w-full">
+<h1 class="text-[#003D2B] font-bold tracking-widest text-xl uppercase">1008 Hair Studio</h1>
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden active:scale-95 transition-transform">
+<img alt="Salon Admin Profile" class="w-full h-full object-cover" data-alt="close-up portrait of a professional hair stylist in a modern minimalist studio setting, soft natural window light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAhUVgIqfy-xjNWAhKR1VPupJ4QCzFsemULk85eT5bp6Ca5THfPNS_QDE_jmctJHZTiLH9TN84k31FuiNyOV-LFhaTV1iz5mYIVBVIbfu_x2SjNICUOcl0WvcXxCgTc_mIWM6UZt4sqw7sJhm6-tbMcinlxpemtvhZKyg30jHtFSyLPsQcoYdK9iOy2BYkKG8YXQxgK1aF5fyXjtpSG318CIiVsMNVpRK9fADnpKuepIWs3bRNgal7KX80ICdQhhE9OSk4iS1QJlyG9"/>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="px-6 pb-32">
+<!-- Header Section -->
+<div class="mb-8 mt-4">
+<h2 class="text-[20px] font-bold text-[#003D2B] font-headline">更多</h2>
+<p class="text-on-surface-variant text-sm mt-1">管理您的店鋪與個人設定</p>
+</div>
+<!-- Bento-style Profile Card -->
+<div class="w-full bg-[#F3ECE4] rounded-xl p-6 mb-8 flex items-center gap-4">
+<div class="w-16 h-16 rounded-full bg-[#003D2B] flex items-center justify-center text-white text-xl font-bold">A</div>
+<div>
+<h3 class="text-lg font-bold text-[#003D2B]">Studio Administrator</h3>
+<p class="text-on-surface-variant text-xs tracking-wider uppercase font-semibold">Senior Stylist</p>
+</div>
+</div>
+<!-- Vertical Menu List -->
+<nav class="flex flex-col">
+<!-- Menu Item: Users -->
+<button class="flex items-center w-full h-[56px] border-b border-[#F3ECE4] active:bg-[#F3ECE4]/50 transition-colors group">
+<span class="material-symbols-outlined text-[#003D2B] mr-4" data-icon="group">group</span>
+<span class="flex-grow text-left text-[16px] text-[#2D3A30] font-normal">顧客管理</span>
+<span class="material-symbols-outlined text-[#003D2B]/30 text-[16px]" data-icon="chevron_right">chevron_right</span>
+</button>
+<!-- Menu Item: Services -->
+<button class="flex items-center w-full h-[56px] border-b border-[#F3ECE4] active:bg-[#F3ECE4]/50 transition-colors group">
+<span class="material-symbols-outlined text-[#003D2B] mr-4" data-icon="content_cut">content_cut</span>
+<span class="flex-grow text-left text-[16px] text-[#2D3A30] font-normal">服務項目管理</span>
+<span class="material-symbols-outlined text-[#003D2B]/30 text-[16px]" data-icon="chevron_right">chevron_right</span>
+</button>
+<!-- Menu Item: Marketing -->
+<button class="flex items-center w-full h-[56px] border-b border-[#F3ECE4] active:bg-[#F3ECE4]/50 transition-colors group">
+<span class="material-symbols-outlined text-[#003D2B] mr-4" data-icon="campaign">campaign</span>
+<span class="flex-grow text-left text-[16px] text-[#2D3A30] font-normal">行銷推播</span>
+<span class="material-symbols-outlined text-[#003D2B]/30 text-[16px]" data-icon="chevron_right">chevron_right</span>
+</button>
+<!-- Menu Item: Schedule -->
+<button class="flex items-center w-full h-[56px] border-b border-[#F3ECE4] active:bg-[#F3ECE4]/50 transition-colors group">
+<span class="material-symbols-outlined text-[#003D2B] mr-4" data-icon="calendar_clock">calendar_clock</span>
+<span class="flex-grow text-left text-[16px] text-[#2D3A30] font-normal">營業時間與公休</span>
+<span class="material-symbols-outlined text-[#003D2B]/30 text-[16px]" data-icon="chevron_right">chevron_right</span>
+</button>
+<!-- Menu Item: Export -->
+<button class="flex items-center w-full h-[56px] border-b border-[#F3ECE4] active:bg-[#F3ECE4]/50 transition-colors group">
+<span class="material-symbols-outlined text-[#003D2B] mr-4" data-icon="download">download</span>
+<span class="flex-grow text-left text-[16px] text-[#2D3A30] font-normal">匯出資料</span>
+<span class="material-symbols-outlined text-[#003D2B]/30 text-[16px]" data-icon="chevron_right">chevron_right</span>
+</button>
+<!-- Menu Item: Settings -->
+<button class="flex items-center w-full h-[56px] border-b border-[#F3ECE4] active:bg-[#F3ECE4]/50 transition-colors group">
+<span class="material-symbols-outlined text-[#003D2B] mr-4" data-icon="settings">settings</span>
+<span class="flex-grow text-left text-[16px] text-[#2D3A30] font-normal">店鋪設定</span>
+<span class="material-symbols-outlined text-[#003D2B]/30 text-[16px]" data-icon="chevron_right">chevron_right</span>
+</button>
+</nav>
+<!-- Bottom Actions -->
+<div class="mt-12 flex flex-col items-center gap-4">
+<button class="text-[#A84A3B] text-[15px] font-medium py-2 px-6 active:opacity-60 transition-opacity">
+                登出
+            </button>
+<span class="text-[11px] text-[#003D2B]/20 font-semibold tracking-widest">v1.0</span>
+</div>
+</main>
+<!-- Bottom Nav Bar (Shared Component Execution) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-8 pb-8 pt-3 bg-[#003D2B]/85 dark:bg-black/85 backdrop-blur-md no-border glassmorphism">
+<!-- Tab: Schedule -->
+<a class="flex flex-col items-center justify-center text-white/60 dark:text-stone-500 hover:text-white transition-colors tap-highlight-none" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="calendar_today">calendar_today</span>
+<span class="font-['Manrope'] text-[10px] font-semibold tracking-wider uppercase">SCHEDULE</span>
+</a>
+<!-- Tab: Clients -->
+<a class="flex flex-col items-center justify-center text-white/60 dark:text-stone-500 hover:text-white transition-colors tap-highlight-none" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="group">group</span>
+<span class="font-['Manrope'] text-[10px] font-semibold tracking-wider uppercase">CLIENTS</span>
+</a>
+<!-- Tab: More (ACTIVE) -->
+<a class="flex flex-col items-center justify-center text-white dark:text-emerald-300 scale-110 hover:text-white transition-colors tap-highlight-none" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="more_horiz" style="font-variation-settings: 'FILL' 1;">more_horiz</span>
+<span class="font-['Manrope'] text-[10px] font-semibold tracking-wider uppercase">MORE</span>
+</a>
+</nav>
+</body></html>

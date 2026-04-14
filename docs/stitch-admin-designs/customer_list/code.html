@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh-TW"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;family=Noto+Sans+TC:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-high": "#ddecde",
+                        "outline-variant": "#c0c9c2",
+                        "on-error-container": "#93000a",
+                        "inverse-surface": "#27332a",
+                        "background": "#FFF8F1",
+                        "primary-container": "#003d2b",
+                        "primary-fixed-dim": "#9cd2b9",
+                        "on-secondary-fixed-variant": "#1e5031",
+                        "error": "#A84A3B",
+                        "on-secondary-container": "#3b6d4b",
+                        "primary-fixed": "#b7efd4",
+                        "on-secondary-fixed": "#00210e",
+                        "on-primary-container": "#73a891",
+                        "error-container": "#ffdad6",
+                        "on-background": "#003D2B",
+                        "on-tertiary-container": "#eb7e6c",
+                        "tertiary-fixed-dim": "#ffb4a7",
+                        "on-tertiary-fixed": "#400100",
+                        "tertiary-fixed": "#ffdad4",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface-variant": "#404944",
+                        "primary": "#003D2B",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#e6f5e6",
+                        "outline": "#707974",
+                        "surface-container-highest": "#d7e6d8",
+                        "secondary-fixed": "#b9efc5",
+                        "surface-bright": "#FFF8F1",
+                        "secondary": "#4A7C59",
+                        "on-primary-fixed-variant": "#1a503c",
+                        "on-primary": "#ffffff",
+                        "tertiary": "#C88B3B",
+                        "surface-dim": "#F3ECE4",
+                        "on-surface": "#003D2B",
+                        "on-tertiary-fixed-variant": "#7e2b1e",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-low": "#F3ECE4",
+                        "secondary-fixed-dim": "#9dd3aa",
+                        "tertiary-container": "#65190f",
+                        "surface-tint": "#346853",
+                        "secondary-container": "#b6edc2",
+                        "on-primary-fixed": "#002115",
+                        "surface-variant": "#F3ECE4",
+                        "surface-container": "#e3f2e3",
+                        "inverse-primary": "#9cd2b9",
+                        "surface": "#F3ECE4",
+                        "on-error": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope", "Noto Sans TC"],
+                        "body": ["Manrope", "Noto Sans TC"],
+                        "label": ["Manrope", "Noto Sans TC"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Manrope', 'Noto Sans TC', sans-serif; background-color: #FFF8F1; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        ::-webkit-scrollbar { display: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="flex items-center justify-center min-h-screen bg-stone-200">
+<!-- iPhone 14 Pro Frame -->
+<div class="w-[393px] h-[852px] bg-background relative shadow-2xl overflow-hidden rounded-[55px] border-[8px] border-stone-800">
+<!-- Status Bar Mock -->
+<div class="flex justify-between items-center px-8 pt-4 pb-2 w-full text-on-surface">
+<span class="text-sm font-bold">9:41</span>
+<div class="flex gap-1">
+<span class="material-symbols-outlined text-[18px]">signal_cellular_4_bar</span>
+<span class="material-symbols-outlined text-[18px]">wifi</span>
+<span class="material-symbols-outlined text-[18px]">battery_full</span>
+</div>
+</div>
+<!-- TOP BAR (Shared Component Context) -->
+<header class="w-full top-0 sticky bg-[#F3ECE4] flex items-center justify-between px-6 py-4">
+<div class="flex items-center gap-4">
+<button class="flex items-center justify-center p-1 hover:bg-[#F3ECE4]/50 transition-colors active:duration-150 scale-95 active:scale-90">
+<span class="material-symbols-outlined text-primary text-2xl">arrow_back</span>
+</button>
+<h1 class="font-headline text-2xl font-bold tracking-tight text-primary">顧客</h1>
+</div>
+<div class="flex gap-3">
+<span class="material-symbols-outlined text-primary">person_add</span>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="h-[calc(100%-140px)] overflow-y-auto px-5 pt-6">
+<!-- SEARCH BAR -->
+<section class="mb-6">
+<div class="relative w-full h-[44px] bg-surface rounded-lg flex items-center px-4">
+<span class="material-symbols-outlined text-primary opacity-30 mr-3">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-primary placeholder-primary/30 w-full text-sm font-body" placeholder="搜尋姓名或電話" type="text"/>
+</div>
+</section>
+<!-- FILTER CHIPS (Horizontal Scroll) -->
+<section class="mb-8 -mx-5 px-5 overflow-x-auto whitespace-nowrap flex gap-2">
+<button class="px-4 py-1.5 rounded-lg bg-primary text-background text-sm font-medium">全部</button>
+<button class="px-4 py-1.5 rounded-lg bg-surface text-primary text-sm font-medium">新客</button>
+<button class="px-4 py-1.5 rounded-lg bg-surface text-primary text-sm font-medium">常客</button>
+<button class="px-4 py-1.5 rounded-lg bg-surface text-primary text-sm font-medium">VIP</button>
+<button class="px-4 py-1.5 rounded-lg bg-surface text-primary text-sm font-medium">流失中</button>
+<button class="px-4 py-1.5 rounded-lg bg-surface text-primary text-sm font-medium">已流失</button>
+</section>
+<!-- CUSTOMER LIST -->
+<section class="space-y-0">
+<!-- Row 1: 王小明 -->
+<div class="flex items-center justify-between h-[72px] border-b border-surface">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface flex items-center justify-center">
+<span class="text-primary font-bold">王</span>
+</div>
+<div>
+<div class="text-primary font-semibold text-[16px]">王小明</div>
+<div class="text-[12px] text-primary/50 font-body tracking-tight">12 次 · 上次 4/10 · 2天前</div>
+</div>
+</div>
+<span class="px-2.5 py-0.5 rounded-full bg-tertiary/15 text-tertiary text-[11px] font-bold tracking-wider">VIP</span>
+</div>
+<!-- Row 2: 李大華 -->
+<div class="flex items-center justify-between h-[72px] border-b border-surface">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface flex items-center justify-center">
+<span class="text-primary font-bold">李</span>
+</div>
+<div>
+<div class="text-primary font-semibold text-[16px]">李大華</div>
+<div class="text-[12px] text-primary/50 font-body tracking-tight">5 次 · 5天前</div>
+</div>
+</div>
+<span class="px-2.5 py-0.5 rounded-full bg-secondary/15 text-secondary text-[11px] font-bold tracking-wider uppercase">常客</span>
+</div>
+<!-- Row 3: 張美玲 -->
+<div class="flex items-center justify-between h-[72px] border-b border-surface">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface flex items-center justify-center">
+<span class="text-primary font-bold">張</span>
+</div>
+<div>
+<div class="text-primary font-semibold text-[16px]">張美玲</div>
+<div class="text-[12px] text-primary/50 font-body tracking-tight">1 次 · 今天</div>
+</div>
+</div>
+<span class="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-bold tracking-wider">新客</span>
+</div>
+<!-- Row 4: 陳先生 -->
+<div class="flex items-center justify-between h-[72px] border-b border-surface">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface flex items-center justify-center">
+<span class="text-primary font-bold">陳</span>
+</div>
+<div>
+<div class="text-primary font-semibold text-[16px]">陳先生</div>
+<div class="text-[12px] text-primary/50 font-body tracking-tight">3 次 · 57天前</div>
+</div>
+</div>
+<span class="px-2.5 py-0.5 rounded-full bg-tertiary/15 text-tertiary text-[11px] font-bold tracking-wider">流失中</span>
+</div>
+<!-- Row 5: 林小姐 -->
+<div class="flex items-center justify-between h-[72px] border-b border-surface">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface flex items-center justify-center">
+<span class="text-primary font-bold">林</span>
+</div>
+<div>
+<div class="text-primary font-semibold text-[16px]">林小姐</div>
+<div class="text-[12px] text-primary/50 font-body tracking-tight">8 次 · 3天前</div>
+</div>
+</div>
+<span class="px-2.5 py-0.5 rounded-full bg-tertiary/15 text-tertiary text-[11px] font-bold tracking-wider">VIP</span>
+</div>
+<!-- Row 6: 趙大明 -->
+<div class="flex items-center justify-between h-[72px] border-b border-surface">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface flex items-center justify-center">
+<span class="text-primary font-bold">趙</span>
+</div>
+<div>
+<div class="text-primary font-semibold text-[16px]">趙大明</div>
+<div class="text-[12px] text-primary/50 font-body tracking-tight">2 次 · 130天前</div>
+</div>
+</div>
+<span class="px-2.5 py-0.5 rounded-full bg-error/15 text-error text-[11px] font-bold tracking-wider">已流失</span>
+</div>
+</section>
+<!-- Bottom Illustration / Empty State for visual balance -->
+<div class="mt-12 opacity-50 flex flex-col items-center">
+<div class="w-16 h-1 bg-surface-dim rounded-full mb-8"></div>
+<div class="relative w-full aspect-[16/9] rounded-xl bg-surface overflow-hidden">
+<img alt="Salon Interior" class="w-full h-full object-cover grayscale" data-alt="Minimalist high-end hair salon interior with organic wooden textures, botanical plants, and soft natural sunlight through large windows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCyvoI28ABPjUhQ4ee3IOb3i7L5EDDisAiDwJEZ_s_2IFccSS_HRo2ti6xUSB6SaRtWGXQXBitIRBsvSP4XTy79Ee7izfLADbYGsqo6moi4O7wsLSPtCs1VWOBVBC5848pwytuo8tYSghaXOSukCjWP5Pq7KhcfdeDCgGT3agVulAG_iQJUF2ztZ8Ml6sUEbr7ICZaOY9VCP6QK3ttgN2eB7PAK8LpYO9Ibjn8-pSWmISKh0Pg10u_iDENhYv9Dm0VJ8ZVItRA4QOSx"/>
+<div class="absolute inset-0 bg-primary/20"></div>
+</div>
+<p class="mt-4 text-[10px] tracking-[0.2em] text-primary/40 uppercase font-bold">Crafted for Professionals</p>
+</div>
+</main>
+<!-- Home Indicator -->
+<div class="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-1.5 bg-primary/20 rounded-full"></div>
+</div>
+</body></html>

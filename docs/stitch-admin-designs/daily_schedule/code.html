@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh-TW"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Noto+Sans+TC:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-dim": "#e0d9d1",
+                        "on-primary-fixed": "#002115",
+                        "on-surface": "#1e1b17",
+                        "secondary-fixed": "#b9efc5",
+                        "inverse-on-surface": "#f7f0e8",
+                        "outline-variant": "#c0c9c2",
+                        "on-primary": "#ffffff",
+                        "on-secondary-fixed-variant": "#1e5031",
+                        "on-secondary-container": "#3b6d4b",
+                        "on-primary-container": "#73a891",
+                        "surface-container-low": "#faf2ea",
+                        "on-secondary": "#ffffff",
+                        "background": "#fff8f1",
+                        "outline": "#707974",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#ffb4a7",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-variant": "#e8e1da",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed": "#ffdad4",
+                        "on-tertiary-fixed-variant": "#7e2b1e",
+                        "primary-fixed-dim": "#9cd2b9",
+                        "surface-tint": "#346853",
+                        "tertiary": "#470300",
+                        "surface-container-high": "#eee7df",
+                        "secondary": "#376847",
+                        "surface-container-highest": "#e8e1da",
+                        "inverse-primary": "#9cd2b9",
+                        "secondary-fixed-dim": "#9dd3aa",
+                        "surface-bright": "#fff8f1",
+                        "on-tertiary-fixed": "#400100",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-container": "#eb7e6c",
+                        "error": "#ba1a1a",
+                        "primary-fixed": "#b7efd4",
+                        "primary": "#002519",
+                        "on-primary-fixed-variant": "#1a503c",
+                        "on-background": "#1e1b17",
+                        "surface-container": "#f4ede5",
+                        "on-secondary-fixed": "#00210e",
+                        "tertiary-container": "#65190f",
+                        "surface": "#fff8f1",
+                        "inverse-surface": "#33302b",
+                        "primary-container": "#003d2b",
+                        "error-container": "#ffdad6",
+                        "secondary-container": "#b6edc2",
+                        "on-surface-variant": "#404944"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope", "Noto Sans TC"],
+                        "body": ["Manrope", "Noto Sans TC"],
+                        "label": ["Manrope", "Noto Sans TC"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+        }
+        .safe-area-pb { padding-bottom: env(safe-area-inset-bottom); }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body select-none">
+<!-- Top Navigation Bar (The Verdant Atelier) -->
+<header class="sticky top-0 w-full bg-emerald-50/80 dark:bg-emerald-950/80 backdrop-blur-md z-50 border-b border-emerald-900/10 dark:border-emerald-100/10">
+<div class="flex items-center justify-between px-6 py-4 w-full">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl overflow-hidden bg-primary-container flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined text-lg">spa</span>
+</div>
+<h1 class="text-xl font-bold text-emerald-900 dark:text-emerald-100 font-manrope tracking-tight">1008 Hair Studio</h1>
+</div>
+<button class="w-10 h-10 rounded-xl flex items-center justify-center text-emerald-900 hover:bg-emerald-100/50 transition-all duration-300">
+<span class="material-symbols-outlined" data-icon="calendar_today">calendar_today</span>
+</button>
+</div>
+<!-- Date Navigation & View Switcher -->
+<div class="px-6 pb-4 space-y-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<button class="text-primary-container hover:opacity-60 transition-opacity">
+<span class="material-symbols-outlined leading-none">chevron_left</span>
+</button>
+<span class="text-lg font-semibold text-primary-container tracking-tight">2026/04/13 (日)</span>
+<button class="text-primary-container hover:opacity-60 transition-opacity">
+<span class="material-symbols-outlined leading-none">chevron_right</span>
+</button>
+</div>
+<button class="px-4 py-1.5 border border-outline rounded-xl text-sm font-medium text-primary-container hover:bg-surface-container-low transition-colors">
+                    今天
+                </button>
+</div>
+<div class="flex bg-surface-container-low p-1 rounded-xl">
+<button class="flex-1 py-1.5 bg-primary-container text-background rounded-lg text-sm font-medium transition-all">日</button>
+<button class="flex-1 py-1.5 text-on-surface-variant rounded-lg text-sm font-medium transition-all">週</button>
+<button class="flex-1 py-1.5 text-on-surface-variant rounded-lg text-sm font-medium transition-all">月</button>
+</div>
+</div>
+</header>
+<main class="relative pb-24">
+<!-- Summary Strip -->
+<div class="bg-[#F3ECE4] px-6 py-3 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container text-sm">event_note</span>
+<span class="text-primary-container font-semibold text-sm">今日 5 預約</span>
+</div>
+<div class="text-primary-container font-semibold text-sm">
+                預估 NT$4,600
+            </div>
+</div>
+<!-- Timeline -->
+<div class="relative bg-background mt-4 px-4 overflow-x-hidden">
+<!-- Current Time Line (14:30) -->
+<!-- Positioning logic: 11:00 is 0px, each hour is 72px. 14:30 is 3.5 hours = 252px from start -->
+<div class="absolute left-0 w-full flex items-center z-10 pointer-events-none" style="top: 252px;">
+<div class="w-3 h-3 rounded-full bg-[#A84A3B] -ml-1.5 ring-4 ring-background"></div>
+<div class="flex-1 h-[1px] bg-[#A84A3B]"></div>
+</div>
+<!-- Time Slots -->
+<div class="grid grid-cols-[60px_1fr] relative">
+<!-- 11:00 -->
+<div class="h-[72px] flex items-start justify-center text-xs font-medium text-outline pt-2">11:00</div>
+<div class="h-[72px] border-t border-outline-variant/40 relative">
+<!-- Booking: 王小明 -->
+<div class="absolute inset-x-0 top-1 mx-2 p-3 bg-surface-container rounded-xl border-l-4 border-[#C88B3B] h-14 flex flex-col justify-center">
+<div class="flex items-center justify-between">
+<span class="font-bold text-sm text-on-surface">王小明 <span class="font-normal text-xs text-on-surface-variant ml-2">男士剪髮</span></span>
+<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#C88B3B]/10 text-[#C88B3B]">VIP</span>
+</div>
+</div>
+</div>
+<!-- 12:00 -->
+<div class="h-[72px] flex items-start justify-center text-xs font-medium text-outline pt-2">12:00</div>
+<div class="h-[72px] border-t border-outline-variant/40 relative">
+<div class="absolute inset-2 border-2 border-dashed border-primary-container/20 rounded-xl flex items-center justify-center">
+<span class="material-symbols-outlined text-primary-container/20">add_circle</span>
+</div>
+</div>
+<!-- 13:00 -->
+<div class="h-[72px] flex items-start justify-center text-xs font-medium text-outline pt-2">13:00</div>
+<div class="h-[72px] border-t border-outline-variant/40 relative">
+<!-- Booking: 李大華 (Multi-row) -->
+<div class="absolute z-20 inset-x-0 top-1 mx-2 p-4 bg-secondary-container/10 rounded-xl border-l-4 border-[#4A7C59] h-[134px] flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-bold text-sm text-on-surface">李大華</span>
+<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#4A7C59]/10 text-[#4A7C59]">常客</span>
+</div>
+<div class="text-xs text-on-surface-variant">溫塑燙</div>
+<div class="mt-auto flex items-center gap-1 text-[10px] text-[#4A7C59] font-medium">
+<span class="material-symbols-outlined text-xs">timer</span> 120 min
+                        </div>
+</div>
+</div>
+<!-- 14:00 -->
+<div class="h-[72px] flex items-start justify-center text-xs font-medium text-outline pt-2">14:00</div>
+<div class="h-[72px] border-t border-outline-variant/40"></div>
+<!-- 15:00 -->
+<div class="h-[72px] flex items-start justify-center text-xs font-medium text-outline pt-2">15:00</div>
+<div class="h-[72px] border-t border-outline-variant/40 relative">
+<div class="absolute inset-2 border-2 border-dashed border-primary-container/20 rounded-xl flex items-center justify-center">
+<span class="material-symbols-outlined text-primary-container/20">add_circle</span>
+</div>
+</div>
+<!-- 16:00 -->
+<div class="h-[72px] flex items-start justify-center text-xs font-medium text-outline pt-2">16:00</div>
+<div class="h-[72px] border-t border-outline-variant/40"></div>
+<!-- 17:00 -->
+<div class="h-[72px] flex items-start justify-center text-xs font-medium text-outline pt-2">17:00</div>
+<div class="h-[72px] border-t border-outline-variant/40 relative">
+<!-- Booking: 張美玲 -->
+<div class="absolute inset-x-0 top-1 mx-2 p-3 bg-surface-container rounded-xl border-l-4 border-primary-container h-14 flex flex-col justify-center">
+<div class="flex items-center justify-between">
+<span class="font-bold text-sm text-on-surface">張美玲 <span class="font-normal text-xs text-on-surface-variant ml-2">女士剪髮</span></span>
+<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary-container text-background">新客</span>
+</div>
+</div>
+</div>
+<!-- 18:00 -->
+<div class="h-[72px] flex items-start justify-center text-xs font-medium text-outline pt-2">18:00</div>
+<div class="h-[72px] border-t border-outline-variant/40"></div>
+<!-- 19:00 -->
+<div class="h-[72px] flex items-start justify-center text-xs font-medium text-outline pt-2">19:00</div>
+<div class="h-[72px] border-t border-outline-variant/40 border-b relative">
+<!-- Booking: 陳先生 -->
+<div class="absolute inset-x-0 top-1 mx-2 p-3 bg-surface-container rounded-xl border-l-4 border-[#4A7C59] h-14 flex flex-col justify-center">
+<div class="flex items-center justify-between">
+<span class="font-bold text-sm text-on-surface">陳先生 <span class="font-normal text-xs text-on-surface-variant ml-2">男士剪髮</span></span>
+<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#4A7C59]/10 text-[#4A7C59]">常客</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Action Button -->
+<button class="fixed bottom-24 right-6 w-14 h-14 bg-primary-container text-on-primary rounded-full shadow-lg flex items-center justify-center z-[60] active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-3xl">add</span>
+</button>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe pt-2 bg-emerald-50/80 dark:bg-emerald-950/80 backdrop-blur-md border-t border-emerald-900/10 dark:border-emerald-100/10">
+<!-- Calendar (Active) -->
+<a class="flex flex-col items-center justify-center bg-emerald-100/50 dark:bg-emerald-900/50 text-emerald-900 dark:text-emerald-100 rounded-lg py-1 px-3 active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="calendar_month" style="font-variation-settings: 'FILL' 1;">calendar_month</span>
+<span class="text-[11px] font-manrope font-semibold mt-0.5">日曆</span>
+</a>
+<!-- Reports -->
+<a class="flex flex-col items-center justify-center text-emerald-800/60 dark:text-emerald-200/60 py-1 px-3 hover:text-emerald-900 dark:hover:text-emerald-100 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="text-[11px] font-manrope font-semibold mt-0.5">報表</span>
+</a>
+<!-- More -->
+<a class="flex flex-col items-center justify-center text-emerald-800/60 dark:text-emerald-200/60 py-1 px-3 hover:text-emerald-900 dark:hover:text-emerald-100 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="more_horiz">more_horiz</span>
+<span class="text-[11px] font-manrope font-semibold mt-0.5">更多</span>
+</a>
+</nav>
+<!-- Subtle Background Layering / Glass Reflection Decoration -->
+<div class="fixed top-0 left-0 w-full h-full pointer-events-none -z-10 opacity-30">
+<div class="absolute top-[20%] -left-20 w-80 h-80 bg-primary-fixed blur-[100px] rounded-full"></div>
+<div class="absolute bottom-[10%] -right-20 w-80 h-80 bg-secondary-fixed blur-[100px] rounded-full"></div>
+</div>
+</body></html>

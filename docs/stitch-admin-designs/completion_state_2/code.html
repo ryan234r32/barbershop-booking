@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Noto+Sans+TC:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-container": "#eb7e6c",
+                    "on-tertiary-fixed-variant": "#7e2b1e",
+                    "primary-fixed": "#b7efd4",
+                    "outline-variant": "#c0c9c2",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-fixed-variant": "#1a503c",
+                    "on-background": "#121e15",
+                    "on-error": "#ffffff",
+                    "surface-container-high": "#ddecde",
+                    "background": "#eefdee",
+                    "primary-container": "#003d2b",
+                    "outline": "#707974",
+                    "on-secondary": "#ffffff",
+                    "surface-bright": "#eefdee",
+                    "tertiary-container": "#65190f",
+                    "surface-variant": "#d7e6d8",
+                    "tertiary-fixed": "#ffdad4",
+                    "on-primary-container": "#73a891",
+                    "inverse-primary": "#9cd2b9",
+                    "tertiary-fixed-dim": "#ffb4a7",
+                    "inverse-on-surface": "#e6f5e6",
+                    "error-container": "#ffdad6",
+                    "on-error-container": "#93000a",
+                    "surface-container": "#e3f2e3",
+                    "tertiary": "#470300",
+                    "secondary-container": "#b6edc2",
+                    "on-tertiary-fixed": "#400100",
+                    "on-surface": "#121e15",
+                    "secondary-fixed": "#b9efc5",
+                    "error": "#ba1a1a",
+                    "on-surface-variant": "#404944",
+                    "on-primary-fixed": "#002115",
+                    "surface-container-highest": "#d7e6d8",
+                    "secondary": "#376847",
+                    "on-primary": "#ffffff",
+                    "on-secondary-container": "#3b6d4b",
+                    "secondary-fixed-dim": "#9dd3aa",
+                    "surface-tint": "#346853",
+                    "surface-container-lowest": "#ffffff",
+                    "inverse-surface": "#27332a",
+                    "on-secondary-fixed-variant": "#1e5031",
+                    "primary": "#002519",
+                    "on-secondary-fixed": "#00210e",
+                    "primary-fixed-dim": "#9cd2b9",
+                    "surface": "#eefdee",
+                    "surface-container-low": "#e8f8e9",
+                    "surface-dim": "#cfded0"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope", "Noto Sans TC"],
+                    "body": ["Manrope", "Noto Sans TC"],
+                    "label": ["Manrope", "Noto Sans TC"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Manrope', 'Noto Sans TC', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .tonal-shift { background-color: #F3ECE4; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col overflow-hidden">
+<!-- Top App Bar -->
+<header class="w-full top-0 sticky flex justify-between items-center px-6 py-4 bg-[#FFF8F1] z-10 transition-opacity blur-[2px]">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden">
+<img alt="Salon Owner Profile" class="w-full h-full object-cover" data-alt="Portrait of a professional hair stylist in a minimalist botanical studio setting with soft natural light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAnxQtAR3q-T_eTmUnNKY4I1Healua1cVYAKUdO0-ymzZWP74PWXUoPmCyRX-XvJct5v5JJN9L07iqJcLtfPhEWubvD31NuB5A6OsADX5aeVLyi267-QzRDlfCYoTRPdBHg1O4oXRcktw3KSIYQyAxJdF-VSKfqI2BYTOyVDTDAVugQZGzANQF4hXUrKScHK_msGlLzhfAQF21zrpHv9_yuncKujlWO_NznsX8DT82jwBKWk3cZCPeH2sDFPXlP2WNZCv6Up6-A4XTZ"/>
+</div>
+<h1 class="font-manrope tracking-tight font-bold text-2xl uppercase text-[#003D2B]">The Botanical Atoll</h1>
+</div>
+<div class="text-[#003D2B] material-symbols-outlined hover:opacity-80 transition-opacity active:scale-95 duration-150 cursor-pointer">calendar_today</div>
+</header>
+<!-- Calendar View (Dimmed Backdrop) -->
+<main class="flex-1 px-6 pt-4 blur-[4px] opacity-40">
+<div class="flex justify-between items-end mb-8">
+<div>
+<span class="font-label text-[10px] font-bold tracking-widest uppercase text-on-surface-variant">October 2023</span>
+<h2 class="text-4xl font-headline font-extrabold tracking-tighter text-primary">Studio Schedule</h2>
+</div>
+</div>
+<!-- Asymmetric Calendar Grid -->
+<div class="grid grid-cols-7 gap-2 mb-8">
+<div class="text-center font-label text-[10px] text-on-surface-variant py-2">MON</div>
+<div class="text-center font-label text-[10px] text-on-surface-variant py-2">TUE</div>
+<div class="text-center font-label text-[10px] text-on-surface-variant py-2">WED</div>
+<div class="text-center font-label text-[10px] text-on-surface-variant py-2">THU</div>
+<div class="text-center font-label text-[10px] text-on-surface-variant py-2">FRI</div>
+<div class="text-center font-label text-[10px] text-on-surface-variant py-2">SAT</div>
+<div class="text-center font-label text-[10px] text-on-surface-variant py-2">SUN</div>
+<!-- Partial Calendar Rows -->
+<div class="aspect-square bg-surface-container-lowest flex items-center justify-center text-sm font-medium">1</div>
+<div class="aspect-square bg-surface-container-lowest flex items-center justify-center text-sm font-medium">2</div>
+<div class="aspect-square bg-primary-container text-white flex items-center justify-center text-sm font-bold rounded-lg relative">
+                3
+                <div class="absolute bottom-1 w-1 h-1 bg-secondary rounded-full"></div>
+</div>
+<div class="aspect-square bg-surface-container-lowest flex items-center justify-center text-sm font-medium">4</div>
+<div class="aspect-square bg-surface-container-lowest flex items-center justify-center text-sm font-medium">5</div>
+<div class="aspect-square bg-surface-container-lowest flex items-center justify-center text-sm font-medium">6</div>
+<div class="aspect-square bg-surface-container-lowest flex items-center justify-center text-sm font-medium">7</div>
+</div>
+<!-- Appointment Blotter (Example Cards) -->
+<div class="space-y-4">
+<div class="bg-surface-container-low p-6 flex justify-between items-start border-l-4 border-[#A84A3B]">
+<div>
+<span class="font-label text-[10px] font-bold tracking-widest text-on-surface-variant uppercase">09:00 AM</span>
+<h3 class="text-xl font-bold text-primary mt-1">Lillian Chen</h3>
+<p class="text-sm text-on-surface-variant mt-1">Botanical Treatment &amp; Trim</p>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-6 flex justify-between items-start">
+<div>
+<span class="font-label text-[10px] font-bold tracking-widest text-on-surface-variant uppercase">11:30 AM</span>
+<h3 class="text-xl font-bold text-primary mt-1">Marcus Wong</h3>
+<p class="text-sm text-on-surface-variant mt-1">Deep Cleanse &amp; Sculpt</p>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation (Dimmed) -->
+<nav class="fixed bottom-0 left-0 w-full z-20 flex justify-around items-center px-4 pb-6 pt-2 bg-[#003D2B]/85 backdrop-blur-md rounded-t-xl blur-[2px] opacity-40">
+<div class="flex flex-col items-center justify-center bg-white/10 text-white rounded-xl p-3">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">event_note</span>
+<span class="font-manrope text-[10px] font-bold tracking-widest uppercase mt-1">Studio</span>
+</div>
+<div class="flex flex-col items-center justify-center text-white/60 p-3">
+<span class="material-symbols-outlined">group</span>
+<span class="font-manrope text-[10px] font-bold tracking-widest uppercase mt-1">Clients</span>
+</div>
+<div class="flex flex-col items-center justify-center text-white/60 p-3">
+<span class="material-symbols-outlined">content_cut</span>
+<span class="font-manrope text-[10px] font-bold tracking-widest uppercase mt-1">Services</span>
+</div>
+<div class="flex flex-col items-center justify-center text-white/60 p-3">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-manrope text-[10px] font-bold tracking-widest uppercase mt-1">Settings</span>
+</div>
+</nav>
+<!-- OVERLAY: Dimmed Background -->
+<div class="fixed inset-0 bg-primary/20 backdrop-blur-sm z-30"></div>
+<!-- BOTTOM SHEET: Confirmation State -->
+<div class="fixed bottom-0 left-0 w-full z-40 bg-[#FFF8F1] rounded-t-[32px] px-8 pt-2 pb-24 shadow-2xl">
+<!-- Handle -->
+<div class="flex justify-center mb-10">
+<div class="w-12 h-1.5 bg-surface-variant rounded-full mt-2"></div>
+</div>
+<!-- Confirmation Content -->
+<div class="flex flex-col items-center justify-center py-12">
+<!-- Icon Container -->
+<div class="w-20 h-20 rounded-full bg-secondary-container flex items-center justify-center mb-6">
+<span class="material-symbols-outlined text-secondary text-5xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<!-- Success Text -->
+<h2 class="text-[#003D2B] text-xl font-headline font-semibold tracking-tight">筆記已儲存</h2>
+<p class="text-on-surface-variant text-sm mt-2">1008 Hair Studio</p>
+</div>
+<!-- Asymmetric Action Button -->
+<div class="mt-4 flex justify-center">
+<button class="bg-primary-container text-white px-10 py-3 rounded-full font-label text-xs font-bold tracking-widest uppercase hover:opacity-90 active:scale-95 transition-all">
+                好的
+            </button>
+</div>
+</div>
+</body></html>

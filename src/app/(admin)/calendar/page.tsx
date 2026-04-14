@@ -148,6 +148,7 @@ export default function CalendarPage() {
   // ─── Polling: new booking toast + near-end detection ───
   useCalendarPolling({
     bookings,
+    isLoading,
     onNearingEnd: useCallback((b: Booking) => {
       setNearEndBookings((prev) => {
         const next = new Set(prev);

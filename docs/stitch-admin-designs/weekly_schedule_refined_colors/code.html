@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh-TW"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>1008 Hair Studio Admin - Weekly View</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Noto+Sans+TC:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-background": "#2D3A30",
+                        "tertiary-fixed": "#ffddb8",
+                        "tertiary-fixed-dim": "#fdb964",
+                        "on-primary": "#ffffff",
+                        "surface-container": "#F3ECE4",
+                        "secondary-fixed-dim": "#9dd3aa",
+                        "outline": "#707974",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#2D3A30",
+                        "on-secondary-fixed-variant": "#1e5031",
+                        "surface-container-low": "#F3ECE4",
+                        "on-primary-fixed": "#002115",
+                        "on-tertiary-fixed": "#2b1700",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#b6edc2",
+                        "on-tertiary-fixed-variant": "#653e00",
+                        "surface-dim": "#F3ECE4",
+                        "on-primary-fixed-variant": "#1a503c",
+                        "error": "#A84A3B",
+                        "surface-variant": "#F3ECE4",
+                        "primary-fixed": "#b7efd4",
+                        "on-surface-variant": "#2D3A30",
+                        "primary-fixed-dim": "#9cd2b9",
+                        "primary": "#003D2B",
+                        "on-primary-container": "#003D2B",
+                        "surface-tint": "#003D2B",
+                        "surface-container-high": "#F3ECE4",
+                        "on-tertiary": "#ffffff",
+                        "inverse-primary": "#9cd2b9",
+                        "outline-variant": "rgba(0, 61, 43, 0.1)",
+                        "inverse-on-surface": "#e6f5e6",
+                        "on-secondary-fixed": "#00210e",
+                        "on-secondary-container": "#3b6d4b",
+                        "inverse-surface": "#27332a",
+                        "on-error-container": "#93000a",
+                        "on-secondary": "#ffffff",
+                        "tertiary": "#301b00",
+                        "secondary": "#376847",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-container": "#cf9140",
+                        "tertiary-container": "#4d2e00",
+                        "surface-container-highest": "#F3ECE4",
+                        "secondary-fixed": "#b9efc5",
+                        "background": "#FFF8F1",
+                        "surface": "#FFF8F1",
+                        "primary-container": "#003D2B",
+                        "surface-bright": "#FFF8F1"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope", "Noto Sans TC"],
+                        "body": ["Manrope", "Noto Sans TC"],
+                        "label": ["Manrope", "Noto Sans TC"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Manrope', 'Noto Sans TC', sans-serif;
+            background-color: #FFF8F1;
+            color: #2D3A30;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: 3rem repeat(7, 1fr);
+        }
+        .glass-header {
+            background: rgba(255, 248, 241, 0.85);
+            backdrop-filter: blur(20px);
+        }
+        .booked-cell {
+            background-color: rgba(0, 61, 43, 0.18);
+        }
+        .grid-line {
+            border-color: rgba(0, 61, 43, 0.1);
+            border-bottom-width: 0.5px;
+        }
+        .vertical-line {
+            border-left-width: 0.5px;
+            border-color: rgba(0, 61, 43, 0.1);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-24">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 glass-header flex justify-between items-center px-6 h-16">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#003D2B]" data-icon="calendar_today">calendar_today</span>
+<h1 class="text-xl font-bold tracking-tight text-[#003D2B]">Salon Admin</h1>
+</div>
+<div class="flex items-center gap-1 bg-[#F3ECE4] p-1 rounded-lg">
+<button class="px-3 py-1 text-sm font-medium text-[#2D3A30] hover:text-[#003D2B] transition-colors duration-300">日</button>
+<button class="px-3 py-1 text-sm font-bold bg-[#003D2B] text-white rounded-lg transition-transform duration-200 active:scale-95">週</button>
+<button class="px-3 py-1 text-sm font-medium text-[#2D3A30] hover:text-[#003D2B] transition-colors duration-300">月</button>
+</div>
+</header>
+<main class="pt-16">
+<!-- Date Selector Strip -->
+<div class="px-6 py-4 flex justify-between items-center bg-[#FFF8F1]">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#003D2B] cursor-pointer" data-icon="chevron_left">chevron_left</span>
+<div class="flex flex-col">
+<span class="text-lg font-bold tracking-tight text-[#003D2B]">4/14 — 4/20 週</span>
+</div>
+<span class="material-symbols-outlined text-[#003D2B] cursor-pointer" data-icon="chevron_right">chevron_right</span>
+</div>
+<div class="text-[10px] font-bold text-[#2D3A30]/60 uppercase tracking-widest">April 2024</div>
+</div>
+<!-- Weekly Summary Strip -->
+<div class="mx-6 mb-4 p-3 bg-[#F3ECE4] rounded-xl flex justify-between items-center">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#003D2B] text-sm" data-icon="event_available">event_available</span>
+<span class="text-xs font-medium text-[#2D3A30]">本週: <span class="font-bold text-[#003D2B]">30</span> 預約</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#003D2B] text-sm" data-icon="payments">payments</span>
+<span class="text-xs font-bold text-[#003D2B]">NT$ 38,400</span>
+</div>
+</div>
+<!-- Calendar Header -->
+<div class="calendar-grid border-b border-[#003D2B]/10 sticky top-16 bg-[#FFF8F1] z-40">
+<div class="h-14"></div> <!-- Time label spacer -->
+<!-- Mon -->
+<div class="flex flex-col items-center justify-center h-14">
+<span class="text-[10px] font-bold text-[#2D3A30]/60">一</span>
+<span class="text-sm font-semibold text-[#2D3A30]">14</span>
+</div>
+<!-- Tue -->
+<div class="flex flex-col items-center justify-center h-14">
+<span class="text-[10px] font-bold text-[#2D3A30]/60">二</span>
+<span class="text-sm font-semibold text-[#2D3A30]">15</span>
+</div>
+<!-- Wed (Today) -->
+<div class="flex flex-col items-center justify-center h-14">
+<span class="text-[10px] font-bold text-[#003D2B]">三</span>
+<div class="w-6 h-6 rounded-full bg-[#003D2B] flex items-center justify-center">
+<span class="text-sm font-bold text-white">16</span>
+</div>
+</div>
+<!-- Thu -->
+<div class="flex flex-col items-center justify-center h-14">
+<span class="text-[10px] font-bold text-[#2D3A30]/60">四</span>
+<span class="text-sm font-semibold text-[#2D3A30]">17</span>
+</div>
+<!-- Fri -->
+<div class="flex flex-col items-center justify-center h-14">
+<span class="text-[10px] font-bold text-[#2D3A30]/60">五</span>
+<span class="text-sm font-semibold text-[#2D3A30]">18</span>
+</div>
+<!-- Sat (Holiday) -->
+<div class="flex flex-col items-center justify-center h-14 bg-[#F3ECE4]/50">
+<span class="text-[10px] font-bold text-[#A84A3B]">六</span>
+<span class="text-sm font-semibold text-[#A84A3B]">19</span>
+</div>
+<!-- Sun -->
+<div class="flex flex-col items-center justify-center h-14">
+<span class="text-[10px] font-bold text-[#2D3A30]/60">日</span>
+<span class="text-sm font-semibold text-[#2D3A30]">20</span>
+</div>
+</div>
+<!-- Time Grid Content -->
+<div class="calendar-grid relative">
+<!-- Left Time Column -->
+<div class="flex flex-col">
+<div class="h-16 flex items-start justify-center pt-2 text-[10px] font-bold text-[#2D3A30]/40">11:00</div>
+<div class="h-16 flex items-start justify-center pt-2 text-[10px] font-bold text-[#2D3A30]/40">12:00</div>
+<div class="h-16 flex items-start justify-center pt-2 text-[10px] font-bold text-[#2D3A30]/40">13:00</div>
+<div class="h-16 flex items-start justify-center pt-2 text-[10px] font-bold text-[#2D3A30]/40">14:00</div>
+<div class="h-16 flex items-start justify-center pt-2 text-[10px] font-bold text-[#2D3A30]/40">15:00</div>
+<div class="h-16 flex items-start justify-center pt-2 text-[10px] font-bold text-[#2D3A30]/40">16:00</div>
+<div class="h-16 flex items-start justify-center pt-2 text-[10px] font-bold text-[#2D3A30]/40">17:00</div>
+<div class="h-16 flex items-start justify-center pt-2 text-[10px] font-bold text-[#2D3A30]/40">18:00</div>
+<div class="h-16 flex items-start justify-center pt-2 text-[10px] font-bold text-[#2D3A30]/40">19:00</div>
+</div>
+<!-- Monday -->
+<div class="vertical-line min-h-[576px] relative">
+<div class="absolute top-16 left-0 w-full h-24 booked-cell rounded-sm m-0.5"></div>
+<div class="absolute top-64 left-0 w-full h-12 booked-cell rounded-sm m-0.5"></div>
+</div>
+<!-- Tuesday -->
+<div class="vertical-line relative">
+<div class="absolute top-0 left-0 w-full h-32 booked-cell rounded-sm m-0.5"></div>
+</div>
+<!-- Wednesday -->
+<div class="vertical-line relative">
+<div class="absolute top-32 left-0 w-full h-16 booked-cell rounded-sm m-0.5"></div>
+<div class="absolute top-80 left-0 w-full h-32 booked-cell rounded-sm m-0.5"></div>
+</div>
+<!-- Thursday -->
+<div class="vertical-line relative">
+<div class="absolute top-0 left-0 w-full h-16 booked-cell rounded-sm m-0.5"></div>
+<div class="absolute top-16 left-0 w-full h-32 booked-cell rounded-sm m-0.5"></div>
+<div class="absolute top-52 left-0 w-full h-24 booked-cell rounded-sm m-0.5"></div>
+<div class="absolute top-80 left-0 w-full h-16 booked-cell rounded-sm m-0.5"></div>
+<div class="absolute top-112 left-0 w-full h-32 booked-cell rounded-sm m-0.5"></div>
+</div>
+<!-- Friday -->
+<div class="vertical-line relative">
+<div class="absolute top-16 left-0 w-full h-48 booked-cell rounded-sm m-0.5"></div>
+</div>
+<!-- Saturday (Holiday) -->
+<div class="vertical-line bg-[#F3ECE4]/50 flex items-center justify-center">
+<span class="text-[#A84A3B]/40 font-bold tracking-widest text-xs [writing-mode:vertical-lr]">休假公告</span>
+</div>
+<!-- Sunday -->
+<div class="vertical-line relative">
+<div class="absolute top-64 left-0 w-full h-32 booked-cell rounded-sm m-0.5"></div>
+</div>
+<!-- Horizontal Grid Lines -->
+<div class="absolute top-0 right-0 w-[calc(100%-3rem)] h-full pointer-events-none">
+<div class="h-16 grid-line"></div>
+<div class="h-16 grid-line"></div>
+<div class="h-16 grid-line"></div>
+<div class="h-16 grid-line"></div>
+<div class="h-16 grid-line"></div>
+<div class="h-16 grid-line"></div>
+<div class="h-16 grid-line"></div>
+<div class="h-16 grid-line"></div>
+<div class="h-16 grid-line"></div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-[#FFF8F1]/80 backdrop-blur-xl z-50">
+<!-- Active Nav Item -->
+<a class="flex flex-col items-center justify-center bg-[#003D2B] text-white rounded-full px-5 py-1.5 transition-transform duration-200 active:scale-95" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="event_note">event_note</span>
+<span class="text-[10px] font-medium mt-0.5">日曆</span>
+</a>
+<!-- Inactive Nav Item -->
+<a class="flex flex-col items-center justify-center text-[#2D3A30] hover:bg-[#F3ECE4] transition-colors duration-300 px-5 py-1.5 rounded-full" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="analytics">analytics</span>
+<span class="text-[10px] font-medium mt-0.5">報表</span>
+</a>
+<!-- Inactive Nav Item -->
+<a class="flex flex-col items-center justify-center text-[#2D3A30] hover:bg-[#F3ECE4] transition-colors duration-300 px-5 py-1.5 rounded-full" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="more_horiz">more_horiz</span>
+<span class="text-[10px] font-medium mt-0.5">更多</span>
+</a>
+</nav>
+<!-- FAB -->
+<button class="fixed bottom-24 right-6 w-14 h-14 bg-[#003D2B] text-white rounded-full flex items-center justify-center transition-transform active:scale-95 z-40 shadow-lg">
+<span class="material-symbols-outlined text-2xl" data-icon="add">add</span>
+</button>
+</body></html>

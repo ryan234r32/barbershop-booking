@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+
+<html lang="zh-TW"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Customer Details - 1008 Hair Studio</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Noto+Sans+TC:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-dim": "#e0d9d1",
+                        "surface-bright": "#fff8f1",
+                        "secondary-fixed-dim": "#9dd3aa",
+                        "on-tertiary-container": "#eb7e6c",
+                        "on-primary-fixed-variant": "#1a503c",
+                        "on-secondary-fixed-variant": "#1e5031",
+                        "secondary-fixed": "#b9efc5",
+                        "inverse-on-surface": "#f7f0e8",
+                        "outline": "#707974",
+                        "on-tertiary": "#ffffff",
+                        "on-surface": "#1e1b17",
+                        "on-primary-container": "#73a891",
+                        "surface-container": "#f4ede5",
+                        "on-error-container": "#93000a",
+                        "primary-container": "#003d2b",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-fixed": "#400100",
+                        "surface-container-high": "#eee7df",
+                        "tertiary-fixed": "#ffdad4",
+                        "error-container": "#ffdad6",
+                        "inverse-primary": "#9cd2b9",
+                        "surface-container-highest": "#e8e1da",
+                        "surface-container-low": "#faf2ea",
+                        "on-primary-fixed": "#002115",
+                        "surface": "#fff8f1",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-surface": "#33302b",
+                        "error": "#ba1a1a",
+                        "on-surface-variant": "#404944",
+                        "tertiary-fixed-dim": "#ffb4a7",
+                        "primary": "#002519",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed": "#00210e",
+                        "secondary": "#376847",
+                        "on-background": "#1e1b17",
+                        "tertiary": "#470300",
+                        "on-tertiary-fixed-variant": "#7e2b1e",
+                        "primary-fixed-dim": "#9cd2b9",
+                        "primary-fixed": "#b7efd4",
+                        "on-secondary-container": "#3b6d4b",
+                        "outline-variant": "#c0c9c2",
+                        "surface-variant": "#e8e1da",
+                        "on-primary": "#ffffff",
+                        "surface-tint": "#346853",
+                        "tertiary-container": "#65190f",
+                        "secondary-container": "#b6edc2",
+                        "background": "#fff8f1"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope", "Noto Sans TC"],
+                        "body": ["Manrope", "Noto Sans TC"],
+                        "label": ["Manrope", "Noto Sans TC"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Manrope', 'Noto Sans TC', sans-serif; -webkit-font-smoothing: antialiased; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; vertical-align: middle; }
+        .glass-header { background: rgba(255, 248, 241, 0.8); backdrop-filter: blur(20px); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen">
+<!-- Top Navigation Bar -->
+<header class="fixed top-0 w-full z-50 glass-header border-b border-outline-variant/40">
+<div class="flex items-center justify-between px-6 py-4 w-full">
+<div class="flex items-center gap-4">
+<button class="active:scale-95 transition-transform duration-200 text-primary">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<div class="flex items-center gap-2">
+<h1 class="font-headline font-semibold text-lg tracking-tight text-primary">王小明</h1>
+<span class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-[#C88B3B]/15 text-[#C88B3B]">VIP</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-xs font-semibold text-primary/60">Customer Details</span>
+</div>
+</div>
+</header>
+<main class="pt-20 pb-12 px-6 max-w-lg mx-auto">
+<!-- Hero Profile & Stats Card -->
+<section class="mb-6">
+<div class="bg-surface-container rounded-xl p-6 relative overflow-hidden">
+<div class="flex items-start justify-between mb-8">
+<div class="flex flex-col gap-1">
+<a class="flex items-center gap-2 text-primary font-medium hover:underline" href="tel:0912-345-678">
+<span class="material-symbols-outlined text-sm">call</span>
+                            0912-345-678
+                        </a>
+<p class="flex items-center gap-2 text-on-surface-variant text-sm">
+<span class="material-symbols-outlined text-sm">cake</span>
+                            68/05/15
+                        </p>
+</div>
+<div class="w-16 h-16 rounded-full border border-outline-variant/40 p-1">
+<img alt="User" class="w-full h-full rounded-full object-cover" data-alt="portrait of a professional stylish young man with neat hair and clean appearance in a soft lit studio background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCuucqKsNo1A9aEn28Q7Zywk9JY87cBZMeLYL7yvYkvD34zgRxt8QHvSKaRx-b4JG6YvQeDhCN8-5hNULi1PCLK3ZBGj382HloZELJOpgGfqvYNpYWYcs_9kECYH3P4FZswRZJs8vhY4XHOOpNtguIRmz4fFcO5DIieApt-SjKUNrrodwM6ftiODf-mv86prm_1QrCo0tGCvrTuQtGGzaMdlanS3KL0AbQi69kS9OueNsq1z5ZVtIFkITMWndzLqLEqdK6ueJMoOkCk"/>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-lowest/80 p-4 rounded-lg border border-outline-variant/20">
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant mb-1">來訪</p>
+<p class="text-xl font-bold text-primary">12 <span class="text-xs font-medium opacity-60">次</span></p>
+</div>
+<div class="bg-surface-container-lowest/80 p-4 rounded-lg border border-outline-variant/20">
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant mb-1">總消費</p>
+<p class="text-xl font-bold text-primary">NT$15,600</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Violation Status -->
+<section class="mb-6 flex items-center justify-between bg-error-container/10 border border-error/10 px-4 py-3 rounded-lg">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-error text-lg">report_problem</span>
+<span class="text-sm font-semibold text-on-surface">違規紀錄: <span class="text-error">0</span> 次</span>
+</div>
+<button class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60 hover:text-on-surface">Clear violations</button>
+</section>
+<!-- Notes Dossier Section -->
+<section class="mb-8">
+<div class="flex items-center justify-between mb-4 px-1">
+<h2 class="font-headline text-primary font-bold tracking-tight">備註</h2>
+<button class="text-sm font-bold text-primary flex items-center gap-1 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-base">add</span>
+                    新增
+                </button>
+</div>
+<div class="bg-surface-container rounded-xl p-6">
+<div class="relative space-y-8">
+<!-- Timeline Line -->
+<div class="absolute left-[7px] top-2 bottom-2 w-0.5 bg-primary-container/20"></div>
+<!-- Note 1 -->
+<div class="relative pl-7 group">
+<div class="absolute left-0 top-1.5 w-3.5 h-3.5 rounded-full bg-primary border-2 border-surface-container"></div>
+<div class="flex flex-col gap-1">
+<span class="text-[10px] font-bold text-primary/40 uppercase tracking-widest">4月10日</span>
+<p class="text-sm leading-relaxed text-on-surface">喜歡短一點，頭皮比較敏感。上次建議他試染髮，有興趣</p>
+</div>
+</div>
+<!-- Note 2 -->
+<div class="relative pl-7 group">
+<div class="absolute left-0 top-1.5 w-3.5 h-3.5 rounded-full bg-primary-container/40 border-2 border-surface-container"></div>
+<div class="flex flex-col gap-1">
+<span class="text-[10px] font-bold text-primary/40 uppercase tracking-widest">3月15日</span>
+<p class="text-sm leading-relaxed text-on-surface">髮質偏細軟，瀏海要留長</p>
+</div>
+</div>
+<!-- Note 3 -->
+<div class="relative pl-7 group">
+<div class="absolute left-0 top-1.5 w-3.5 h-3.5 rounded-full bg-primary-container/40 border-2 border-surface-container"></div>
+<div class="flex flex-col gap-1">
+<span class="text-[10px] font-bold text-primary/40 uppercase tracking-widest">2月20日</span>
+<p class="text-sm leading-relaxed text-on-surface">第一次來，朋友介紹的</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Booking History -->
+<section class="mb-8">
+<h2 class="font-headline text-primary font-bold tracking-tight mb-4 px-1">預約歷史</h2>
+<div class="space-y-3">
+<!-- Booking Item 1 -->
+<div class="bg-surface-container-low border border-outline-variant/20 p-4 rounded-xl flex items-center justify-between">
+<div class="flex flex-col">
+<p class="text-xs font-bold text-primary/60 mb-1">2023 / 11 / 15</p>
+<p class="font-semibold text-on-surface">洗剪設計</p>
+</div>
+<div class="flex flex-col items-end gap-1">
+<p class="font-bold text-primary">NT$ 1,200</p>
+<span class="material-symbols-outlined text-secondary text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+<!-- Booking Item 2 -->
+<div class="bg-surface-container-low border border-outline-variant/20 p-4 rounded-xl flex items-center justify-between">
+<div class="flex flex-col">
+<p class="text-xs font-bold text-primary/60 mb-1">2023 / 10 / 02</p>
+<p class="font-semibold text-on-surface">頭皮理療 + 剪髮</p>
+</div>
+<div class="flex flex-col items-end gap-1">
+<p class="font-bold text-primary">NT$ 2,500</p>
+<span class="material-symbols-outlined text-secondary text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+<!-- Booking Item 3 -->
+<div class="bg-surface-container-low border border-outline-variant/20 p-4 rounded-xl flex items-center justify-between">
+<div class="flex flex-col">
+<p class="text-xs font-bold text-primary/60 mb-1">2023 / 08 / 20</p>
+<p class="font-semibold text-on-surface">深層護髮</p>
+</div>
+<div class="flex flex-col items-end gap-1">
+<p class="font-bold text-primary">NT$ 1,800</p>
+<span class="material-symbols-outlined text-secondary text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+<!-- Booking Item 4 -->
+<div class="bg-surface-container-low border border-outline-variant/20 p-4 rounded-xl flex items-center justify-between opacity-70">
+<div class="flex flex-col">
+<p class="text-xs font-bold text-primary/60 mb-1">2023 / 07 / 11</p>
+<p class="font-semibold text-on-surface">洗剪設計</p>
+</div>
+<div class="flex flex-col items-end gap-1">
+<p class="font-bold text-primary">NT$ 1,200</p>
+<span class="material-symbols-outlined text-secondary text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+<!-- Booking Item 5 -->
+<div class="bg-surface-container-low border border-outline-variant/20 p-4 rounded-xl flex items-center justify-between opacity-70">
+<div class="flex flex-col">
+<p class="text-xs font-bold text-primary/60 mb-1">2023 / 05 / 30</p>
+<p class="font-semibold text-on-surface">精緻染髮 + 剪髮</p>
+</div>
+<div class="flex flex-col items-end gap-1">
+<p class="font-bold text-primary">NT$ 4,500</p>
+<span class="material-symbols-outlined text-secondary text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+<button class="w-full py-4 text-center text-sm font-bold text-primary hover:bg-surface-container transition-colors rounded-lg border border-dashed border-outline-variant">
+                    查看更多預約記錄
+                </button>
+</div>
+</section>
+<!-- Footer / Branding -->
+<footer class="mt-12 text-center">
+<p class="text-[10px] uppercase tracking-[0.3em] text-primary/30 font-bold">1008 Hair Studio • Dossier System</p>
+</footer>
+</main>
+<!-- Floating Action Button Contextual Logic: Suppressed on Details Screen -->
+</body></html>
