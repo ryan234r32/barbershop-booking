@@ -263,16 +263,23 @@ export async function POST(request: NextRequest) {
       }
 
       // 10. Notify admin (fire-and-forget)
-      notifyAdminNewBooking({
-        tenantId,
-        bookingId: booking.id,
-        displayName: user.displayName || input.displayName || "未知顧客",
-        serviceName: service.name,
-        date: input.date,
-        startTime: input.startTime,
-        endTime,
-        price: service.price,
-      }).catch((err) => logger.error("Failed to notify admin (new booking)", err, "bookings"));
+      // Must await on Vercel — fire-and-forget promises get killed when the
+      // response is sent, so the push never fires. Booking already takes several
+      // 100ms of DB/LINE work; one more ~200ms await is imperceptible.
+      try {
+        await notifyAdminNewBooking({
+          tenantId,
+          bookingId: booking.id,
+          displayName: user.displayName || input.displayName || "未知顧客",
+          serviceName: service.name,
+          date: input.date,
+          startTime: input.startTime,
+          endTime,
+          price: service.price,
+        });
+      } catch (err) {
+        logger.error("Failed to notify admin (new booking)", err, "bookings");
+      }
 
       return Response.json({ booking }, { status: 201 });
     } finally {

@@ -150,16 +150,20 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         console.error("Failed to send cancellation LINE message:", lineError);
       }
 
-      // Notify admin of cancellation (fire-and-forget)
-      notifyAdminCancellation({
-        tenantId: booking.tenantId,
-        displayName: booking.user.displayName || "未知顧客",
-        serviceName: booking.service.name,
-        date: booking.date.toISOString().split("T")[0],
-        startTime: booking.startTime,
-        isViolation: policy.isViolation,
-        cancelledBy: "customer",
-      }).catch((err) => console.error("Failed to notify admin (cancellation):", err));
+      // Await on Vercel — fire-and-forget promises get killed at response time.
+      try {
+        await notifyAdminCancellation({
+          tenantId: booking.tenantId,
+          displayName: booking.user.displayName || "未知顧客",
+          serviceName: booking.service.name,
+          date: booking.date.toISOString().split("T")[0],
+          startTime: booking.startTime,
+          isViolation: policy.isViolation,
+          cancelledBy: "customer",
+        });
+      } catch (err) {
+        console.error("Failed to notify admin (cancellation):", err);
+      }
 
       return Response.json({
         booking: result,
@@ -292,16 +296,20 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
       cancelBookingNotifications(id).catch(console.error);
 
-      // Notify admin of admin-initiated cancellation (fire-and-forget)
-      notifyAdminCancellation({
-        tenantId: booking.tenantId,
-        displayName: booking.user.displayName || "未知顧客",
-        serviceName: booking.service.name,
-        date: booking.date.toISOString().split("T")[0],
-        startTime: booking.startTime,
-        isViolation: false,
-        cancelledBy: "admin",
-      }).catch((err) => console.error("Failed to notify admin (admin cancel):", err));
+      // Await on Vercel — fire-and-forget promises get killed at response time.
+      try {
+        await notifyAdminCancellation({
+          tenantId: booking.tenantId,
+          displayName: booking.user.displayName || "未知顧客",
+          serviceName: booking.service.name,
+          date: booking.date.toISOString().split("T")[0],
+          startTime: booking.startTime,
+          isViolation: false,
+          cancelledBy: "admin",
+        });
+      } catch (err) {
+        console.error("Failed to notify admin (admin cancel):", err);
+      }
 
       return Response.json({ booking: updated });
     }

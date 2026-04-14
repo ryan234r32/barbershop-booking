@@ -91,14 +91,18 @@ export function persistInboundMessage(
           }))?.displayName
         : null;
 
-      sendWebPushToAdmin(tenantId, {
-        title: `${displayName || "顧客"} 傳來訊息`,
-        body: (content || "").slice(0, 80),
-        url: `/messages/${lineUserId}`,
-        tag: `message-${lineUserId}`,
-      }).catch((err) =>
-        logger.error("Web Push message failed", err, "persist-inbound"),
-      );
+      // Must await on Vercel — fire-and-forget promises get killed when the
+      // webhook response is sent, so the push never fires.
+      try {
+        await sendWebPushToAdmin(tenantId, {
+          title: `${displayName || "顧客"} 傳來訊息`,
+          body: (content || "").slice(0, 80),
+          url: `/messages/${lineUserId}`,
+          tag: `message-${lineUserId}`,
+        });
+      } catch (err) {
+        logger.error("Web Push message failed", err, "persist-inbound");
+      }
     } catch (err) {
       // Unique constraint violation = LINE replay. Log at debug, not error.
       const code = (err as { code?: string })?.code;
