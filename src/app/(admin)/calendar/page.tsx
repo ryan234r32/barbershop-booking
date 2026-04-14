@@ -27,6 +27,7 @@ interface Booking {
     lastVisitAt: string | null;
   };
   payment?: { status: string; method: string | null } | null;
+  createdAt?: string;
 }
 
 function isPaid(b: Booking): boolean {
@@ -85,6 +86,101 @@ function SegmentBadge({ segment }: { segment: string }) {
     >
       {labels[segment] || segment}
     </span>
+  );
+}
+
+// ─── Horizontal Date Strip (smooth scroll + tap to select) ───
+function HorizontalDateStrip({
+  currentDate,
+  onSelect,
+}: {
+  currentDate: Date;
+  onSelect: (d: Date) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const CELL_WIDTH = 56; // px per date cell
+  const DAYS_BEFORE = 30;
+  const DAYS_AFTER = 30;
+
+  // Generate strip dates: 30 before current + current + 30 after = 61 days
+  const dates = useMemo(() => {
+    const list: Date[] = [];
+    for (let offset = -DAYS_BEFORE; offset <= DAYS_AFTER; offset++) {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() + offset);
+      list.push(d);
+    }
+    return list;
+  }, [currentDate]);
+
+  // On mount / when currentDate changes, scroll to center it
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const container = containerRef.current;
+    const selectedIndex = DAYS_BEFORE; // current is always at index 30
+    const targetScroll =
+      selectedIndex * CELL_WIDTH - container.clientWidth / 2 + CELL_WIDTH / 2;
+    container.scrollTo({ left: Math.max(0, targetScroll), behavior: "smooth" });
+  }, [currentDate]);
+
+  const todayStr = formatDate(toTaipeiDate(new Date()));
+  const currentStr = formatDate(currentDate);
+
+  return (
+    <div
+      ref={containerRef}
+      className="flex items-stretch mb-3 select-none overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1"
+      style={{ scrollSnapType: "x proximity", WebkitOverflowScrolling: "touch" }}
+    >
+      {dates.map((d) => {
+        const dStr = formatDate(d);
+        const selected = dStr === currentStr;
+        const isToday = dStr === todayStr;
+        const wdIndex = d.getDay();
+        const isWeekend = wdIndex === 0 || wdIndex === 6;
+        return (
+          <button
+            key={dStr}
+            onClick={() => onSelect(d)}
+            className={`shrink-0 flex flex-col items-center gap-0.5 py-2 rounded-lg transition-colors ${
+              selected
+                ? "bg-[var(--color-brand)]"
+                : "hover:bg-[var(--color-surface)]"
+            }`}
+            style={{
+              width: CELL_WIDTH,
+              scrollSnapAlign: "center",
+            }}
+          >
+            <span
+              className={`text-[10px] leading-none ${
+                selected
+                  ? "text-[var(--color-bg)]/80"
+                  : isWeekend
+                    ? "text-[var(--color-danger)]"
+                    : "text-[var(--color-text-muted)]"
+              }`}
+            >
+              {WEEKDAYS[wdIndex]}
+            </span>
+            <span
+              className={`text-[15px] font-semibold leading-tight ${
+                selected
+                  ? "text-[var(--color-bg)]"
+                  : isWeekend
+                    ? "text-[var(--color-danger)]"
+                    : "text-[var(--color-text-primary)]"
+              }`}
+            >
+              {d.getDate()}
+            </span>
+            {isToday && !selected && (
+              <span className="w-1 h-1 rounded-full bg-[var(--color-brand)]" />
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -469,84 +565,11 @@ export default function CalendarPage() {
       {/* ═══ DAY VIEW ═══ */}
       {view === "day" && !isLoading && (
         <>
-          {/* Horizontal date strip — 7 days, evenly distributed, swipeable */}
-          <div
-            className="flex items-stretch mb-3 select-none"
-            style={{ touchAction: "pan-y" }}
-            onPointerDown={(e) => {
-              const target = e.currentTarget;
-              const startX = e.clientX;
-              const startY = e.clientY;
-              let isHorizontal: boolean | null = null;
-
-              const onMove = (ev: PointerEvent) => {
-                if (isHorizontal === null) {
-                  const dx = Math.abs(ev.clientX - startX);
-                  const dy = Math.abs(ev.clientY - startY);
-                  if (dx > 10 || dy > 10) {
-                    isHorizontal = dx > dy;
-                  }
-                }
-              };
-              const onUp = (ev: PointerEvent) => {
-                target.removeEventListener("pointermove", onMove);
-                target.removeEventListener("pointerup", onUp);
-                target.removeEventListener("pointercancel", onUp);
-                if (isHorizontal) {
-                  const dx = ev.clientX - startX;
-                  if (Math.abs(dx) > 50) {
-                    const d = new Date(currentDate);
-                    d.setDate(d.getDate() + (dx < 0 ? 7 : -7));
-                    setCurrentDate(d);
-                  }
-                }
-              };
-              target.addEventListener("pointermove", onMove);
-              target.addEventListener("pointerup", onUp);
-              target.addEventListener("pointercancel", onUp);
-            }}
-          >
-            {(() => {
-              // Show 7 days centered on current
-              const strip: Date[] = [];
-              for (let offset = -3; offset <= 3; offset++) {
-                const d = new Date(currentDate);
-                d.setDate(d.getDate() + offset);
-                strip.push(d);
-              }
-              return strip.map((d) => {
-                const selected = formatDate(d) === formatDate(currentDate);
-                const wdIndex = d.getDay();
-                const isWeekend = wdIndex === 0 || wdIndex === 6;
-                return (
-                  <button
-                    key={formatDate(d)}
-                    onClick={() => setCurrentDate(d)}
-                    className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-lg transition-colors ${
-                      selected
-                        ? "bg-[var(--color-brand)]"
-                        : "hover:bg-[var(--color-surface)]"
-                    }`}
-                  >
-                    <span className={`text-[10px] leading-none ${
-                      selected
-                        ? "text-[var(--color-bg)]/80"
-                        : isWeekend ? "text-[var(--color-danger)]" : "text-[var(--color-text-muted)]"
-                    }`}>
-                      {WEEKDAYS[wdIndex]}
-                    </span>
-                    <span className={`text-[15px] font-semibold leading-tight ${
-                      selected
-                        ? "text-[var(--color-bg)]"
-                        : isWeekend ? "text-[var(--color-danger)]" : "text-[var(--color-text-primary)]"
-                    }`}>
-                      {d.getDate()}
-                    </span>
-                  </button>
-                );
-              });
-            })()}
-          </div>
+          {/* Horizontal date strip — smooth scroll, tap to select */}
+          <HorizontalDateStrip
+            currentDate={currentDate}
+            onSelect={setCurrentDate}
+          />
 
           {/* Near-End Banner */}
           {(() => {

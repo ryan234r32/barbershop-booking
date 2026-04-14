@@ -11,6 +11,7 @@ interface Booking {
   status: string;
   service: { name: string; slotsNeeded: number };
   user: { displayName: string | null };
+  createdAt?: string;
 }
 
 interface UseCalendarPollingOptions<T extends Booking = Booking> {
@@ -76,17 +77,31 @@ export function useCalendarPolling<T extends Booking>({
 
     if (!seenRef.current) return;
 
-    // Subsequent updates — toast only truly new bookings
+    // Subsequent updates — toast only truly new bookings.
+    // A booking is "truly new" if:
+    //   (1) not seen before (not in seenRef or localStorage)
+    //   (2) created within the last 5 minutes (protects against view-switch
+    //       loading wider date ranges that include older bookings)
     let changed = false;
+    const now = Date.now();
+    const FIVE_MINUTES = 5 * 60 * 1000;
+
     for (const b of bookings) {
-      if (!seenRef.current.has(b.id) && b.status === "CONFIRMED") {
+      if (seenRef.current.has(b.id)) continue;
+      if (b.status !== "CONFIRMED") continue;
+
+      const createdMs = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      const isRecent = createdMs > 0 && now - createdMs < FIVE_MINUTES;
+
+      if (isRecent) {
         toast({
           type: "info",
           message: `新預約！${b.user.displayName || "顧客"} ${b.startTime} ${b.service.name}`,
         });
-        seenRef.current.add(b.id);
-        changed = true;
       }
+      // Always mark as seen (even if not recent) so we don't re-evaluate
+      seenRef.current.add(b.id);
+      changed = true;
     }
 
     if (changed) saveSeen(seenRef.current);
