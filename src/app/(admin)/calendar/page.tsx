@@ -619,38 +619,48 @@ export default function CalendarPage() {
       {/* ═══ WEEK VIEW ═══ */}
       {view === "week" && !isLoading && (
         <>
-          {/* Week summary */}
-          <div className="bg-[var(--color-surface)] rounded-lg px-4 py-2.5 mb-4 flex items-center justify-between text-sm">
-            <span className="font-semibold text-[var(--color-text-primary)]">
-              本週 {bookings.filter((b) => b.status !== "CANCELLED" && b.status !== "CANCELLED_BY_ADMIN").length} 預約
+          {/* Compact summary — single line */}
+          <div className="text-[11px] text-[var(--color-text-muted)] mb-2 flex items-center justify-between">
+            <span>
+              本週 <span className="font-semibold text-[var(--color-text-primary)]">
+                {bookings.filter((b) => b.status !== "CANCELLED" && b.status !== "CANCELLED_BY_ADMIN").length}
+              </span> 預約
             </span>
-            <span className="text-[var(--color-text-body)]">
-              NT${bookings.filter((b) => b.status !== "CANCELLED" && b.status !== "CANCELLED_BY_ADMIN").reduce((s, b) => s + (b.service?.price || 0), 0).toLocaleString()}
+            <span>
+              NT$<span className="font-semibold text-[var(--color-text-primary)]">
+                {bookings.filter((b) => b.status !== "CANCELLED" && b.status !== "CANCELLED_BY_ADMIN").reduce((s, b) => s + (b.service?.price || 0), 0).toLocaleString()}
+              </span>
             </span>
           </div>
 
-          {/* Grid */}
-          <div className="overflow-x-auto rounded-lg">
-            <table className="w-full border-collapse text-center">
+          {/* Compact grid — fits in one viewport */}
+          <div className="rounded-lg">
+            <table className="w-full border-collapse text-center" style={{ tableLayout: "fixed" }}>
               <thead>
                 <tr>
-                  <th className="w-10 p-1 text-[10px] text-[var(--color-text-muted)]" />
+                  <th className="w-6 p-0 text-[9px] text-[var(--color-text-muted)]" />
                   {weekDates.map((d) => {
                     const today = isToday(d);
+                    const wdIndex = d.getDay();
+                    const isWeekend = wdIndex === 0 || wdIndex === 6;
                     return (
-                      <th key={formatDate(d)} className="p-1">
-                        <span className="text-[10px] text-[var(--color-text-muted)] block">
-                          {WEEKDAYS[d.getDay()]}
-                        </span>
+                      <th key={formatDate(d)} className="p-1 pb-1.5">
                         <button
                           onClick={() => { setCurrentDate(d); setView("day"); }}
-                          className={`text-xs font-semibold w-7 h-7 rounded-full inline-flex items-center justify-center transition-colors ${
-                            today
-                              ? "bg-[var(--color-brand)] text-[var(--color-bg)]"
-                              : "text-[var(--color-text-primary)] hover:bg-[var(--color-surface)]"
-                          }`}
+                          className="flex flex-col items-center gap-0.5 w-full"
                         >
-                          {d.getDate()}
+                          <span className={`text-[9px] leading-none ${isWeekend ? "text-[var(--color-danger)]" : "text-[var(--color-text-muted)]"}`}>
+                            {WEEKDAYS[wdIndex]}
+                          </span>
+                          <span
+                            className={`text-[11px] font-semibold w-5 h-5 rounded-full inline-flex items-center justify-center transition-colors ${
+                              today
+                                ? "bg-[var(--color-brand)] text-[var(--color-bg)]"
+                                : isWeekend ? "text-[var(--color-danger)]" : "text-[var(--color-text-primary)]"
+                            }`}
+                          >
+                            {d.getDate()}
+                          </span>
                         </button>
                       </th>
                     );
@@ -659,8 +669,8 @@ export default function CalendarPage() {
               </thead>
               <tbody>
                 {HOURS.map((hour) => (
-                  <tr key={hour} style={{ height: 44 }}>
-                    <td className="p-0.5 text-[10px] text-[var(--color-text-muted)] font-mono align-top pt-1">
+                  <tr key={hour} style={{ height: 42 }}>
+                    <td className="p-0 text-[9px] text-[var(--color-text-muted)] font-mono align-top pt-0.5 pr-0.5">
                       {hour.slice(0, 2)}
                     </td>
                     {weekDates.map((d) => {
@@ -669,14 +679,16 @@ export default function CalendarPage() {
                       const occupied = isSlotOccupied(dateStr, hour);
                       const isContinuation = occupied && !booking;
 
-                      // Skip continuation slots — parent booking uses rowSpan
                       if (isContinuation) return null;
 
                       if (booking) {
                         const paid = isPaid(booking);
                         const cellBg = paid
-                          ? "bg-[var(--color-success)]/20 hover:bg-[var(--color-success)]/30"
-                          : "bg-[var(--color-brand)]/15 hover:bg-[var(--color-brand)]/25";
+                          ? "bg-[var(--color-success)]/25 hover:bg-[var(--color-success)]/35"
+                          : "bg-[var(--color-brand)]/20 hover:bg-[var(--color-brand)]/30";
+                        const name = booking.user.displayName || "客";
+                        // Show max 3 characters (Chinese or alphanumeric)
+                        const displayName = name.length > 3 ? name.slice(0, 3) : name;
                         return (
                           <td
                             key={dateStr + hour}
@@ -685,14 +697,11 @@ export default function CalendarPage() {
                           >
                             <div
                               onClick={() => openBookingDetail(booking)}
-                              className={`w-full h-full rounded p-1 cursor-pointer transition-colors ${cellBg}`}
+                              className={`w-full h-full rounded p-0.5 cursor-pointer transition-colors flex items-center justify-center overflow-hidden ${cellBg}`}
                             >
-                              <p className="text-[10px] font-semibold text-[var(--color-text-primary)] truncate leading-tight">
-                                {booking.user.displayName || "顧客"}
-                              </p>
-                              <p className="text-[9px] text-[var(--color-text-muted)] truncate mt-0.5 leading-tight">
-                                {booking.service.name}
-                              </p>
+                              <span className="text-[10px] font-semibold text-[var(--color-text-primary)] leading-none truncate">
+                                {displayName}
+                              </span>
                             </div>
                           </td>
                         );
@@ -701,8 +710,7 @@ export default function CalendarPage() {
                       return (
                         <td key={dateStr + hour} className="p-0.5">
                           <div
-                            className="w-full h-full rounded transition-colors cursor-pointer bg-[var(--color-bg)] hover:bg-[var(--color-surface)]"
-                            style={{ minHeight: 40 }}
+                            className="w-full h-full rounded transition-colors cursor-pointer bg-[var(--color-bg)] border border-[var(--color-surface)] hover:bg-[var(--color-surface)]"
                             onClick={() => { setCurrentDate(d); setView("day"); }}
                           />
                         </td>
