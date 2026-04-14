@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { PastDueModal } from "@/components/admin/past-due-modal";
+import { adminHeaders } from "@/lib/auth/admin-fetch";
 
 interface Booking {
   id: string;
@@ -74,7 +75,7 @@ export default function DashboardPage() {
   const handleAction = async (bookingId: string, action: string) => {
     const res = await fetch(`/api/bookings/${bookingId}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: adminHeaders(),
       body: JSON.stringify({ action }),
     });
 

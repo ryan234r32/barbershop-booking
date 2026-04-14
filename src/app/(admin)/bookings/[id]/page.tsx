@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
+import { adminHeaders } from "@/lib/auth/admin-fetch";
 
 interface BookingDetail {
   id: string;
@@ -106,7 +107,7 @@ export default function BookingDetailPage() {
     try {
       const res = await fetch(`/api/bookings/${bookingId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: adminHeaders(),
         body: JSON.stringify({ action }),
       });
       if (!res.ok) {

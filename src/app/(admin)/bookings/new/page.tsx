@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
+import { adminHeaders } from "@/lib/auth/admin-fetch";
 
 interface Service {
   id: string;
@@ -56,13 +57,9 @@ export default function NewBookingPage() {
     setSubmitting(true);
     try {
       // Auth via admin cookie or Bearer (iOS PWA fallback). Server synthesizes lineUserId.
-      const bearer = typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
       const res = await fetch("/api/bookings", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
-        },
+        headers: adminHeaders(),
         body: JSON.stringify({
           serviceId: selectedService,
           date,

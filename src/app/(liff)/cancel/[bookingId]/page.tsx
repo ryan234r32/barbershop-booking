@@ -75,9 +75,13 @@ export default function CancelPage({
   const handleCancel = async () => {
     setCancelling(true);
     try {
+      const idToken = liff?.getIDToken?.() || "";
       const res = await fetch(`/api/bookings/${bookingId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { "X-LIFF-ID-Token": idToken } : {}),
+        },
         body: JSON.stringify({ action: "cancel" }),
       });
 

@@ -95,9 +95,13 @@ export default function ReschedulePage({
     if (!booking || !selectedDate || !selectedTime) return;
     setSubmitting(true);
     try {
+      const idToken = liff?.getIDToken?.() || "";
       const res = await fetch(`/api/bookings/${bookingId}/reschedule`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { "X-LIFF-ID-Token": idToken } : {}),
+        },
         body: JSON.stringify({ date: selectedDate, startTime: selectedTime }),
       });
 

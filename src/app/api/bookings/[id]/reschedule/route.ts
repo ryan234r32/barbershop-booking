@@ -10,12 +10,15 @@ import { rescheduleBookingSchema } from "@/lib/utils/validation";
 import { errorResponse, SlotUnavailableError } from "@/lib/utils/errors";
 import { addHours } from "@/lib/utils/time";
 import { logger } from "@/lib/utils/logger";
+import { requireBookingAuth, requireBookingOwnership } from "@/lib/auth/booking-auth";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 /** POST /api/bookings/[id]/reschedule — reschedule an existing booking */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
+    const auth = await requireBookingAuth(request);
+
     const { id } = await params;
     const body = await request.json();
     const input = rescheduleBookingSchema.parse(body);
@@ -25,13 +28,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       include: {
         user: true,
         service: true,
-        tenant: true,
+        // Use select white-list to avoid leaking lineAccessToken / lineChannelSecret.
+        tenant: {
+          select: {
+            id: true,
+            businessName: true,
+            phone: true,
+            address: true,
+            liffId: true,
+          },
+        },
       },
     });
 
     if (!booking) {
       return Response.json({ error: "Booking not found" }, { status: 404 });
     }
+
+    // Caller must own this booking (LIFF) or be admin of this tenant.
+    requireBookingOwnership(auth, booking);
 
     if (booking.status !== "CONFIRMED") {
       return Response.json({ error: "只能改期已確認的預約" }, { status: 400 });

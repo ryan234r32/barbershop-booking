@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import { adminHeaders } from "@/lib/auth/admin-fetch";
 
 interface PastDueBooking {
   id: string;
@@ -35,7 +36,7 @@ export function PastDueModal({ bookings, onProcessed }: PastDueModalProps) {
     try {
       const res = await fetch(`/api/bookings/${current.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: adminHeaders(),
         body: JSON.stringify({ action }),
       });
 

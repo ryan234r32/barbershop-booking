@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Drawer } from "vaul";
 import { useToast } from "@/components/ui/toast";
+import { adminHeaders } from "@/lib/auth/admin-fetch";
 import useSWR from "swr";
 
 interface Props {
@@ -84,13 +85,9 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
     try {
       // Auth comes from the admin_token cookie (or Bearer header on iOS PWA).
       // The server generates a synthetic lineUserId internally — we never send one.
-      const bearer = typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
       const res = await fetch("/api/bookings", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
-        },
+        headers: adminHeaders(),
         body: JSON.stringify({
           displayName: customerName.trim(),
           phone: phone.trim() || undefined,

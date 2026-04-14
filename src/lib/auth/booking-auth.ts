@@ -73,3 +73,38 @@ export async function requireBookingAuth(request: NextRequest): Promise<BookingA
 
   throw new UnauthorizedError();
 }
+
+/**
+ * Require that the authenticated caller is allowed to modify the given booking.
+ * - Admin: must be for the same tenant as the booking.
+ * - LIFF customer: must be the booking's owner (lineUserId match).
+ * Throws UnauthorizedError otherwise.
+ */
+export function requireBookingOwnership(
+  auth: BookingAuth,
+  booking: { tenantId: string; user: { lineUserId: string } }
+): void {
+  if (auth.type === "admin") {
+    if (auth.tenantId !== booking.tenantId) {
+      throw new UnauthorizedError("無權存取此預約");
+    }
+    return;
+  }
+  // LIFF: must own the booking
+  if (auth.lineUserId !== booking.user.lineUserId) {
+    throw new UnauthorizedError("無權存取此預約");
+  }
+}
+
+/**
+ * Require the caller to be admin. Use on endpoints that should never be
+ * callable by customers (e.g. marking a booking as completed / no-show).
+ */
+export function requireAdmin(auth: BookingAuth): asserts auth is Extract<
+  BookingAuth,
+  { type: "admin" }
+> {
+  if (auth.type !== "admin") {
+    throw new UnauthorizedError("僅限店家人員操作");
+  }
+}

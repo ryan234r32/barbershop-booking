@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Drawer } from "vaul";
 import { useToast } from "@/components/ui/toast";
+import { adminHeaders } from "@/lib/auth/admin-fetch";
 
 interface BookingUser {
   id: string;
@@ -46,7 +47,7 @@ export function BookingDetailSheet({ booking, open, onOpenChange, onAction }: Pr
     try {
       const res = await fetch(`/api/bookings/${booking.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: adminHeaders(),
         body: JSON.stringify({ action: "complete", paymentMethod }),
       });
       if (!res.ok) throw new Error("Failed to complete booking");
@@ -64,7 +65,7 @@ export function BookingDetailSheet({ booking, open, onOpenChange, onAction }: Pr
     try {
       const res = await fetch(`/api/bookings/${booking.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: adminHeaders(),
         body: JSON.stringify({ action: "no_show" }),
       });
       if (!res.ok) throw new Error("Failed");
@@ -84,7 +85,7 @@ export function BookingDetailSheet({ booking, open, onOpenChange, onAction }: Pr
     try {
       const res = await fetch(`/api/bookings/${booking.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: adminHeaders(),
         body: JSON.stringify({ action: "admin_cancel" }),
       });
       if (!res.ok) throw new Error("Failed");
@@ -103,7 +104,7 @@ export function BookingDetailSheet({ booking, open, onOpenChange, onAction }: Pr
       try {
         await fetch(`/api/customers/${booking.user.id}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: adminHeaders(),
           body: JSON.stringify({
             notes: booking.user.notes
               ? `${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" })} ${noteText.trim()}\n${booking.user.notes}`

@@ -8,6 +8,7 @@ import { notifyAdminCancellation } from "@/lib/notifications/admin-notify";
 import { cancelBookingSchema } from "@/lib/utils/validation";
 import { errorResponse, CancellationNotAllowedError } from "@/lib/utils/errors";
 import { MAX_VIOLATIONS } from "@/lib/utils/constants";
+import { requireBookingAuth, requireBookingOwnership, requireAdmin } from "@/lib/auth/booking-auth";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -40,6 +41,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 /** PATCH /api/bookings/[id] — cancel or update status */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
+    // Auth first — anyone making changes must prove identity (LIFF or admin)
+    const auth = await requireBookingAuth(request);
+
     const { id } = await params;
     const body = await request.json();
     const action = body.action as string;
@@ -55,6 +59,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     if (!booking) {
       return Response.json({ error: "Booking not found" }, { status: 404 });
+    }
+
+    // Cancel is customer-or-admin; all other actions are admin-only.
+    if (action === "cancel") {
+      requireBookingOwnership(auth, booking);
+    } else {
+      requireAdmin(auth);
     }
 
     // --- Cancel ---
