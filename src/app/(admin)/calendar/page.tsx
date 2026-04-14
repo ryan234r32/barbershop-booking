@@ -411,6 +411,10 @@ export default function CalendarPage() {
       // Long-press timer (350ms): enter drag mode
       longPressTimerRef.current = setTimeout(() => {
         dragModeActiveRef.current = true;
+        // Switch to touch-action: none so subsequent vertical movement becomes
+        // drag-to-extend instead of browser scroll. Before this point we stay
+        // pan-y so casual vertical swipes scroll the timeline as expected.
+        target.style.touchAction = "none";
         setDragState({ startHour, endHour: startHour + 1, active: true });
         if ("vibrate" in navigator) navigator.vibrate?.(30);
       }, 350);
@@ -452,18 +456,31 @@ export default function CalendarPage() {
 
   const handleSlotPointerUp = useCallback(
     (e: React.PointerEvent<HTMLDivElement>, startHour: number) => {
-      // Release pointer capture
+      // Release pointer capture + restore touch-action so next gesture can scroll
       try {
         e.currentTarget.releasePointerCapture(e.pointerId);
       } catch {
         // silent
       }
+      e.currentTarget.style.touchAction = "pan-y";
 
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
+
+      // If finger moved >10px without triggering long-press, treat as scroll — don't open sheet
+      const movedFarBeforeRelease =
+        dragStartPosRef.current !== null &&
+        (Math.abs(e.clientX - dragStartPosRef.current.x) > 10 ||
+          Math.abs(e.clientY - dragStartPosRef.current.y) > 10);
       dragStartPosRef.current = null;
+
+      if (movedFarBeforeRelease && !dragModeActiveRef.current) {
+        dragModeActiveRef.current = false;
+        setDragState(null);
+        return;
+      }
 
       // Drag mode completed → open sheet with calculated duration
       if (dragModeActiveRef.current && dragState?.active) {
@@ -484,7 +501,8 @@ export default function CalendarPage() {
     [dragState, currentDate]
   );
 
-  const handleSlotPointerCancel = useCallback(() => {
+  const handleSlotPointerCancel = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.style.touchAction = "pan-y";
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
@@ -687,7 +705,7 @@ export default function CalendarPage() {
                         onPointerMove={(e) => handleSlotPointerMove(e, parseInt(hour.split(":")[0]))}
                         onPointerUp={(e) => handleSlotPointerUp(e, parseInt(hour.split(":")[0]))}
                         onPointerCancel={handleSlotPointerCancel}
-                        style={{ touchAction: "none" }}
+                        style={{ touchAction: "pan-y" }}
                         className="h-full rounded-lg border border-dashed border-[var(--color-text-muted)]/20 flex items-center justify-center cursor-pointer hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-brand)]/5 transition-colors select-none"
                       >
                         <span className="text-xs text-[var(--color-text-muted)]">點擊新增・長按拖拉</span>
