@@ -98,11 +98,30 @@ function HorizontalDateStrip({
   onSelect: (d: Date) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const CELL_WIDTH = 56; // px per date cell
   const DAYS_BEFORE = 30;
   const DAYS_AFTER = 30;
+  const VISIBLE_DAYS = 7;
 
-  // Generate strip dates: 30 before current + current + 30 after = 61 days
+  // Dynamic cell width — divide container width by 7 so exactly 7 days fit
+  const [cellWidth, setCellWidth] = useState(52);
+  useEffect(() => {
+    const update = () => {
+      const el = containerRef.current;
+      if (!el || el.clientWidth <= 0) return;
+      setCellWidth(Math.floor(el.clientWidth / VISIBLE_DAYS));
+    };
+    update();
+    // Re-measure on resize
+    window.addEventListener("resize", update);
+    // Also re-measure on next frame to catch initial layout
+    const raf = requestAnimationFrame(update);
+    return () => {
+      window.removeEventListener("resize", update);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  // Generate strip dates: 30 before + current + 30 after = 61 days
   const dates = useMemo(() => {
     const list: Date[] = [];
     for (let offset = -DAYS_BEFORE; offset <= DAYS_AFTER; offset++) {
@@ -113,15 +132,15 @@ function HorizontalDateStrip({
     return list;
   }, [currentDate]);
 
-  // On mount / when currentDate changes, scroll to center it
+  // Center the selected date in the visible 7-day window
   useEffect(() => {
-    if (!containerRef.current) return;
     const container = containerRef.current;
-    const selectedIndex = DAYS_BEFORE; // current is always at index 30
+    if (!container) return;
+    const selectedIndex = DAYS_BEFORE;
     const targetScroll =
-      selectedIndex * CELL_WIDTH - container.clientWidth / 2 + CELL_WIDTH / 2;
-    container.scrollTo({ left: Math.max(0, targetScroll), behavior: "smooth" });
-  }, [currentDate]);
+      selectedIndex * cellWidth - container.clientWidth / 2 + cellWidth / 2;
+    container.scrollTo({ left: Math.max(0, targetScroll), behavior: "auto" });
+  }, [currentDate, cellWidth]);
 
   const todayStr = formatDate(toTaipeiDate(new Date()));
   const currentStr = formatDate(currentDate);
@@ -129,8 +148,8 @@ function HorizontalDateStrip({
   return (
     <div
       ref={containerRef}
-      className="flex items-stretch mb-3 select-none overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1"
-      style={{ scrollSnapType: "x proximity", WebkitOverflowScrolling: "touch" }}
+      className="flex items-stretch mb-3 select-none overflow-x-auto scrollbar-hide pb-1 w-full"
+      style={{ WebkitOverflowScrolling: "touch" }}
     >
       {dates.map((d) => {
         const dStr = formatDate(d);
@@ -147,10 +166,7 @@ function HorizontalDateStrip({
                 ? "bg-[var(--color-brand)]"
                 : "hover:bg-[var(--color-surface)]"
             }`}
-            style={{
-              width: CELL_WIDTH,
-              scrollSnapAlign: "center",
-            }}
+            style={{ width: cellWidth }}
           >
             <span
               className={`text-[11px] leading-none ${
@@ -544,13 +560,13 @@ export default function CalendarPage() {
         </button>
       </div>
 
-      {/* View Switcher */}
-      <div className="flex mb-4 border border-[var(--color-brand)] rounded-lg overflow-hidden">
+      {/* View Switcher — 3 equal buttons */}
+      <div className="grid grid-cols-3 mb-4 border border-[var(--color-brand)] rounded-lg overflow-hidden w-full">
         {(["day", "week", "month"] as const).map((v) => (
           <button
             key={v}
             onClick={() => setView(v)}
-            className={`flex-1 py-2 text-sm font-medium transition-colors ${
+            className={`py-2 text-sm font-medium transition-colors min-w-0 ${
               view === v
                 ? "bg-[var(--color-brand)] text-[var(--color-bg)]"
                 : "text-[var(--color-brand)] hover:bg-[var(--color-brand)]/5"
