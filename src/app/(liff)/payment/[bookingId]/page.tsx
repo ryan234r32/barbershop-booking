@@ -71,7 +71,7 @@ export default function PaymentPage({
   params: Promise<{ bookingId: string }>;
 }) {
   const { bookingId } = use(params);
-  const { isReady, liff } = useLiff();
+  const { isReady, liff, userId: liffUserId } = useLiff();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -106,7 +106,13 @@ export default function PaymentPage({
     (async () => {
       try {
         const [cfgRes, b] = await Promise.all([
-          fetch("/api/payments/config").then((r) => r.json()).catch(() => ({ ecpayEnabled: false })),
+          fetch(
+            liffUserId
+              ? `/api/payments/config?lineUserId=${encodeURIComponent(liffUserId)}`
+              : "/api/payments/config",
+          )
+            .then((r) => r.json())
+            .catch(() => ({ ecpayEnabled: false })),
           fetchBooking(),
         ]);
         if (cancelled) return;
@@ -147,7 +153,7 @@ export default function PaymentPage({
     return () => {
       cancelled = true;
     };
-  }, [isReady, fetchBooking, bookingId, liff]);
+  }, [isReady, fetchBooking, bookingId, liff, liffUserId]);
 
   const copy = async (text: string, label: string) => {
     try {
