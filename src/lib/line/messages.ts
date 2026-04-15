@@ -149,6 +149,169 @@ export function bookingConfirmationMessage(params: {
   };
 }
 
+/** Transfer reported Flex Message — sent after customer submits last-5 digits */
+export function transferReportedMessage(params: {
+  serviceName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  price: number;
+  transferLastFive: string;
+  liffBaseUrl?: string;
+}): FlexMessage {
+  const { serviceName, date, startTime, endTime, price, transferLastFive, liffBaseUrl } = params;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const footerButtons: any[] = [];
+  if (liffBaseUrl) {
+    footerButtons.push({
+      type: "button" as const,
+      action: {
+        type: "uri" as const,
+        label: "查看我的預約",
+        uri: `${liffBaseUrl}/my-bookings`,
+      },
+      style: "secondary" as const,
+      height: "sm" as const,
+    });
+  }
+
+  const bubble: FlexBubble = {
+    type: "bubble",
+    header: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        { type: "text", text: "已收到轉帳資訊 ✓", weight: "bold", size: "lg", color: "#003D2B" },
+      ],
+      backgroundColor: "#FFF8F1",
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "box",
+          layout: "vertical",
+          spacing: "sm",
+          contents: [
+            infoRow("服務", serviceName),
+            infoRow("日期", date),
+            infoRow("時間", `${startTime} - ${endTime}`),
+            infoRow("金額", `NT$${price.toLocaleString()}`),
+            infoRow("末五碼", transferLastFive),
+          ],
+        },
+        {
+          type: "text",
+          text: "老闆核對完成後會再通知您。如需修改末五碼，請直接聯絡店家。",
+          size: "xs",
+          color: "#809A8E",
+          margin: "xl",
+          wrap: true,
+        },
+      ],
+    },
+    footer: footerButtons.length
+      ? {
+          type: "box",
+          layout: "vertical",
+          spacing: "sm",
+          contents: footerButtons,
+          backgroundColor: "#FFF8F1",
+        }
+      : undefined,
+  };
+
+  return {
+    type: "flex",
+    altText: `已收到轉帳末五碼 ${transferLastFive}`,
+    contents: bubble,
+  };
+}
+
+/** Cash selected Flex Message — sent after customer chooses pay-at-store */
+export function cashSelectedMessage(params: {
+  serviceName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  price: number;
+  shopName?: string;
+  shopAddress?: string;
+  liffBaseUrl?: string;
+}): FlexMessage {
+  const { serviceName, date, startTime, endTime, price, shopName, shopAddress, liffBaseUrl } = params;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const footerButtons: any[] = [];
+  if (liffBaseUrl) {
+    footerButtons.push({
+      type: "button" as const,
+      action: {
+        type: "uri" as const,
+        label: "查看我的預約",
+        uri: `${liffBaseUrl}/my-bookings`,
+      },
+      style: "secondary" as const,
+      height: "sm" as const,
+    });
+  }
+
+  const bubble: FlexBubble = {
+    type: "bubble",
+    header: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        { type: "text", text: "已選擇到店現金付款 ✓", weight: "bold", size: "lg", color: "#003D2B" },
+      ],
+      backgroundColor: "#FFF8F1",
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "box",
+          layout: "vertical",
+          spacing: "sm",
+          contents: [
+            infoRow("服務", serviceName),
+            infoRow("日期", date),
+            infoRow("時間", `${startTime} - ${endTime}`),
+            infoRow("應付金額", `NT$${price.toLocaleString()}`),
+            ...(shopAddress ? [infoRow("地址", shopAddress)] : []),
+          ],
+        },
+        {
+          type: "text",
+          text: `到店時直接付現給${shopName ?? "老闆"}即可，期待為您服務 🪮`,
+          size: "xs",
+          color: "#809A8E",
+          margin: "xl",
+          wrap: true,
+        },
+      ],
+    },
+    footer: footerButtons.length
+      ? {
+          type: "box",
+          layout: "vertical",
+          spacing: "sm",
+          contents: footerButtons,
+          backgroundColor: "#FFF8F1",
+        }
+      : undefined,
+  };
+
+  return {
+    type: "flex",
+    altText: `已選擇現金付款 NT$${price.toLocaleString()}`,
+    contents: bubble,
+  };
+}
+
 /** Reminder Flex Message */
 export function reminderMessage(params: {
   serviceName: string;

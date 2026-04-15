@@ -20,6 +20,10 @@ const STATUS_BADGE: Record<string, { label: string; style: string }> = {
     label: "即將到來",
     style: "bg-[#003D2B] text-[#FFF8F1]",
   },
+  PAST_DUE: {
+    label: "待結算",
+    style: "bg-[#C88B3B]/15 text-[#8B4513]",
+  },
   COMPLETED: {
     label: "已完成",
     style: "bg-[#003D2B]/10 text-[#003D2B]",
@@ -36,6 +40,13 @@ const STATUS_BADGE: Record<string, { label: string; style: string }> = {
     label: "店家取消",
     style: "bg-[#003D2B]/10 text-[#003D2B]/60",
   },
+};
+
+const PAYMENT_BADGE: Record<string, { label: string; style: string }> = {
+  RECEIVED: { label: "已付款", style: "bg-[#1a503c]/10 text-[#1a503c]" },
+  VERIFYING: { label: "核對中", style: "bg-[#C88B3B]/15 text-[#8B4513]" },
+  PENDING: { label: "待付款", style: "bg-[#A84A3B]/10 text-[#A84A3B]" },
+  WAIVED: { label: "免付款", style: "bg-[#003D2B]/10 text-[#003D2B]/60" },
 };
 
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
@@ -68,15 +79,23 @@ export default function MyBookingsPage() {
     ? `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}`
     : "";
 
-  // Filter out CONFIRMED bookings whose date+endTime has already passed
+  // Prisma @db.Date serializes to full ISO string (e.g. "2026-04-14T00:00:00.000Z"),
+  // not "YYYY-MM-DD". Slice to the date portion before composing Taipei datetime.
   const now = new Date();
-  const upcoming = bookings.filter((b) => {
-    if (b.status !== "CONFIRMED") return false;
-    const bookingEnd = new Date(`${b.date}T${b.endTime}:00+08:00`);
-    return bookingEnd > now;
-  });
-  const history = bookings.filter((b) =>
-    ["COMPLETED", "CANCELLED", "NO_SHOW", "CANCELLED_BY_ADMIN"].includes(b.status)
+  const isPastEnd = (b: Booking) => {
+    const dateOnly = b.date.slice(0, 10);
+    const bookingEnd = new Date(`${dateOnly}T${b.endTime}:00+08:00`);
+    return bookingEnd <= now;
+  };
+
+  const upcoming = bookings.filter(
+    (b) => b.status === "CONFIRMED" && !isPastEnd(b),
+  );
+  // History = settled statuses OR past-due CONFIRMED (admin hasn't marked it yet).
+  const history = bookings.filter(
+    (b) =>
+      ["COMPLETED", "CANCELLED", "NO_SHOW", "CANCELLED_BY_ADMIN"].includes(b.status) ||
+      (b.status === "CONFIRMED" && isPastEnd(b)),
   );
   const currentList = activeTab === "upcoming" ? upcoming : history;
 
@@ -152,11 +171,18 @@ export default function MyBookingsPage() {
         {!loading && isReady && currentList.length > 0 && (
           <div className="space-y-8">
             {currentList.map((booking) => {
-              const badge = STATUS_BADGE[booking.status] || {
+              const isPastDue = booking.status === "CONFIRMED" && isPastEnd(booking);
+              const badgeKey = isPastDue ? "PAST_DUE" : booking.status;
+              const badge = STATUS_BADGE[badgeKey] || {
                 label: booking.status,
                 style: "bg-[#003D2B]/10 text-[#003D2B]",
               };
-              const isUpcoming = booking.status === "CONFIRMED";
+              const isUpcoming = booking.status === "CONFIRMED" && !isPastDue;
+              const paymentBadge = booking.payment?.status
+                ? PAYMENT_BADGE[booking.payment.status]
+                : null;
+              const paymentReceived = booking.payment?.status === "RECEIVED";
+              const paymentPicked = booking.payment?.method === "CASH" || paymentReceived || booking.payment?.status === "VERIFYING";
 
               return (
                 <article
@@ -172,11 +198,20 @@ export default function MyBookingsPage() {
 
                   {/* Status badge + service name + price */}
                   <div className="pl-2">
-                    <span
-                      className={`inline-block text-[0.65rem] font-bold px-2 py-0.5 rounded tracking-widest uppercase ${badge.style}`}
-                    >
-                      {badge.label}
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`inline-block text-[0.65rem] font-bold px-2 py-0.5 rounded tracking-widest uppercase ${badge.style}`}
+                      >
+                        {badge.label}
+                      </span>
+                      {paymentBadge && (
+                        <span
+                          className={`inline-block text-[0.65rem] font-bold px-2 py-0.5 rounded tracking-widest ${paymentBadge.style}`}
+                        >
+                          {paymentBadge.label}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-start justify-between mt-2">
                       <h3 className="text-2xl font-bold text-[#003D2B] tracking-tight">
                         {booking.service.name}
@@ -233,12 +268,14 @@ export default function MyBookingsPage() {
                           取消
                         </a>
                       </div>
-                      <a
-                        href={`/payment/${booking.id}`}
-                        className="block w-full py-4 bg-[#003D2B] text-[#FFF8F1] text-[0.8rem] font-bold tracking-[0.15em] text-center rounded transition-colors hover:bg-[#003D2B]/90"
-                      >
-                        前往付款
-                      </a>
+                      {!paymentPicked && (
+                        <a
+                          href={`/payment/${booking.id}`}
+                          className="block w-full py-4 bg-[#003D2B] text-[#FFF8F1] text-[0.8rem] font-bold tracking-[0.15em] text-center rounded transition-colors hover:bg-[#003D2B]/90"
+                        >
+                          前往付款
+                        </a>
+                      )}
                     </div>
                   )}
                 </article>

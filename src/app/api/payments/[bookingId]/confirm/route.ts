@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLineClient } from "@/lib/line/client";
+import { cashSelectedMessage } from "@/lib/line/messages";
 import { errorResponse } from "@/lib/utils/errors";
 import { logger } from "@/lib/utils/logger";
 import { getLineUserIdFromRequest } from "@/lib/liff/verify-id-token";
@@ -25,6 +26,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       include: {
         service: { select: { name: true, price: true } },
         user: { select: { lineUserId: true, displayName: true } },
+        tenant: { select: { businessName: true, address: true, liffId: true } },
       },
     });
 
@@ -48,35 +50,30 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    // Send LINE confirmation to customer
-    try {
-      const lineClient = getLineClient();
-      const methodLabel = method === "CASH" ? "到店現金付款" : "銀行轉帳";
-      const description = method === "CASH"
-        ? "到店時直接付款即可，我們期待為您服務！"
-        : "請依付款頁指示完成轉帳並回填末 5 碼。";
-
-      await lineClient.pushMessage(booking.user.lineUserId, {
-        type: "flex",
-        altText: `已選擇${methodLabel}`,
-        contents: {
-          type: "bubble",
-          body: {
-            type: "box",
-            layout: "vertical",
-            contents: [
-              { type: "text", text: `付款方式已確認`, weight: "bold", size: "lg", color: "#003D2B" },
-              { type: "separator", margin: "md" },
-              { type: "text", text: `服務：${booking.service.name}`, size: "sm", color: "#2D3A30", margin: "lg" },
-              { type: "text", text: `金額：NT$${booking.service.price.toLocaleString()}`, size: "sm", color: "#2D3A30", margin: "sm" },
-              { type: "text", text: `付款方式：${methodLabel}`, size: "sm", color: "#003D2B", weight: "bold", margin: "sm" },
-              { type: "text", text: description, size: "xs", color: "#809A8E", margin: "lg", wrap: true },
-            ],
-          },
-        },
-      });
-    } catch (lineErr) {
-      logger.error("Failed to send payment confirmation LINE message", lineErr, "payments");
+    // Push LINE Flex to customer. Cash gets a distinct "pay-at-store" Flex;
+    // bank transfer users see the real "transfer received" Flex only after
+    // submitting last-5 via report-transfer, so skip here.
+    if (method === "CASH") {
+      try {
+        const liffBaseUrl = booking.tenant.liffId
+          ? `https://liff.line.me/${booking.tenant.liffId}`
+          : undefined;
+        await getLineClient().pushMessage(
+          booking.user.lineUserId,
+          cashSelectedMessage({
+            serviceName: booking.service.name,
+            date: booking.date.toISOString().slice(0, 10),
+            startTime: booking.startTime,
+            endTime: booking.endTime,
+            price: booking.service.price,
+            shopName: booking.tenant.businessName,
+            shopAddress: booking.tenant.address ?? undefined,
+            liffBaseUrl,
+          }),
+        );
+      } catch (lineErr) {
+        logger.error("Failed to push cashSelected Flex", lineErr, "payments");
+      }
     }
 
     return Response.json({ success: true });

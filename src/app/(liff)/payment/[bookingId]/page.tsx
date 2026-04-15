@@ -186,7 +186,15 @@ export default function PaymentPage({
         return;
       }
       toast({ message: "已選擇現金付款，到店時直接付款即可", type: "success" });
-      setTimeout(() => router.push("/my-bookings"), 800);
+      // Close LIFF back to the LINE chat — the customer sees the Flex there.
+      // Fall back to /my-bookings if closeWindow is unavailable (e.g. external browser).
+      setTimeout(() => {
+        try {
+          liff?.closeWindow();
+        } catch {
+          router.push("/my-bookings");
+        }
+      }, 800);
     } catch {
       toast({ message: "送出失敗，請稍後再試", type: "error" });
     }
@@ -383,6 +391,14 @@ export default function PaymentPage({
       toast({ message: "✓ 已收到，老闆確認後會通知您", type: "success" });
       await fetchBooking();
       setStage("submitted");
+      // Close LIFF back to the LINE chat — the customer sees the Flex there.
+      setTimeout(() => {
+        try {
+          liff?.closeWindow();
+        } catch {
+          /* stay on submitted screen if closeWindow unavailable */
+        }
+      }, 1200);
     } catch {
       toast({ message: "送出失敗，請稍後再試", type: "error" });
     } finally {

@@ -5,7 +5,7 @@ import { getLineClient } from "@/lib/line/client";
 import { verifyLineSignature } from "@/lib/line/webhook";
 import { logger } from "@/lib/utils/logger";
 import { persistInboundMessage, persistOutboundMessage } from "@/lib/messages/persist";
-import { nowTaipei, formatTime } from "@/lib/utils/time";
+import { nowTaipei } from "@/lib/utils/time";
 import { TIMEZONE } from "@/lib/utils/constants";
 import {
   welcomeMessage,
@@ -231,31 +231,35 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
 
     if (!user) return reply(myBookingsEmptyMessage(liffUrl), true);
 
-    // Use Taipei timezone for date comparison
+    // Use Taipei timezone for date comparison.
+    // NOTE: `gte: todayDate` is unreliable because `@db.Date` column comparison
+    // depends on Postgres session timezone, which varies by host. Instead, pull
+    // last 7 days and filter precisely in JS using Taipei endTime vs. now.
     const now = nowTaipei();
-    const todayStr = now.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
-    const todayDate = new Date(todayStr + "T00:00:00+08:00");
-    const currentTime = formatTime(now);
+    const lookbackStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     const bookings = await prisma.booking.findMany({
       where: {
         userId: user.id,
         status: "CONFIRMED",
-        date: { gte: todayDate },
+        date: { gte: lookbackStart },
       },
       include: {
         service: { select: { name: true, price: true } },
         payment: { select: { status: true } },
       },
       orderBy: [{ date: "asc" }, { startTime: "asc" }],
-      take: 10,
+      take: 20,
     });
 
-    // Filter out today's bookings whose end time has already passed
+    // Keep only bookings whose end time (Taipei) is still in the future.
     const upcoming = bookings.filter((b) => {
       const bDateStr = b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
-      if (bDateStr === todayStr) return b.endTime > currentTime;
-      return true;
+      const [y, m, d] = bDateStr.split("-").map(Number);
+      const [eH] = b.endTime.split(":").map(Number);
+      // Taipei (UTC+8) → UTC instant of appointment end
+      const bookingEndUtc = new Date(Date.UTC(y, m - 1, d, eH - 8, 0, 0));
+      return bookingEndUtc > now;
     });
 
     if (upcoming.length === 0) return reply(myBookingsEmptyMessage(liffUrl), true);
@@ -339,21 +343,21 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
     if (!user7) return reply(myBookingsEmptyMessage(liffUrl), true);
 
     const now7 = nowTaipei();
-    const todayStr7 = now7.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
-    const todayDate7 = new Date(todayStr7 + "T00:00:00+08:00");
-    const currentTime7 = formatTime(now7);
+    const lookbackStart7 = new Date(now7.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     const bookings7 = await prisma.booking.findMany({
-      where: { userId: user7.id, status: "CONFIRMED", date: { gte: todayDate7 } },
+      where: { userId: user7.id, status: "CONFIRMED", date: { gte: lookbackStart7 } },
       include: { service: { select: { name: true, price: true } }, payment: { select: { status: true } } },
       orderBy: [{ date: "asc" }, { startTime: "asc" }],
-      take: 10,
+      take: 20,
     });
 
     const upcoming7 = bookings7.filter((b) => {
       const bDateStr = b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
-      if (bDateStr === todayStr7) return b.endTime > currentTime7;
-      return true;
+      const [y, m, d] = bDateStr.split("-").map(Number);
+      const [eH] = b.endTime.split(":").map(Number);
+      const bookingEndUtc = new Date(Date.UTC(y, m - 1, d, eH - 8, 0, 0));
+      return bookingEndUtc > now7;
     });
 
     if (upcoming7.length === 0) return reply(myBookingsEmptyMessage(liffUrl), true);

@@ -4,6 +4,8 @@ import { errorResponse, AppError, UnauthorizedError } from "@/lib/utils/errors";
 import { reportTransferSchema } from "@/lib/utils/validation";
 import { requireBookingAuth, requireBookingOwnership } from "@/lib/auth/booking-auth";
 import { notifyAdminTransferReported } from "@/lib/notifications/admin-notify";
+import { getLineClient } from "@/lib/line/client";
+import { transferReportedMessage } from "@/lib/line/messages";
 import { logger } from "@/lib/utils/logger";
 
 type RouteParams = { params: Promise<{ bookingId: string }> };
@@ -32,6 +34,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         service: { select: { name: true, price: true } },
         user: { select: { lineUserId: true, displayName: true } },
         payment: true,
+        tenant: { select: { liffId: true } },
       },
     });
 
@@ -89,6 +92,29 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }).catch((err) => {
       logger.error("notifyAdminTransferReported failed", err, "payments");
     });
+
+    // Push Flex to customer (awaited; fire-and-forget gets killed on Vercel).
+    if (booking.user.lineUserId && !booking.user.lineUserId.startsWith("manual-")) {
+      try {
+        const liffBaseUrl = booking.tenant.liffId
+          ? `https://liff.line.me/${booking.tenant.liffId}`
+          : undefined;
+        await getLineClient().pushMessage(
+          booking.user.lineUserId,
+          transferReportedMessage({
+            serviceName: booking.service.name,
+            date: booking.date.toISOString().slice(0, 10),
+            startTime: booking.startTime,
+            endTime: booking.endTime,
+            price: payment.amount,
+            transferLastFive,
+            liffBaseUrl,
+          }),
+        );
+      } catch (lineErr) {
+        logger.error("Failed to push transferReported Flex", lineErr, "payments");
+      }
+    }
 
     return Response.json({
       success: true,
