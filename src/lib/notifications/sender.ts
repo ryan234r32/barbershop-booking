@@ -133,6 +133,44 @@ export async function processPendingNotifications() {
         });
         results.sent++;
 
+      // --- CUSTOM (ECPay Tier S: received / admin_notify / amount_mismatch) ---
+      } else if (notification.type === "CUSTOM") {
+        const payload = (notification.messagePayload ?? {}) as {
+          kind?: string;
+          amount?: number;
+          bookingId?: string;
+          customerName?: string;
+          merchantTradeNo?: string;
+          expected?: number;
+          actual?: number;
+        };
+
+        let text: string | null = null;
+        if (payload.kind === "ecpay_received") {
+          const amt = payload.amount != null ? `NT$${payload.amount.toLocaleString()}` : "";
+          text = `✅ 已收到您的付款 ${amt}，感謝您！我們已確認入帳。`;
+        } else if (payload.kind === "ecpay_admin_notify") {
+          const name = payload.customerName || "客戶";
+          const amt = payload.amount != null ? `NT$${payload.amount.toLocaleString()}` : "";
+          text = `💰 綠界入帳\n${name} · ${amt}`;
+        } else if (payload.kind === "ecpay_amount_mismatch") {
+          text = `⚠️ 綠界金額對不上\n訂單：${payload.merchantTradeNo ?? "?"}\n應收：NT$${payload.expected ?? "?"}\n實收：NT$${payload.actual ?? "?"}\n請手動處理。`;
+        }
+
+        if (text) {
+          await lineClient.pushMessage(notification.lineUserId, { type: "text", text });
+          await prisma.notification.update({
+            where: { id: notification.id },
+            data: { status: "SENT", sentAt: now },
+          });
+          results.sent++;
+        } else {
+          await prisma.notification.update({
+            where: { id: notification.id },
+            data: { status: "CANCELLED" },
+          });
+        }
+
       } else {
         // Booking was cancelled or missing — skip notification
         await prisma.notification.update({

@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/daily-settlement",
       "schedule": "30 12 * * *"
+    },
+    {
+      "path": "/api/cron/ecpay-sweeper",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
