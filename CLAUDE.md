@@ -89,6 +89,7 @@ Body-supplied `lineUserId` is **ignored** — caller identity always comes from 
 - `/api/cron/daily-settlement` — 12:30 UTC (20:30 Taipei), push daily settlement summary to admin
 
 ## Key Conventions
+- **犯錯當下**：小坑/一次性事件 → `/lesson {內容}` 丟進 `tasks/lessons-inbox.md`；明顯通則（「永遠要 X」「X 時必須 Y」）→ 直接加一行到本段 `Key Conventions`。Inbox 每週日 `/triage` 審核升格。
 - All dates use **Asia/Taipei** timezone — always use `nowTaipei()` for current time
 - Slot times are always `"HH:00"` format (hourly slots)
 - `tenantId` is on every table and every DB query (multi-tenant)
