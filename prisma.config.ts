@@ -9,6 +9,9 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Migrations (db push/migrate) prefer DIRECT_URL — Supabase pooler (port 6543,
+    // pgbouncer transaction mode) drops connections during DDL and breaks prisma's
+    // schema engine. Falls back to DATABASE_URL if DIRECT_URL is not set.
+    url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"],
   },
 });
