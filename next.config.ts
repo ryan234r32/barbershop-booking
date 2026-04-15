@@ -23,6 +23,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // ecpay_aio_nodejs reads ECpayPayment.xml via __dirname at runtime — webpack/turbopack
+  // can't trace that. Keep it external so file resolution works from node_modules.
+  serverExternalPackages: ["ecpay_aio_nodejs"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "profile.line-scdn.net" },
