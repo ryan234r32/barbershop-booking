@@ -27,3 +27,10 @@ export const LAPSED_DAYS = 120;
 export const BOOKING_LOCK_TTL_MS = 10_000;
 
 export const CRON_REMINDER_INTERVAL_MINUTES = 15;
+
+// ECPay Tier S
+export const ECPAY_CREATE_LOCK_TTL_MS = 15_000;
+export const ECPAY_API_TIMEOUT_MS = 8_000;
+// NT$280k guardrail (個人戶月度上限 NT$300k 的 93%)
+export const ECPAY_MONTHLY_CAP_TWD = 280_000;
+export const ECPAY_STALE_CREATED_THRESHOLD_MS = 5 * 60_000;

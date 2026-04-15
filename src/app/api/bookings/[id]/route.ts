@@ -225,10 +225,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           existingPayment?.status !== "RECEIVED" && existingPayment?.status !== "WAIVED";
 
         if (shouldWritePayment) {
-          // Priority: explicit paymentMethod > preserve VERIFYING's method > default CASH
-          const finalMethod: "CASH" | "BANK_TRANSFER" =
-            paymentMethod ??
-            (existingPayment?.status === "VERIFYING" ? existingPayment.method : "CASH");
+          // Priority: explicit paymentMethod > preserve VERIFYING's method > default CASH.
+          // Past-due completion is for walk-in / cash-equivalent flows; if the preserved
+          // method is ECPAY_ATM (Tier S) it means the auto-webhook path got interrupted —
+          // fall back to CASH so the manual completion still records something usable.
+          const preservedMethod =
+            existingPayment?.status === "VERIFYING" && existingPayment.method === "BANK_TRANSFER"
+              ? "BANK_TRANSFER"
+              : "CASH";
+          const finalMethod: "CASH" | "BANK_TRANSFER" = paymentMethod ?? preservedMethod;
 
           await tx.payment.upsert({
             where: { bookingId: id },

@@ -17,6 +17,9 @@ const eslintConfig = defineConfig([
     "public/sw.js",
     // One-off scripts under docs/ — not part of app surface.
     "docs/rich-menu/**",
+    // gstack worktrees are scratch copies of the repo for parallel work;
+    // linting them double-counts every issue from files we're not changing.
+    ".claude/worktrees/**",
   ]),
 ]);
 
