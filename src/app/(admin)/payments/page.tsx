@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { useToast } from "@/components/ui/toast";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
+import { EcpayAtmTab } from "@/components/admin/ecpay-atm-tab";
 
 /* ------------------------------------------------------------------ */
 /*  Types (match GET /api/admin/payments response)                     */
@@ -80,9 +81,27 @@ function relativeTime(iso: string | null): string {
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
+type MethodTab = "atm" | "manual" | "cash";
+
 export default function PaymentsPage() {
   usePageTitle("付款對帳");
   const { toast } = useToast();
+
+  // Top-level method switcher. Default to "manual" so owner reflex (末五碼 search)
+  // is unchanged. ATM tab only mounts when feature flag is on.
+  const [method, setMethod] = useState<MethodTab>("manual");
+  const [ecpayEnabled, setEcpayEnabled] = useState<boolean>(false);
+  const [atmAttention, setAtmAttention] = useState<number>(0);
+
+  useEffect(() => {
+    // Feature-flag probe via Agent C's public config endpoint. Public/no auth.
+    fetch("/api/payments/config")
+      .then((r) => (r.ok ? r.json() : { ecpayEnabled: false }))
+      .then((c: { ecpayEnabled?: boolean }) =>
+        setEcpayEnabled(Boolean(c.ecpayEnabled))
+      )
+      .catch(() => setEcpayEnabled(false));
+  }, []);
 
   const [tab, setTab] = useState<TabKey>("VERIFYING");
   const [query, setQuery] = useState("");
@@ -151,13 +170,23 @@ export default function PaymentsPage() {
     }
   };
 
-  const items = data?.items ?? [];
   const summary = data?.summary;
 
   const filteredItems = useMemo(() => {
-    // Server already handles status+q; no extra filter needed
+    // Server handles status+q. For the 現金 method tab, filter client-side by
+    // Payment.method — the existing /api/admin/payments response doesn't
+    // split by method, so we slice here to avoid a round-trip API change.
+    const items = data?.items ?? [];
+    if (method === "cash") {
+      return items.filter((i) => i.method === "CASH" || i.method === null);
+    }
+    if (method === "manual") {
+      return items.filter(
+        (i) => i.method === "BANK_TRANSFER" || i.method === null,
+      );
+    }
     return items;
-  }, [items]);
+  }, [data, method]);
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
@@ -165,6 +194,107 @@ export default function PaymentsPage() {
         <h1 className="text-2xl font-bold text-foreground">付款對帳</h1>
       </div>
 
+      {/* Method switcher (top-level). ATM tab hidden when ECPAY_ENABLED=false. */}
+      <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg" role="tablist">
+        {ecpayEnabled && (
+          <button
+            role="tab"
+            aria-selected={method === "atm"}
+            onClick={() => setMethod("atm")}
+            className={`flex-1 py-2 text-sm rounded-md transition-colors relative
+              ${method === "atm"
+                ? "bg-card text-foreground font-medium shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+              }`}
+          >
+            🏦 ATM 自動對帳
+            {atmAttention > 0 && (
+              <span
+                className="absolute top-1 right-2 w-2 h-2 rounded-full bg-amber-500"
+                aria-label={`${atmAttention} 筆需注意`}
+              />
+            )}
+          </button>
+        )}
+        <button
+          role="tab"
+          aria-selected={method === "manual"}
+          onClick={() => setMethod("manual")}
+          className={`flex-1 py-2 text-sm rounded-md transition-colors
+            ${method === "manual"
+              ? "bg-card text-foreground font-medium shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+            }`}
+        >
+          ✋ 末五碼手動
+        </button>
+        <button
+          role="tab"
+          aria-selected={method === "cash"}
+          onClick={() => setMethod("cash")}
+          className={`flex-1 py-2 text-sm rounded-md transition-colors
+            ${method === "cash"
+              ? "bg-card text-foreground font-medium shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+            }`}
+        >
+          💵 現金/到店
+        </button>
+      </div>
+
+      {method === "atm" ? (
+        <EcpayAtmTab onAttentionCount={setAtmAttention} />
+      ) : (
+        <ManualAndCashContent
+          query={query}
+          setQuery={setQuery}
+          searchRef={searchRef}
+          summary={summary}
+          tab={tab}
+          setTab={setTab}
+          loading={loading}
+          filteredItems={filteredItems}
+          debouncedQuery={debouncedQuery}
+          handleMarkReceived={handleMarkReceived}
+          pendingAction={pendingAction}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Manual / Cash content (existing behavior, extracted)               */
+/* ------------------------------------------------------------------ */
+
+function ManualAndCashContent(props: {
+  query: string;
+  setQuery: (v: string) => void;
+  searchRef: React.RefObject<HTMLInputElement | null>;
+  summary: PaymentsResponse["summary"] | undefined;
+  tab: TabKey;
+  setTab: (t: TabKey) => void;
+  loading: boolean;
+  filteredItems: PaymentItem[];
+  debouncedQuery: string;
+  handleMarkReceived: (id: string) => void;
+  pendingAction: string | null;
+}) {
+  const {
+    query,
+    setQuery,
+    searchRef,
+    summary,
+    tab,
+    setTab,
+    loading,
+    filteredItems,
+    debouncedQuery,
+    handleMarkReceived,
+    pendingAction,
+  } = props;
+  return (
+    <>
       {/* Search — the UI hero */}
       <div className="bg-card rounded-xl border border-border p-4">
         <label
@@ -267,7 +397,7 @@ export default function PaymentsPage() {
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }
 

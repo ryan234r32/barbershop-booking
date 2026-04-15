@@ -1,10 +1,15 @@
 "use client";
 
-import { useState, useEffect, use, useRef, useCallback } from "react";
+import { useState, useEffect, use, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useLiff } from "@/lib/liff/provider";
 import { useToast } from "@/components/ui/toast";
 import { IconArrowBack, IconCheckCircle } from "@/components/liff/icons";
+import {
+  formatAccountNumber,
+  formatBankLabel,
+} from "@/lib/ecpay/bank-codes";
+import { useEcpayStatus } from "@/lib/hooks/use-ecpay-status";
 
 interface BookingDetail {
   id: string;
@@ -33,7 +38,32 @@ function formatDate(dateStr: string): string {
   return `${d.getMonth() + 1}/${d.getDate()} (${WEEKDAYS[d.getDay()]})`;
 }
 
-type Stage = "method" | "info" | "last5" | "submitted";
+/**
+ * Format an ISO timestamp as "4/16 23:59 前" in Taipei timezone.
+ * Returns empty string for nullish input.
+ */
+function formatExpireDate(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  const month = get("month");
+  const day = get("day");
+  const hour = get("hour");
+  const minute = get("minute");
+  return `${month}/${day} ${hour}:${minute} 前`;
+}
+
+type Method = "cash" | "transfer" | "ecpay";
+type Stage = "method" | "info" | "last5" | "submitted" | "ecpay-waiting" | "ecpay-vaccount";
 
 export default function PaymentPage({
   params,
@@ -47,33 +77,77 @@ export default function PaymentPage({
 
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer">("cash");
+  const [ecpayEnabled, setEcpayEnabled] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<Method>("cash");
   const [stage, setStage] = useState<Stage>("method");
   const [digits, setDigits] = useState<string[]>(["", "", "", "", ""]);
   const [submitting, setSubmitting] = useState(false);
+  const [ecpayAmount, setEcpayAmount] = useState<number | null>(null);
   const cellRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const submissionFrameRef = useRef<HTMLIFrameElement | null>(null);
+
+  const idToken = liff?.getIDToken?.() ?? null;
 
   const fetchBooking = useCallback(async () => {
-    const idToken = liff?.getIDToken?.() || "";
+    const tok = liff?.getIDToken?.() || "";
     const r = await fetch(`/api/bookings/${bookingId}`, {
-      headers: idToken ? { "X-LIFF-ID-Token": idToken } : {},
+      headers: tok ? { "X-LIFF-ID-Token": tok } : {},
     });
     const data = await r.json();
     setBooking(data.booking);
     return data.booking as BookingDetail | null;
   }, [bookingId, liff]);
 
+  // Fetch feature flag + booking + any existing ECPay order in parallel on mount.
   useEffect(() => {
     if (!isReady) return;
-    fetchBooking()
-      .then((b) => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const [cfgRes, b] = await Promise.all([
+          fetch("/api/payments/config").then((r) => r.json()).catch(() => ({ ecpayEnabled: false })),
+          fetchBooking(),
+        ]);
+        if (cancelled) return;
+        setEcpayEnabled(Boolean(cfgRes?.ecpayEnabled));
+
+        // Already submitted bank-transfer last-5? stay on submitted screen.
         if (b?.payment?.status === "VERIFYING" || b?.payment?.status === "RECEIVED") {
           setStage("submitted");
+        } else if (b?.payment?.method === "ECPAY_ATM" && b?.payment?.status === "AWAITING_BANK") {
+          // Resume an in-flight ECPay order — peek at status to decide which stage.
+          try {
+            const tok = liff?.getIDToken?.() || "";
+            const sRes = await fetch(`/api/payments/${bookingId}/ecpay/status`, {
+              headers: tok
+                ? { "X-LIFF-ID-Token": tok, Authorization: `Bearer ${tok}` }
+                : {},
+              cache: "no-store",
+            });
+            if (sRes.ok && !cancelled) {
+              const s = await sRes.json();
+              setEcpayAmount(typeof s.amount === "number" ? s.amount : null);
+              if (s.vAccount) setStage("ecpay-vaccount");
+              else setStage("ecpay-waiting");
+            } else if (!cancelled) {
+              setStage("ecpay-waiting");
+            }
+          } catch {
+            if (!cancelled) setStage("ecpay-waiting");
+          }
         }
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [isReady, fetchBooking]);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isReady, fetchBooking, bookingId, liff]);
 
   const copy = async (text: string, label: string) => {
     try {
@@ -86,8 +160,8 @@ export default function PaymentPage({
 
   const handleCashConfirm = async () => {
     try {
-      const idToken = liff?.getIDToken();
-      if (!idToken) {
+      const tok = liff?.getIDToken();
+      if (!tok) {
         toast({ message: "請先登入 LINE", type: "error" });
         return;
       }
@@ -95,8 +169,8 @@ export default function PaymentPage({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-          "X-LIFF-ID-Token": idToken,
+          Authorization: `Bearer ${tok}`,
+          "X-LIFF-ID-Token": tok,
         },
         body: JSON.stringify({ method: "CASH" }),
       });
@@ -109,6 +183,132 @@ export default function PaymentPage({
       setTimeout(() => router.push("/my-bookings"), 800);
     } catch {
       toast({ message: "送出失敗，請稍後再試", type: "error" });
+    }
+  };
+
+  /**
+   * Submit the ECPay auto-submitting form into a hidden iframe so the page
+   * stays put while ECPay processes the order. We don't read the response —
+   * our own status endpoint + webhooks drive the UI.
+   */
+  const submitEcpayForm = (html: string) => {
+    // Clean up any previous frame.
+    if (submissionFrameRef.current) {
+      submissionFrameRef.current.remove();
+      submissionFrameRef.current = null;
+    }
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.left = "-10000px";
+    iframe.style.width = "1px";
+    iframe.style.height = "1px";
+    iframe.style.border = "0";
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.name = `ecpay-submit-${Date.now()}`;
+    document.body.appendChild(iframe);
+    submissionFrameRef.current = iframe;
+
+    const doc = iframe.contentDocument;
+    if (!doc) {
+      // Extremely unlikely (blocked iframe) — fall back to top-level submit.
+      console.warn("ecpay iframe contentDocument unavailable; falling back to top submit");
+      const tmp = document.createElement("div");
+      tmp.innerHTML = html;
+      document.body.appendChild(tmp);
+      const form = tmp.querySelector("form");
+      form?.submit();
+      return;
+    }
+    doc.open();
+    doc.write(html);
+    doc.close();
+    // The HTML produced by the SDK has its own script tag that calls form.submit().
+    // If the SDK ever stops emitting that, submit the first form as a safety net.
+    const firstForm = doc.querySelector("form");
+    if (firstForm && !firstForm.dataset.submitted) {
+      firstForm.dataset.submitted = "1";
+      // Give the embedded script a tick to run first; only submit if it didn't.
+      setTimeout(() => {
+        try {
+          firstForm.submit();
+        } catch {
+          /* noop */
+        }
+      }, 50);
+    }
+  };
+
+  // Clean up the submission iframe on unmount.
+  useEffect(() => {
+    return () => {
+      if (submissionFrameRef.current) {
+        submissionFrameRef.current.remove();
+        submissionFrameRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleEcpayCreate = async () => {
+    try {
+      setSubmitting(true);
+      const tok = liff?.getIDToken();
+      if (!tok) {
+        toast({ message: "請先登入 LINE", type: "error" });
+        return;
+      }
+      const res = await fetch(`/api/payments/${bookingId}/ecpay/create-order`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${tok}`,
+          "X-LIFF-ID-Token": tok,
+        },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 503) {
+          toast({ message: "金流服務暫時關閉，請改用其他方式", type: "error" });
+        } else {
+          toast({ message: data.error || "建立付款失敗", type: "error" });
+        }
+        return;
+      }
+      const data = (await res.json()) as { html: string; merchantTradeNo: string; amount: number };
+      setEcpayAmount(data.amount);
+      submitEcpayForm(data.html);
+      setStage("ecpay-waiting");
+    } catch {
+      toast({ message: "建立付款失敗，請稍後再試", type: "error" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleIvePaid = async () => {
+    try {
+      const res = await fetch(`/api/payments/${bookingId}/ecpay/status`, {
+        headers: idToken
+          ? { "X-LIFF-ID-Token": idToken, Authorization: `Bearer ${idToken}` }
+          : {},
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        toast({ message: "查詢失敗，請稍後再試", type: "error" });
+        return;
+      }
+      const data = await res.json();
+      if (data.status === "PAID") {
+        toast({ message: "已確認收款，感謝您！", type: "success" });
+        setTimeout(() => router.push("/my-bookings"), 800);
+      } else {
+        toast({
+          message: "系統仍在確認中，最多 5 分鐘內會通知您",
+          type: "info",
+        });
+      }
+    } catch {
+      toast({ message: "查詢失敗，請稍後再試", type: "error" });
     }
   };
 
@@ -147,8 +347,8 @@ export default function PaymentPage({
 
     setSubmitting(true);
     try {
-      const idToken = liff?.getIDToken();
-      if (!idToken) {
+      const tok = liff?.getIDToken();
+      if (!tok) {
         toast({ message: "請先登入 LINE", type: "error" });
         setSubmitting(false);
         return;
@@ -157,7 +357,7 @@ export default function PaymentPage({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-LIFF-ID-Token": idToken,
+          "X-LIFF-ID-Token": tok,
         },
         body: JSON.stringify({ transferLastFive }),
       });
@@ -184,6 +384,36 @@ export default function PaymentPage({
     }
   };
 
+  // ECPay polling — only active on waiting/vaccount stages.
+  const pollEnabled = stage === "ecpay-waiting" || stage === "ecpay-vaccount";
+  const {
+    data: ecpayStatus,
+    error: ecpayPollError,
+    stopped: ecpayPollStopped,
+    timedOut: ecpayPollTimedOut,
+    refetch: refetchEcpay,
+  } = useEcpayStatus(bookingId, {
+    enabled: pollEnabled,
+    idToken,
+  });
+
+  // Promote waiting → vaccount the moment vAccount lands.
+  useEffect(() => {
+    if (ecpayStatus?.vAccount && stage === "ecpay-waiting") {
+      setStage("ecpay-vaccount");
+    }
+    if (ecpayStatus?.status === "PAID") {
+      toast({ message: "已確認收款，感謝您！", type: "success" });
+      const t = setTimeout(() => router.push("/my-bookings"), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [ecpayStatus, stage, toast, router]);
+
+  const expireDateDisplay = useMemo(
+    () => formatExpireDate(ecpayStatus?.expireDate),
+    [ecpayStatus?.expireDate],
+  );
+
   // --- Loading ---
   if (!isReady || loading) {
     return (
@@ -206,6 +436,7 @@ export default function PaymentPage({
 
   const isPaid = booking.payment?.status === "RECEIVED";
   const isVerifying = booking.payment?.status === "VERIFYING";
+  const isAwaitingBank = booking.payment?.status === "AWAITING_BANK";
   const dateDisplay = `${formatDate(booking.date)} · ${booking.startTime} — ${booking.endTime}`;
 
   const bankName = booking.tenant.bankInfo || "（店家尚未設定）";
@@ -215,6 +446,14 @@ export default function PaymentPage({
   const bankConfigured = Boolean(
     booking.tenant.bankInfo && booking.tenant.bankAccountName && booking.tenant.bankAccountNumber,
   );
+
+  const statusBadge = isPaid
+    ? "已確認"
+    : isVerifying
+      ? "核對中"
+      : isAwaitingBank
+        ? "待匯款"
+        : "待付款";
 
   return (
     <div className="min-h-screen bg-[#FFF8F1]" style={{ fontFamily: "'Manrope', 'Noto Sans TC', sans-serif" }}>
@@ -251,7 +490,7 @@ export default function PaymentPage({
                 </p>
               </div>
               <span className="text-[10px] font-bold tracking-wider px-2 py-1 rounded-sm text-[#1a503c] bg-[#b7efd4]">
-                {isPaid ? "已確認" : isVerifying ? "核對中" : "待付款"}
+                {statusBadge}
               </span>
             </div>
           </div>
@@ -288,6 +527,110 @@ export default function PaymentPage({
               返回我的預約
             </a>
           </div>
+        ) : stage === "ecpay-waiting" ? (
+          /* === ECPay: submitted form, waiting for vAccount webhook === */
+          <div className="flex flex-col items-center py-10 space-y-5">
+            {ecpayPollStopped && ecpayPollTimedOut ? (
+              <>
+                <p className="text-lg font-bold text-[#003D2B]">系統處理中</p>
+                <p className="text-sm text-[#404944]/60 text-center px-6 leading-relaxed">
+                  綠界仍在配發專屬帳號，請稍後回到此頁查看，或在 LINE 等待通知。
+                </p>
+                <a
+                  href="/my-bookings"
+                  className="mt-2 text-sm font-bold tracking-widest text-[#003D2B] underline underline-offset-4"
+                >
+                  返回我的預約
+                </a>
+              </>
+            ) : ecpayPollStopped && ecpayPollError ? (
+              <>
+                <p className="text-lg font-bold text-[#003D2B]">連線不穩</p>
+                <p className="text-sm text-[#404944]/60 text-center px-6">
+                  暫時無法取得專屬帳號，請重試或回頭改用其他付款方式。
+                </p>
+                <button
+                  onClick={() => {
+                    void refetchEcpay();
+                  }}
+                  className="mt-2 bg-[#003D2B] text-[#FFF8F1] px-6 py-3 font-bold tracking-widest text-sm rounded"
+                >
+                  重試
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="w-10 h-10 border-2 border-[#003D2B] border-t-transparent rounded-full animate-spin" />
+                <p className="text-lg font-bold text-[#003D2B]">正在產生專屬帳號</p>
+                <p className="text-sm text-[#404944]/60 text-center px-6 leading-relaxed">
+                  通常 10 秒內完成，請稍候⋯⋯
+                </p>
+              </>
+            )}
+          </div>
+        ) : stage === "ecpay-vaccount" ? (
+          /* === ECPay: show virtual account === */
+          <>
+            <h3 className="text-sm font-bold tracking-widest text-[#404944]/80 uppercase mt-2 mb-4">
+              請匯款至以下帳號
+            </h3>
+
+            {ecpayStatus?.vAccount ? (
+              <div className="bg-[#faf2ea] rounded-xl p-5 space-y-4">
+                <InfoRow
+                  label="銀行"
+                  value={formatBankLabel(ecpayStatus.bankCode)}
+                  onCopy={() => copy(ecpayStatus.bankCode ?? "", "銀行代碼")}
+                  disabled={!ecpayStatus.bankCode}
+                />
+                <InfoRow
+                  label="帳號"
+                  value={formatAccountNumber(ecpayStatus.vAccount)}
+                  mono
+                  onCopy={() => copy(ecpayStatus.vAccount ?? "", "帳號")}
+                />
+                <InfoRow
+                  label="金額"
+                  value={`NT$${(ecpayStatus.amount ?? ecpayAmount ?? booking.service.price).toLocaleString()}`}
+                  onCopy={() =>
+                    copy(
+                      String(ecpayStatus.amount ?? ecpayAmount ?? booking.service.price),
+                      "金額",
+                    )
+                  }
+                />
+              </div>
+            ) : (
+              <div className="bg-[#faf2ea] rounded-xl p-5 text-sm text-[#404944]/60 text-center">
+                專屬帳號載入中⋯⋯
+              </div>
+            )}
+
+            {expireDateDisplay && (
+              <p className="text-sm text-[#404944]/80 mt-4 font-medium">
+                ⏰ 請在 {expireDateDisplay}完成
+              </p>
+            )}
+
+            <p className="text-xs text-[#404944]/60 mt-2 leading-relaxed">
+              💡 匯款後系統會自動確認，無需回報
+            </p>
+
+            <div className="flex gap-3 mt-8">
+              <a
+                href="/my-bookings"
+                className="flex-1 text-center border border-[#003D2B]/20 text-[#003D2B] py-4 font-bold tracking-widest text-sm rounded hover:bg-[#003D2B]/5 transition-colors"
+              >
+                稍後再匯
+              </a>
+              <button
+                onClick={handleIvePaid}
+                className="flex-[2] bg-[#003D2B] text-[#FFF8F1] py-4 font-bold tracking-widest text-sm rounded hover:bg-[#003D2B]/90 transition-colors active:scale-[0.98]"
+              >
+                我已匯款
+              </button>
+            </div>
+          </>
         ) : stage === "method" ? (
           /* === Stage 0: Method picker === */
           <>
@@ -325,19 +668,51 @@ export default function PaymentPage({
                   </p>
                 </div>
               </label>
+
+              {ecpayEnabled && (
+                <label className="flex items-start gap-4 p-4 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="payment-method"
+                    checked={paymentMethod === "ecpay"}
+                    onChange={() => setPaymentMethod("ecpay")}
+                    className="w-5 h-5 mt-0.5 text-[#003D2B] border-[#707974] focus:ring-0 accent-[#003D2B]"
+                  />
+                  <div>
+                    <p className="font-bold text-[#1e1b17]">
+                      ATM 專屬帳號
+                      <span className="text-xs text-[#404944]/60 font-medium ml-2">
+                        （自動對帳，扣 NT$10）
+                      </span>
+                    </p>
+                    <p className="text-sm text-[#404944]/60 mt-0.5">
+                      系統產生專屬帳號，匯款後自動完成對帳
+                    </p>
+                  </div>
+                </label>
+              )}
             </div>
 
             <button
               onClick={() => {
                 if (paymentMethod === "cash") {
                   handleCashConfirm();
-                } else {
+                } else if (paymentMethod === "transfer") {
                   setStage("info");
+                } else {
+                  void handleEcpayCreate();
                 }
               }}
-              className="w-full bg-[#003D2B] text-[#FFF8F1] py-4 font-bold tracking-widest text-sm rounded mt-10 hover:bg-[#003D2B]/90 transition-colors active:scale-[0.98]"
+              disabled={submitting}
+              className="w-full bg-[#003D2B] text-[#FFF8F1] py-4 font-bold tracking-widest text-sm rounded mt-10 hover:bg-[#003D2B]/90 transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {paymentMethod === "cash" ? "確認現金付款" : "前往轉帳"}
+              {paymentMethod === "cash"
+                ? "確認現金付款"
+                : paymentMethod === "transfer"
+                  ? "前往轉帳"
+                  : submitting
+                    ? "建立中..."
+                    : "產生專屬帳號"}
             </button>
           </>
         ) : stage === "info" ? (
