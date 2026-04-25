@@ -90,6 +90,8 @@ Body-supplied `lineUserId` is **ignored** — caller identity always comes from 
 
 ## Key Conventions
 - **犯錯當下**：小坑/一次性事件 → `/lesson {內容}` 丟進 `tasks/lessons-inbox.md`；明顯通則（「永遠要 X」「X 時必須 Y」）→ 直接加一行到本段 `Key Conventions`。Inbox 每週日 `/triage` 審核升格。
+- **訪談問題自動累積**：當對話中出現「要問老闆」、「待老闆確認」、「跟老闆 confirm」等語意的未解問題時，**自動 Append** 到 `docs/interview-questions/pending-after-interview-{N}.md`（N = 當前最新訪談次數）。不要堆在對話中等使用者整理。分類放到 A~H 某個對應區塊；找不到對應分類就放「其他」。
+- **訪談檔放入 docs/ 時自動輪替**：當使用者放入新的 `第N次老闆訪談-*.md` 或 `第N次老闆訪談逐字稿-*.md` 到 `docs/` 時，立刻執行 `python3 scripts/rotate-interview-questions.py` — 它會把舊的 pending 改名為 resolved 並建立下一階段的 pending 檔。然後比對新訪談檔內容，標註舊 pending 裡哪些問題已經解掉、哪些還沒答到。
 - All dates use **Asia/Taipei** timezone — always use `nowTaipei()` for current time
 - Slot times are always `"HH:00"` format (hourly slots)
 - `tenantId` is on every table and every DB query (multi-tenant)
