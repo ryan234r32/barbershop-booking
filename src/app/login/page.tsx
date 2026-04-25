@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -8,7 +8,41 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [restoring, setRestoring] = useState(true);
   const router = useRouter();
+
+  // Auto-restore session from localStorage token when middleware redirects here
+  // with ?from=. iOS Safari ITP can purge the HttpOnly cookie after ~7 days even
+  // though Max-Age is 30d — but the JWT in localStorage is still valid for 30d.
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      setRestoring(false);
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const from = params.get("from");
+    const token = localStorage.getItem("admin_token");
+
+    if (!from || !token) {
+      setRestoring(false);
+      return;
+    }
+
+    fetch("/api/auth/restore-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error("invalid");
+        router.replace(from);
+      })
+      .catch(() => {
+        localStorage.removeItem("admin_token");
+        setRestoring(false);
+      });
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,13 +68,23 @@ export default function LoginPage() {
         localStorage.setItem("admin_token", data.token);
       }
 
-      router.replace("/calendar");
+      const params = new URLSearchParams(window.location.search);
+      const from = params.get("from");
+      router.replace(from && from.startsWith("/") ? from : "/calendar");
     } catch {
       setError("網路錯誤，請稍後再試");
     } finally {
       setLoading(false);
     }
   };
+
+  if (restoring) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <p className="text-sm text-muted-foreground">回復登入中...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -92,6 +136,10 @@ export default function LoginPage() {
           >
             {loading ? "登入中..." : "登入"}
           </button>
+
+          <p className="text-xs text-muted-foreground text-center pt-1">
+            ✓ 自動保持登入 30 天（加到主畫面也適用）
+          </p>
         </form>
       </div>
     </div>
