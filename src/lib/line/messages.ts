@@ -2063,6 +2063,100 @@ export function birthdayMessage(params: {
   };
 }
 
+/**
+ * Service inquiry Flex card — replies to keyword 「燙」/「染」 (PRD-v3 §7).
+ *
+ * 漂髮 (bleach) is intentionally NOT routed here — it goes through the
+ * consultation flow (Wave 4a) which creates a ConsultationRequest record.
+ * Perm/color is lighter touch: just ask the customer for the 3 things admin
+ * needs to give a quote, then admin handles via LINE chat or LIFF booking.
+ */
+export function serviceInquiryFlexMessage(params: {
+  serviceType: "perm" | "color";
+  liffBaseUrl: string;
+  shopName: string;
+}): FlexMessage {
+  const { serviceType, liffBaseUrl, shopName } = params;
+  const isPerm = serviceType === "perm";
+  const serviceLabel = isPerm ? "燙髮" : "染髮";
+  const verbLabel = isPerm ? "燙" : "染";
+
+  const bubble: FlexBubble = {
+    type: "bubble",
+    header: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "text",
+          text: `想${verbLabel}嗎？`,
+          weight: "bold",
+          size: "xl",
+          color: "#003D2B",
+        },
+        {
+          type: "text",
+          text: `${shopName}為您報價前，請提供 3 項資訊：`,
+          size: "sm",
+          color: "#809A8E",
+          margin: "sm",
+          wrap: true,
+        },
+      ],
+      backgroundColor: "#F3ECE4",
+      paddingAll: "lg",
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      spacing: "md",
+      contents: [
+        infoRow("A.", `上次${verbLabel}是什麼時候？（沒${verbLabel}過也告訴我）`),
+        infoRow("B.", "現在頭髮狀況的照片（自然光、後腦勺一張）"),
+        infoRow("C.", `期待的造型參考照（可截圖網路上的${serviceLabel}照）`),
+        {
+          type: "separator",
+          margin: "lg",
+        },
+        {
+          type: "text",
+          text: "📸 直接傳照片到這個對話框即可，回覆後我們會盡快給你報價與時間建議。",
+          size: "xs",
+          color: "#809A8E",
+          wrap: true,
+          margin: "md",
+        },
+      ],
+      paddingAll: "lg",
+    },
+    footer: {
+      type: "box",
+      layout: "vertical",
+      spacing: "sm",
+      contents: [
+        {
+          type: "button",
+          action: {
+            type: "uri",
+            label: `先預約看看（${serviceLabel}）`,
+            uri: liffBaseUrl,
+          },
+          style: "primary",
+          color: "#003D2B",
+          height: "sm",
+        },
+      ],
+      paddingAll: "lg",
+    },
+  };
+
+  return {
+    type: "flex",
+    altText: `想${verbLabel}嗎？請提供：上次${verbLabel}時間、現況照片、期待造型`,
+    contents: bubble,
+  };
+}
+
 // Helper: create an info row for Flex Message
 function infoRow(label: string, value: string) {
   return {

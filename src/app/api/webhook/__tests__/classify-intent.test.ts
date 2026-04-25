@@ -16,7 +16,35 @@ describe("classifyIntent — table-driven keyword routing", () => {
     { input: "取消預約", expected: "cancel-reschedule" },
     { input: "我想改期", expected: "cancel-reschedule" },
     { input: "改時間", expected: "cancel-reschedule" },
+    { input: "換時間", expected: "cancel-reschedule" },
+    { input: "改一下", expected: "cancel-reschedule" },
+    { input: "不約了", expected: "cancel-reschedule" },
+    { input: "不來了", expected: "cancel-reschedule" },
     { input: "cancel my booking", expected: "cancel-reschedule" },
+
+    // service inquiry — perm (Wave 1.7, 漂髮 NOT routed here per PRD §13.2)
+    { input: "燙", expected: "service-inquiry-perm", note: "exact single-char trigger" },
+    { input: "想燙", expected: "service-inquiry-perm" },
+    { input: "我想燙頭髮", expected: "service-inquiry-perm" },
+    { input: "燙髮多久", expected: "service-inquiry-perm" },
+    { input: "要燙", expected: "service-inquiry-perm" },
+    { input: "perm", expected: "service-inquiry-perm" },
+
+    // service inquiry — color
+    { input: "染", expected: "service-inquiry-color", note: "exact single-char trigger" },
+    { input: "想染", expected: "service-inquiry-color" },
+    { input: "我想染頭髮", expected: "service-inquiry-color" },
+    { input: "染髮多少錢", expected: "service-inquiry-color", note: "service inquiry beats pricing — 染髮非固定價，需照片報價" },
+    { input: "要染", expected: "service-inquiry-color" },
+    { input: "color", expected: "service-inquiry-color" },
+
+    // service inquiry — false positive guards (must NOT trigger)
+    { input: "好燙", expected: "none" },
+    { input: "燙手", expected: "none" },
+    { input: "燙傷", expected: "none" },
+    { input: "傳染", expected: "none" },
+    { input: "汙染", expected: "none" },
+    { input: "染色筆", expected: "none" },
 
     // booking
     { input: "預約", expected: "booking" },
