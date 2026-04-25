@@ -11,39 +11,40 @@ datasource db {
 // ============================================
 
 model Tenant {
-  id                String     @id @default(uuid())
+  id                String @id @default(uuid())
   name              String
-  slug              String     @unique
-  lineChannelId     String     @unique @map("line_channel_id")
-  lineChannelSecret String     @map("line_channel_secret")
-  lineAccessToken   String     @map("line_access_token")
-  liffId            String     @map("liff_id")
+  slug              String @unique
+  lineChannelId     String @unique @map("line_channel_id")
+  lineChannelSecret String @map("line_channel_secret")
+  lineAccessToken   String @map("line_access_token")
+  liffId            String @map("liff_id")
 
-  businessName      String     @map("business_name")
+  businessName      String  @map("business_name")
   phone             String?
   address           String?
-  bankInfo          String?    @map("bank_info")
-  bankAccountName   String?    @map("bank_account_name")
-  bankAccountNumber String?    @map("bank_account_number")
+  bankInfo          String? @map("bank_info")
+  bankAccountName   String? @map("bank_account_name")
+  bankAccountNumber String? @map("bank_account_number")
 
-  plan              TenantPlan @default(TRIAL)
-  trialEndsAt       DateTime?  @map("trial_ends_at")
-  subscriptionEndsAt DateTime? @map("subscription_ends_at")
+  plan               TenantPlan @default(TRIAL)
+  trialEndsAt        DateTime?  @map("trial_ends_at")
+  subscriptionEndsAt DateTime?  @map("subscription_ends_at")
 
-  isActive          Boolean    @default(true) @map("is_active")
-  createdAt         DateTime   @default(now()) @map("created_at")
-  updatedAt         DateTime   @updatedAt @map("updated_at")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  users             User[]
-  services          Service[]
-  bookings          Booking[]
-  businessHours     BusinessHours[]
-  holidays          Holiday[]
-  adminUsers        AdminUser[]
-  notifications     Notification[]
-  messages          Message[]
+  users                User[]
+  services             Service[]
+  bookings             Booking[]
+  businessHours        BusinessHours[]
+  holidays             Holiday[]
+  adminUsers           AdminUser[]
+  notifications        Notification[]
+  messages             Message[]
+  consultationRequests ConsultationRequest[]
 
-  quickReplies      Json?              @map("quick_replies")
+  quickReplies Json? @map("quick_replies")
 
   @@map("tenants")
 }
@@ -70,7 +71,7 @@ model AdminUser {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
   pushSubscriptions PushSubscription[]
 
   @@unique([tenantId, email])
@@ -111,42 +112,43 @@ enum AdminRole {
 // ============================================
 
 model User {
-  id                String          @id @default(uuid())
-  tenantId          String          @map("tenant_id")
-  lineUserId        String          @map("line_user_id")
+  id         String @id @default(uuid())
+  tenantId   String @map("tenant_id")
+  lineUserId String @map("line_user_id")
 
-  displayName       String?         @map("display_name")
-  pictureUrl        String?         @map("picture_url")
+  displayName String? @map("display_name")
+  pictureUrl  String? @map("picture_url")
 
-  phone             String?
-  realName          String?         @map("real_name")
-  email             String?
+  phone    String?
+  realName String? @map("real_name")
+  email    String?
 
-  segment           CustomerSegment @default(NEW)
-  isVip             Boolean         @default(false) @map("is_vip")
+  segment CustomerSegment @default(NEW)
+  isVip   Boolean         @default(false) @map("is_vip")
 
-  violationCount    Int             @default(0) @map("violation_count")
-  violationResetAt  DateTime?       @map("violation_reset_at")
-  bookingRestricted Boolean         @default(false) @map("booking_restricted")
-  restrictedUntil   DateTime?       @map("restricted_until")
+  violationCount    Int       @default(0) @map("violation_count")
+  violationResetAt  DateTime? @map("violation_reset_at")
+  bookingRestricted Boolean   @default(false) @map("booking_restricted")
+  restrictedUntil   DateTime? @map("restricted_until")
 
-  totalVisits       Int             @default(0) @map("total_visits")
-  lastVisitAt       DateTime?       @map("last_visit_at")
-  firstVisitAt      DateTime?       @map("first_visit_at")
+  totalVisits  Int       @default(0) @map("total_visits")
+  lastVisitAt  DateTime? @map("last_visit_at")
+  firstVisitAt DateTime? @map("first_visit_at")
 
-  birthday          DateTime?       @db.Date @map("birthday")
-  birthdayMonth     Int?            @map("birthday_month")
-  birthdayDay       Int?            @map("birthday_day")
+  birthday      DateTime? @map("birthday") @db.Date
+  birthdayMonth Int?      @map("birthday_month")
+  birthdayDay   Int?      @map("birthday_day")
 
-  notes             String?
-  tags              String[]        @default([])
-  createdAt         DateTime        @default(now()) @map("created_at")
-  updatedAt         DateTime        @updatedAt @map("updated_at")
+  notes     String?
+  tags      String[] @default([])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant            Tenant          @relation(fields: [tenantId], references: [id])
-  bookings          Booking[]
-  cancellationRecords CancellationRecord[]
-  messages          Message[]
+  tenant               Tenant                @relation(fields: [tenantId], references: [id])
+  bookings             Booking[]
+  cancellationRecords  CancellationRecord[]
+  messages             Message[]
+  consultationRequests ConsultationRequest[]
 
   @@unique([tenantId, lineUserId])
   @@index([tenantId, segment])
@@ -182,8 +184,9 @@ model Service {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  bookings    Booking[]
+  tenant               Tenant                @relation(fields: [tenantId], references: [id])
+  bookings             Booking[]
+  consultationRequests ConsultationRequest[]
 
   @@unique([tenantId, name], name: "tenantId_name")
   @@index([tenantId, isActive])
@@ -202,7 +205,7 @@ model BusinessHours {
   endTime   String  @map("end_time")
   isOpen    Boolean @default(true) @map("is_open")
 
-  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, dayOfWeek])
   @@map("business_hours")
@@ -215,7 +218,7 @@ model Holiday {
   reason    String?
   createdAt DateTime @default(now()) @map("created_at")
 
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, date])
   @@index([tenantId, date])
@@ -227,21 +230,21 @@ model Holiday {
 // ============================================
 
 model Booking {
-  id            String        @id @default(uuid())
-  tenantId      String        @map("tenant_id")
-  userId        String        @map("user_id")
-  serviceId     String        @map("service_id")
+  id        String @id @default(uuid())
+  tenantId  String @map("tenant_id")
+  userId    String @map("user_id")
+  serviceId String @map("service_id")
 
-  date          DateTime      @db.Date
-  startTime     String        @map("start_time")
-  endTime       String        @map("end_time")
-  slotsOccupied Int           @map("slots_occupied")
+  date          DateTime @db.Date
+  startTime     String   @map("start_time")
+  endTime       String   @map("end_time")
+  slotsOccupied Int      @map("slots_occupied")
 
-  status        BookingStatus @default(CONFIRMED)
-  source        BookingSource @default(LIFF)
-  notes         String?
+  status BookingStatus @default(CONFIRMED)
+  source BookingSource @default(LIFF)
+  notes  String?
 
-  lateRescheduleCount Int     @default(0) @map("late_reschedule_count")
+  lateRescheduleCount Int @default(0) @map("late_reschedule_count")
 
   /// When the shop owner clicked "I've seen this" in the unacknowledged-bookings
   /// queue (or by opening the BookingDetailSheet from a notification). NULL means
@@ -250,16 +253,17 @@ model Booking {
   /// /api/bookings/unacknowledged.
   adminAcknowledgedAt DateTime? @map("admin_acknowledged_at")
 
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant        Tenant        @relation(fields: [tenantId], references: [id])
-  user          User          @relation(fields: [userId], references: [id])
-  service       Service       @relation(fields: [serviceId], references: [id])
-  payment       Payment?
-  ecpayOrders   ECPayOrder[]
-  cancellation  CancellationRecord?
-  notifications Notification[]
+  tenant                    Tenant               @relation(fields: [tenantId], references: [id])
+  user                      User                 @relation(fields: [userId], references: [id])
+  service                   Service              @relation(fields: [serviceId], references: [id])
+  payment                   Payment?
+  ecpayOrders               ECPayOrder[]
+  cancellation              CancellationRecord?
+  notifications             Notification[]
+  convertedFromConsultation ConsultationRequest? @relation("ConvertedFromConsultation")
 
   @@index([tenantId, date, status])
   @@index([tenantId, userId])
@@ -288,19 +292,19 @@ enum BookingSource {
 // ============================================
 
 model CancellationRecord {
-  id          String   @id @default(uuid())
-  bookingId   String   @unique @map("booking_id")
-  userId      String   @map("user_id")
+  id        String @id @default(uuid())
+  bookingId String @unique @map("booking_id")
+  userId    String @map("user_id")
 
   cancelledAt DateTime @default(now()) @map("cancelled_at")
   isViolation Boolean  @default(false) @map("is_violation")
   reason      String?
 
-  bookingDate DateTime @db.Date @map("booking_date")
+  bookingDate DateTime @map("booking_date") @db.Date
   bookingTime String   @map("booking_time")
 
-  booking     Booking  @relation(fields: [bookingId], references: [id])
-  user        User     @relation(fields: [userId], references: [id])
+  booking Booking @relation(fields: [bookingId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
 
   @@index([userId, isViolation])
   @@map("cancellation_records")
@@ -311,28 +315,28 @@ model CancellationRecord {
 // ============================================
 
 model Payment {
-  id               String        @id @default(uuid())
-  bookingId        String        @unique @map("booking_id")
+  id        String @id @default(uuid())
+  bookingId String @unique @map("booking_id")
 
-  amount           Int
-  method           PaymentMethod @default(CASH)
-  status           PaymentStatus @default(PENDING)
+  amount Int
+  method PaymentMethod @default(CASH)
+  status PaymentStatus @default(PENDING)
 
   // 轉帳對帳：客戶回報的轉出帳號末 5 碼
-  transferLastFive String?       @map("transfer_last_five")
+  transferLastFive String?   @map("transfer_last_five")
   // 客戶回報末五碼的時間（進入 VERIFYING 狀態的時間戳）
-  verifiedAt       DateTime?     @map("verified_at")
+  verifiedAt       DateTime? @map("verified_at")
 
   /// @deprecated 2026-04 末五碼對帳取代；僅保留舊資料，新流程不寫入
-  screenshotUrl    String?       @map("screenshot_url")
-  receivedAt       DateTime?     @map("received_at")
-  notes            String?
+  screenshotUrl String?   @map("screenshot_url")
+  receivedAt    DateTime? @map("received_at")
+  notes         String?
 
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  booking          Booking       @relation(fields: [bookingId], references: [id])
-  ecpayOrders      ECPayOrder[]
+  booking     Booking      @relation(fields: [bookingId], references: [id])
+  ecpayOrders ECPayOrder[]
 
   @@index([status, verifiedAt])
   @@map("payments")
@@ -341,50 +345,50 @@ model Payment {
 enum PaymentMethod {
   CASH
   BANK_TRANSFER
-  ECPAY_ATM      // Tier S：綠界虛擬帳號
+  ECPAY_ATM // Tier S：綠界虛擬帳號
 }
 
 enum PaymentStatus {
-  PENDING        // 待付款：客戶尚未回報
-  AWAITING_BANK  // Tier S：虛擬帳號已產生，等待客戶匯款入帳
-  VERIFYING      // 待對帳：客戶已回報末五碼，等老闆確認
-  RECEIVED       // 已收款
-  WAIVED         // 免收（admin 豁免）
-  EXPIRED        // Tier S：虛擬帳號過期未入帳
+  PENDING // 待付款：客戶尚未回報
+  AWAITING_BANK // Tier S：虛擬帳號已產生，等待客戶匯款入帳
+  VERIFYING // 待對帳：客戶已回報末五碼，等老闆確認
+  RECEIVED // 已收款
+  WAIVED // 免收（admin 豁免）
+  EXPIRED // Tier S：虛擬帳號過期未入帳
 }
 
 // Tier S：綠界 ECPay 訂單記錄
 // 一個 Payment 可能有多筆 ECPayOrder（重試時舊的標 FAILED，新的建立）
 // 併發控制：create-order handler 使用 Redis lock `ecpay:create:{bookingId}`
 model ECPayOrder {
-  id                String           @id @default(uuid())
-  tenantId          String           @map("tenant_id")
-  bookingId         String           @map("booking_id")
-  paymentId         String           @map("payment_id")
+  id        String @id @default(uuid())
+  tenantId  String @map("tenant_id")
+  bookingId String @map("booking_id")
+  paymentId String @map("payment_id")
 
   // 我們送給綠界的訂單號（20 碼英數、全域 unique）
-  merchantTradeNo   String           @unique @map("merchant_trade_no")
+  merchantTradeNo   String  @unique @map("merchant_trade_no")
   // 綠界要求格式 yyyy/MM/dd HH:mm:ss（台灣時間）
-  merchantTradeDate String           @map("merchant_trade_date")
+  merchantTradeDate String  @map("merchant_trade_date")
   // 綠界回傳的交易編號（PaymentInfo webhook 或 Return webhook 才有）
-  tradeNo           String?          @map("trade_no")
+  tradeNo           String? @map("trade_no")
 
-  amount            Int
-  bankCode          String?          @map("bank_code")       // 虛擬帳號銀行代碼，例 "008"
-  vAccount          String?          @map("v_account")       // 虛擬帳號
-  expireDate        DateTime?        @map("expire_date")     // 虛擬帳號過期時間
+  amount     Int
+  bankCode   String?   @map("bank_code") // 虛擬帳號銀行代碼，例 "008"
+  vAccount   String?   @map("v_account") // 虛擬帳號
+  expireDate DateTime? @map("expire_date") // 虛擬帳號過期時間
 
   status            ECPayOrderStatus @default(CREATED)
-  rawCreateResponse Json?            @map("raw_create_response")   // 綠界建單回應
-  rawPaymentInfo    Json?            @map("raw_payment_info")      // PaymentInfoURL webhook payload
-  rawReturn         Json?            @map("raw_return")            // ReturnURL webhook payload
+  rawCreateResponse Json?            @map("raw_create_response") // 綠界建單回應
+  rawPaymentInfo    Json?            @map("raw_payment_info") // PaymentInfoURL webhook payload
+  rawReturn         Json?            @map("raw_return") // ReturnURL webhook payload
   failureReason     String?          @map("failure_reason")
 
-  createdAt         DateTime         @default(now()) @map("created_at")
-  updatedAt         DateTime         @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  booking           Booking          @relation(fields: [bookingId], references: [id])
-  payment           Payment          @relation(fields: [paymentId], references: [id])
+  booking Booking @relation(fields: [bookingId], references: [id])
+  payment Payment @relation(fields: [paymentId], references: [id])
 
   @@index([tenantId, status])
   @@index([bookingId])
@@ -394,11 +398,11 @@ model ECPayOrder {
 }
 
 enum ECPayOrderStatus {
-  CREATED   // DB 已 insert，尚未呼叫 ECPay
-  PENDING   // ECPay 已產生虛擬帳號，等客戶匯款
-  PAID      // 入帳 webhook 確認
-  EXPIRED   // 逾期未付（cron 標記）
-  FAILED    // ECPay 建單失敗 / timeout / amount mismatch
+  CREATED // DB 已 insert，尚未呼叫 ECPay
+  PENDING // ECPay 已產生虛擬帳號，等客戶匯款
+  PAID // 入帳 webhook 確認
+  EXPIRED // 逾期未付（cron 標記）
+  FAILED // ECPay 建單失敗 / timeout / amount mismatch
 }
 
 // ============================================
@@ -406,23 +410,23 @@ enum ECPayOrderStatus {
 // ============================================
 
 model Notification {
-  id             String             @id @default(uuid())
-  tenantId       String             @map("tenant_id")
-  bookingId      String?            @map("booking_id")
+  id        String  @id @default(uuid())
+  tenantId  String  @map("tenant_id")
+  bookingId String? @map("booking_id")
 
-  type           NotificationType
-  scheduledAt    DateTime           @map("scheduled_at")
-  sentAt         DateTime?          @map("sent_at")
-  status         NotificationStatus @default(PENDING)
+  type        NotificationType
+  scheduledAt DateTime           @map("scheduled_at")
+  sentAt      DateTime?          @map("sent_at")
+  status      NotificationStatus @default(PENDING)
 
-  lineUserId     String             @map("line_user_id")
-  messagePayload Json?              @map("message_payload")
-  errorMessage   String?            @map("error_message")
+  lineUserId     String  @map("line_user_id")
+  messagePayload Json?   @map("message_payload")
+  errorMessage   String? @map("error_message")
 
-  createdAt      DateTime           @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  tenant         Tenant             @relation(fields: [tenantId], references: [id])
-  booking        Booking?           @relation(fields: [bookingId], references: [id])
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  booking Booking? @relation(fields: [bookingId], references: [id])
 
   @@index([status, scheduledAt])
   @@index([tenantId, type])
@@ -468,10 +472,10 @@ model Message {
   // raw: LINE event payload. Debug/sticker metadata only.
   // Do NOT query into this column (no JSON where clauses); add a dedicated
   // column if a new query need emerges.
-  raw             Json?
+  raw Json?
 
-  isRead          Boolean          @default(false) @map("is_read")
-  createdAt       DateTime         @default(now()) @map("created_at")
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
   user   User?  @relation(fields: [userId], references: [id])
@@ -505,4 +509,54 @@ enum MessageKind {
   BUSY_NOTICE
   WELCOME
   KEYWORD_REPLY
+}
+
+// ============================================
+// CONSULTATION REQUESTS (PRD-v3 §3, Wave 2b)
+// ============================================
+//
+// Customers ask about 漂髮 (bleach) or first-time-as-of-45-days don't get a
+// Booking — they get a ConsultationRequest. Admin reviews the photos / notes
+// / target style, then either replies via LINE or converts to a Booking using
+// the standard ack flow.
+//
+// Routes / UI live in Wave 4a (consultation-flow). This Wave 2b PR is schema
+// additive only — zero risk to existing flows.
+model ConsultationRequest {
+  id         String  @id @default(uuid())
+  tenantId   String  @map("tenant_id")
+  userId     String? @map("user_id")
+  lineUserId String  @map("line_user_id")
+  serviceId  String? @map("service_id")
+
+  // Customer-submitted content
+  currentPhotoUrls String[]  @default([]) @map("current_photo_urls")
+  targetPhotoUrls  String[]  @default([]) @map("target_photo_urls")
+  lastServiceDate  DateTime? @map("last_service_date") @db.Date
+  notes            String?
+
+  status   ConsultationStatus @default(PENDING)
+  priority Int                @default(0) // manual bump to top of queue
+
+  respondedAt        DateTime? @map("responded_at")
+  convertedBookingId String?   @unique @map("converted_booking_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  user             User?    @relation(fields: [userId], references: [id])
+  service          Service? @relation(fields: [serviceId], references: [id])
+  convertedBooking Booking? @relation("ConvertedFromConsultation", fields: [convertedBookingId], references: [id])
+
+  @@index([tenantId, status, priority])
+  @@index([lineUserId])
+  @@map("consultation_requests")
+}
+
+enum ConsultationStatus {
+  PENDING // 等老闆回
+  REPLIED // 已回覆，未轉預約
+  CONVERTED // 已轉預約
+  ARCHIVED // 忽略 / 失效
 }
