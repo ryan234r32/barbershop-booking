@@ -3,10 +3,10 @@
 
 | | |
 |---|---|
-| **版本** | v3.0 (Draft，待審核) |
+| **版本** | v3.2 (post-codex review §13.12 蘖身) |
 | **撰寫日期** | 2026-04-24 |
-| **最後更新** | 2026-04-25（融入碩展訪談） |
-| **狀態** | ⏳ 待 G-stack 審核（CEO / Design / Eng / Autoplan） |
+| **最後更新** | 2026-04-25（碩展訪談 + autoplan 三 phase + §13 branch wave + §13.12 G-Stack 戰術組 → codex review 後蘖身） |
+| **狀態** | ✅ 全 sections 已過審核，可進 Phase A |
 | **產品擁有者** | Ryan |
 | **目標 Demo** | 第三次老闆訪談（時間待定） |
 | **預估開發** | 5-6 週（1 人全職） |
@@ -39,13 +39,14 @@
 
 | 角色 | 姓名 | 狀態 | 日期 | 備註 |
 |---|---|---|---|---|
-| 產品擁有者 | Ryan | ⏳ pending | | |
-| CEO Review | `/plan-ceo-review` | ⏳ pending | | |
-| Design Review | `/plan-design-review` | ⏳ pending | | |
-| Eng Review | `/plan-eng-review` | ⏳ pending | | |
-| Final Gate | `/autoplan` | ⏳ pending | | |
-| Stakeholder | 碩展（顧問）| ⏳ optional | | |
-| Stakeholder | Ken 老闆 | ⏳ optional | | |
+| 產品擁有者 | Ryan | ✅ approved | 2026-04-25 | autoplan 跑完 + §13 + §13.12 |
+| CEO Review | `/plan-ceo-review` | ✅ done via autoplan | 2026-04-25 | 6/8 dimensions consensus，user 已解 |
+| Design Review | `/plan-design-review` | ✅ done via autoplan | 2026-04-25 | 7/7 dimensions consensus，12 項自動補 |
+| Eng Review | `/plan-eng-review` | ✅ done via autoplan | 2026-04-25 | 8/9 dimensions consensus，21 項自動補 |
+| Final Gate | `/autoplan` | ✅ done | 2026-04-25 | 三 phase 跑完 |
+| §13.12 G-Stack 戰術 | `/codex review` | ✅ done | 2026-04-25 | 5 個 high/medium 採納，§13.12 蘖身 |
+| Stakeholder | 碩展（顧問）| ⏳ optional | | 訪談已融入，可選擇給他看 v3.1 |
+| Stakeholder | Ken 老闆 | ⏳ optional | | 第三次訪談時 demo |
 
 ---
 
@@ -678,7 +679,7 @@ model Tenant {
 **執行方式**：
 - 先把所有新元件樣式寫出來
 - 每個 PR 跑 `/design-review` skill 做 QA
-- 老闆在平板 dogfood 前跑 `/autoplan` 最後一關
+- 老闆在平板 dogfood 前跑一次 `/qa` + `/canary` 整體驗收（`/autoplan` 已在 2026-04-25 跑完，PRD-level 不再重跑）
 
 ---
 
@@ -952,16 +953,14 @@ model Tenant {
   3. admin 在 /calendar 拖拉預約 → reschedule API → 客戶收通知 → ack 重置 → modal 再彈
 - **Excel 匯入 + 報表 demo**：跑 `scripts/import-2025-excel.ts --tenant=demo-2025-history --dry-run` → review → 灌入 → 開 /admin/analytics 切到 demo tenant → 看 12 個月趨勢線 + 服務 mix + 熱力圖都有資料
 
-### G-stack 審核
-按順序跑：
-1. `/plan-ceo-review` — 挑戰 scope（要不要砍 §8 回購券（A/B）？）
-2. `/plan-design-review` — 行事曆 + 對帳卡 + 諮詢頁視覺評分
-3. `/plan-eng-review` — 拖拉改期的 race condition、cron 時機、schema migration 安全性
-4. `/autoplan` — 最後一道閘
+### G-stack 審核（2026-04-25 已完成）
+- ✅ `/autoplan` 跑完三 phase（CEO + Design + Eng），結果見 §「/autoplan Phase 1-4 結果」
+- ✅ `/codex review` 跑完 §13.12 G-Stack 戰術工具搭配
+- 之後 V3 開發週期內按需求啟用 §13.12 工具配套
 
 ### 老闆驗收
 - 老闆平板實地 dogfood 1 週
-- 每日老闆回饋 → 立刻修 → `/canary` 監控錯誤
+- 每日老闆回饋 → 立刻修 → 改 → 部署後跑一次 `/canary`（單 pass 檢查，非持續監控）
 
 ---
 
@@ -1639,4 +1638,137 @@ Branch name pattern: main
 - Anti-pattern 重寫為 branch 視角
 
 **v3 工作模式總結**：一條 branch、sequential 工作、每條 branch 走 PR + Vercel preview + 你親手 merge，main 永遠保持線上穩定。
+
+---
+
+### 13.12 G-Stack 戰術工具搭配（精簡版，post-codex review）
+
+**定位**：§13.0–§13.11 是**戰略**（branch model、wave order、CI gate）。本節列出開發週期會**實際反覆使用**的最小工具組。
+
+> **為什麼這節這麼短？** 2026-04-25 跑 `/codex review` 抓到原版 §13.12「過度發明 G-Stack 工具行為、儀式 overload、跟其他段矛盾」，採納 codex 建議蘖身為「最小默認組 + 條件 gate + 高風險協議」。
+>
+> **本節列入原則**：repo 內已有 artifacts（`.gstack/canary-reports/`、`.gstack/security-reports/`）證明用過的 skill，預設「會用」；其他存在於 `~/.claude/skills/gstack/` 但本 repo 未驗證實際適用性的 skill，不寫進工作流，動工時想用再評估。
+
+#### 13.12.1 Per-PR 默認組（2 個 skill）
+
+每個 PR 提交前都該跑：
+
+| Skill | 觸發時機 | 解決什麼 |
+|---|---|---|
+| **`/health`** | 每個 PR 提交前 | repo 品質檢查：跑 [CLAUDE.md「Health Stack」段](/Users/ryan/Documents/VS_code/理髮廳/CLAUDE.md) 設定的 typecheck + lint + test 三件（dead code 與 shell lint 本 repo 未裝） |
+| **`/review`** | PR diff 完成、merge 前 | Pre-landing review — SQL safety、LLM trust boundary、conditional side effects |
+
+#### 13.12.1b Stage / Conditional Gates（3 個 skill，**不是每 PR**）
+
+只在特定階段觸發：
+
+| Skill | 觸發時機 | 解決什麼 |
+|---|---|---|
+| **`/qa`** | Integration gate — Wave 結束 / demo 前 / 高風險功能整合 | 端對端 QA + 自動修 bug。每 PR 都跑會 ceremony overload |
+| **`/canary`** | 每次 production deploy 後 | 一次性快速檢查（screenshot diff、console errors、performance）。**單一 pass 不是持續監控** |
+| **`/cso`** | Wave 4 之前一次（payment + consultation 動到 PII / bank info / LINE creds）+ V3 launch 前一次 | 安全審計。本 repo 已有 `.gstack/security-reports/2026-04-14-cso.md` 列 3 個 HIGH findings 待修，動 payment / webhook 前必跑 |
+
+#### 13.12.2 高風險協議（不是每 PR）
+
+只在這些**特定情境**觸發：
+
+| 情境 | 額外 skill | 為什麼 |
+|---|---|---|
+| Wave 2 任一 schema migration | `/codex review` | 第二意見挑戰 schema design、migration 順序 |
+| Wave 3 calendar 拖拉 sub-PR | `/codex challenge` | Adversarial 挑戰 race conditions (E-1, E-5, E-6) |
+| Wave 4a consultation webhook + photo upload | `/codex review` | Webhook handler 安全 + Supabase Storage RLS 設定 |
+| Production bug | `/investigate` | 4-phase 系統性 debug |
+| Wave 結束 / 中期 demo 前 | `/qa-only` | 純 report 不改 code，給老闆 / 碩展看 |
+
+#### 13.12.3 §13 鐵律 ↔ 真實對應機制
+
+| §13 鐵律 / 反 pattern | 對應的真實機制 |
+|---|---|
+| §13.0「直接 push main 絕對禁止」 | **GitHub branch protection** §13.10（不是 G-Stack skill）|
+| §13.1 #1「每個 PR 必過 lint/test/preview」 | **`/health` + Vercel preview**（自動）|
+| §13.1 #2「DB snapshot before deploy」 | **手動** Supabase dashboard（無對應 skill）|
+| §13.1 #3「Feature flag 0-cost rollback」 | **手動** 翻 `tenant.featureFlags` JSON（無對應 skill）|
+| §13.1 #4「Demo tenant guard」 | **程式碼內 E-18 guard**（無對應 skill）|
+| §13.7 反 pattern「PR 沒看 Vercel preview 就 merge」 | **自己看** Vercel preview URL（無強制 skill）|
+
+#### 13.12.4 Daily Workflow（簡化版）
+
+```
+PR 完成、要 merge：
+  1. /health  → 通過 baseline
+  2. /review  → 自己漏的 issue 抓出來
+  3. (高風險時才加) /codex review  或  /codex challenge
+  4. 自己手動看 Vercel preview URL
+  5. PR merge
+
+Production deploy 後：
+  6. /canary  → 一次性檢查上線是否健康
+
+Bug 出現：
+  → /investigate  → 別跳到結論，4-phase 走完
+```
+
+**不要做的事**（codex 警告的儀式 overload）：
+- ❌ 每個 PR 都跑 `/canary`（過度，浪費時間）
+- ❌ 每個 PR 都跑 `/qa`（屬於 integration gate 不是 PR gate）
+- ❌ 用 `/freeze`、`/guard`、`/checkpoint` 強制流程化（這些都存在但都是「想用就用」工具，不是工作流核心）
+- ❌ 把 `/canary` 拿來「24h 持續監控」（其實是一次性快速檢查）
+
+#### 13.12.5 Escalation Playbook（首要回應流程）
+
+production bug 出現的標準操作（**取代原版「跳 git tag + force redeploy」naive 路徑**）：
+
+```
+1. Reproduce — 在 staging tenant 或 dev local 重現問題
+2. Scope blast radius — 問「誰受影響？哪些路由？哪個 tenant？」
+3. /investigate — 4-phase 找 root cause（不是先跳 fix）
+4. Hot-fix on a branch — 不要直接 push main
+5. /review + Vercel preview verify
+6. Land via PR
+7. /canary verify production
+8. 若 root cause 來自最近 deploy 且 hot-fix 風險高 → 翻對應 feature flag 回滾
+9. 若 feature flag 不夠 → 走正規 git revert PR（不要 git checkout tag + force redeploy，特別是 migration release）
+```
+
+#### 13.12.6 不在 V3 用的 G-Stack skill
+
+| Skill | 為什麼不用 |
+|---|---|
+| `/office-hours` | 已過 ideation 階段 |
+| `/plan-ceo-review`、`/plan-design-review`、`/plan-eng-review`、`/autoplan` | **2026-04-25 已透過 autoplan 跑完**（簽核欄已標 ✅）。新增子功能再個別跑 |
+| `/design-consultation` / `/design-html` / `/design-shotgun` | 品牌規範已 lock |
+| `/follow-builders` | 不相關 |
+| `/pair-agent` | Solo dev |
+| `/checkpoint` / `/freeze` / `/guard` / `/ship` / `/land-and-deploy` / `/learn` / `/setup-deploy` | 存在於 `~/.claude/skills/gstack/`，但本 repo 沒實際使用 artifact 可參考。動工時想用再個別評估，不寫進 PRD 工作流（避免「以為有支援結果動工卡關」）|
+
+#### 13.12.7 V3 開始前一次性設定
+
+```bash
+# 1. 確認 GitHub branch protection 已設（§13.10 是核心防線，不是 skill）
+gh api repos/ryan234r32/barbershop-booking/branches/main/protection
+
+# 2. 跑 baseline /health 留分數對照
+/health
+
+# 3. Wave 4 之前一次 /cso（也可以現在就跑一次，把 4 月 14 日報告裡的 3 個 HIGH 修掉）
+/cso
+```
+
+### 13.13 v3 → v3.1 → v3.2 修正履歷
+
+**v3 → v3.1** 源頭：用戶 2026-04-25 提問「G-Stack skill 怎麼搭配 §13？」
+
+- ➕ 新增 §13.12 G-Stack 戰術工具搭配（原版 7 個子節 + 對應表 + Wave 套裝 + Daily workflow + Escalation）
+
+**v3.1 → v3.2** 源頭：`/codex review` 2026-04-25 抓到 §13.12「過度發明工具行為、儀式 overload、跟其他段矛盾」（5 個 high/medium findings）
+
+- ✂️ §13.12 蘖身（211 行 → ~110 行）：
+  - 修正 `/health` 描述（拿掉 dead code + shell lint，本 repo 未裝）
+  - 拿掉每 PR `/health + /review + /ship + /land-and-deploy + /canary` ceremony
+  - `/canary` 從「24-48h 持續監控」回正為「一次性快速檢查」
+  - 移除每 Wave 強制套裝（過度規定 `/freeze`/`/guard`/`/checkpoint`）
+  - 加 `/cso`（Wave 4 + launch 前必跑，不再延 V4 — repo 已有 3 個 HIGH security findings 待修）
+  - Escalation 重寫（拿掉「git checkout tag + force redeploy」改 reproduce → investigate → hot-fix → revert PR）
+- ✅ 簽核欄更新：CEO/Design/Eng/Final Gate 改 ✅ done via autoplan
+- ✅ 驗證段更新：G-stack 審核段標 ✅ done
 
