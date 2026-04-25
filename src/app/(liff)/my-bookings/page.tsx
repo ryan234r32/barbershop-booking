@@ -56,21 +56,72 @@ function formatDate(dateStr: string): string {
   return `${d.getMonth() + 1}/${d.getDate()} (週${WEEKDAYS[d.getDay()]})`;
 }
 
+const CACHE_KEY = "my-bookings:cache:v1";
+const CACHE_TTL_MS = 5 * 60_000; // 5 minutes — stale-while-revalidate
+
+interface CachedBookings {
+  ts: number;
+  userId: string;
+  bookings: Booking[];
+}
+
+function readCache(userId: string): Booking[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedBookings;
+    if (parsed.userId !== userId) return null;
+    if (Date.now() - parsed.ts > CACHE_TTL_MS) return null;
+    return parsed.bookings;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(userId: string, bookings: Booking[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({ ts: Date.now(), userId, bookings } satisfies CachedBookings),
+    );
+  } catch {
+    /* quota exceeded — silent */
+  }
+}
+
 export default function MyBookingsPage() {
   const { isReady, error, userId, liff } = useLiff();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"upcoming" | "history">("upcoming");
 
+  // Stale-while-revalidate: paint cached bookings instantly, then refetch in background.
+  // setState within effect is intentional for SWR — cached data is the synchronous
+  // optimistic paint, fetch result overwrites with fresh data. Disabling
+  // react-hooks/set-state-in-effect for this established pattern.
   useEffect(() => {
     if (!isReady || !userId) return;
+
+    const cached = readCache(userId);
+    if (cached) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- SWR optimistic paint
+      setBookings(cached);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- SWR optimistic paint
+      setLoading(false);
+    }
 
     const idToken = liff?.getIDToken?.() || "";
     fetch(`/api/bookings`, {
       headers: idToken ? { "X-LIFF-ID-Token": idToken } : {},
     })
       .then((r) => r.json())
-      .then((data) => setBookings(data.bookings || []))
+      .then((data) => {
+        const next = data.bookings || [];
+        setBookings(next);
+        writeCache(userId, next);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [isReady, userId, liff]);
