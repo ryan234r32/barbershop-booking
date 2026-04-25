@@ -1338,24 +1338,38 @@ model Tenant {
 
 ---
 
-## 13. 執行計劃（Worktree 戰略 v2）
+## 13. 執行計劃（Branch-based Wave 執行模型）
 
-> **產出日期**：2026-04-25
+> **產出日期**：2026-04-25（v3：從 worktree 改 branch-only）
 > **執行人**：Ryan（solo dev）
-> **總時程**：**5-6 週**（autoplan 樂觀估 4-4.5 週，Plan agent review 修正後恢復）
+> **總時程**：**5-6 週**（autoplan 樂觀估 4-4.5 週，Plan agent eng review 修正後恢復）
 > **追蹤檔**：[`tasks/in-flight.md`](../tasks/in-flight.md) — 每天開工前必看
-> **版本說明**：v1 經 Plan agent review 評 5.5/10 不核准，本版 v2 已整合所有 critical 修正
+>
+> **版本演進**：
+> - v1 經 Plan agent eng review 評 5.5/10 不核准 → 修依賴鏈與時程
+> - v2 加入跨 Wave 配套（DB snapshot, feature flag, 中期 demo）
+> - **v3** 經 CEO + Eng 雙 review 確認「solo sequential dev 用 worktree 是 over-engineering」→ 全面改 branch-only 模式
 
-### 13.0 同時並存原則（鐵律）
+### 13.0 工作紀律（鐵律）
 
 | 規則 | 數值 |
 |------|------|
-| 任何時刻 active worktree 上限 | **2 個**（+ main） |
-| 每個 worktree 壽命 | **2–10 天**（calendar 例外可到 14 天） |
-| 大 worktree 內部 | **拆 commit 邊做邊 merge**，不養長分支 |
+| 同時 active branch 上限 | **1 條**（solo dev sequential） |
+| 例外（Wave 3 calendar 期間） | 可開 1 條獨立 polish branch（純 docs/asset，不動 code） |
+| 每個 branch 壽命 | **1–3 天**（calendar 例外 10-14 天，內部分階段 sub-PR） |
 | 跳 Wave 順序 | **絕對禁止**（後波依賴前波 schema/foundation） |
+| 直接 push main | **絕對禁止**（GitHub branch protection 強制） |
 
-**Solo dev 為什麼是 2 個上限**：人類能 deep work 的 context 上限就是 2 件事。Anthropic Boris Cherny demo 也只開 2-3 個 tmux worktree。
+**為什麼 1 條 branch 上限**：
+- Solo dev 一次只能 deep work 一件事，多開只是注意力碎裂
+- Branch 切換成本是「commit + checkout」，比 worktree 切資料夾還快
+- Vercel auto-preview 每個 PR 一個獨立 URL，不需要平行跑 dev server
+- Linus Torvalds 30 年 Linux kernel 也很少用 worktree —— 業界共識
+
+**為什麼不用 worktree**（CEO + Eng 雙 review 結論）：
+- Worktree 真正解決的是「同時跑多 dev server / 多 Claude session 並行」
+- Solo sequential dev 兩個都用不到
+- Worktree 帶來的多管理一個資料夾、merge 衝突風險、注意力碎裂 —— 純 overhead
 
 ---
 
@@ -1396,9 +1410,9 @@ model Tenant {
 
 ---
 
-### 13.3 Wave 2：Schema 三拆獨立 PR（Week 2）
+### 13.3 Wave 2：Schema 三條獨立 branch（Week 2）
 
-**模式**：⚠️ **三個獨立 PR**（v1 把三個塞同一個 worktree 是地雷，已修正）
+**模式**：⚠️ **三條獨立 branch sequential**（v1 把三個塞同一個分支是地雷，已修正）
 
 **為什麼必須拆**：
 - §1 Service 重構 = high blast radius（動 booking flow + admin + seed.ts + smoke-ecpay）
@@ -1407,7 +1421,7 @@ model Tenant {
 - 綁一起 → §1 出包整批 rollback，連帶把 §3/§8 也回滾
 
 ```
-Wave 2a: worktree `schema-v3-service` (3 天)
+Wave 2a: branch `wave-2a/service-schema` (3 天)
 ├── §1 Service schema (type, requiresWith, allowStandalone)
 ├── seed.ts 重寫（等老闆服務確認表回來才能 finalize）
 ├── booking flow 整合新型別
@@ -1415,17 +1429,17 @@ Wave 2a: worktree `schema-v3-service` (3 天)
 ├── prisma migrate dev → migration 檔
 ├── DB snapshot before deploy
 └── tenant.featureFlags['service-v3'] (E-21)
-        ↓ merge to main
-Wave 2b: branch `schema-v3-consultation` (1 天，無 worktree)
+        ↓ PR + Vercel preview + merge to main
+Wave 2b: branch `wave-2b/consultation-schema` (1 天)
 ├── §3 ConsultationRequest 表 + status enum
 ├── prisma migrate dev
 └── tenant.featureFlags['consultation'] (E-21)
-        ↓ merge to main
-Wave 2c: branch `schema-v3-coupon` (1 天，無 worktree)
+        ↓ PR + Vercel preview + merge to main
+Wave 2c: branch `wave-2c/coupon-schema` (1 天)
 ├── §8 Coupon 表 + experimentArm 欄位
 ├── prisma migrate dev
 └── tenant.featureFlags['coupon-ab'] (E-21)
-        ↓ merge to main
+        ↓ PR + Vercel preview + merge to main
 ```
 
 **v1 → v2 變更**：
@@ -1438,44 +1452,42 @@ Wave 2c: branch `schema-v3-coupon` (1 天，無 worktree)
 
 ---
 
-### 13.4 Wave 3：Calendar V3 + Excel Import（Week 3-5）
+### 13.4 Wave 3：Excel 匯入 → Calendar V3（Week 3-5）
 
-**模式**：🎯 **Wave 2a 完全 merge 後**才能開始；2 個 worktree 並存
+**模式**：🎯 **Wave 2a 完全 merge 後**才能開始；兩條 branch sequential（excel 先、calendar 後）
 
-**為什麼順序很關鍵**（v1 嚴重錯誤已修正）：
-- calendar/page.tsx 寫死 `service.name/price/slotsNeeded` → Wave 2a §1 改 schema 後 calendar 整個 break
-- excel-import 需要 import 後的 Service ID（PRD §10.1 line 727 明寫「服務名對應到 V3 重構後的 Service ID」）
-- **calendar-v3 跟 excel-import 都吃 Wave 2a 產出**，**Wave 2a 沒 merge 不能開**
+**為什麼這個順序**（v3 修正：branch-only 模式不平行）：
+- 兩條都依賴 Wave 2a §1 schema 完成
+- Excel 4-5 天較小，先做：累積信心 + 灌好 demo data 給後續報表用
+- Calendar 10-14 天最大，後做：有了 demo data 可以一邊測一邊改
 
 ```
-worktree A: calendar-v3 (預估 10-14 天，主力)  ← v1 估 5-7 天嚴重低估
-├── Commit 1: 子元件拆分（DayView, WeekView, MonthView 三檔）
-│             + 新型別整合（service.type, requiresWith）
-├── Commit 2: Day 檢視 + 縮放（PointerEvent + wheel）
-├── Commit 3: Week 檢視
-├── Commit 4: Month 檢視（件數，不顯示營收）
-├── Commit 5: 拖拉改期 + ghost preview + 衝突檢測
-│             + E-5: idempotency key + 真 undo endpoint
-│             + Optimistic UI + polling invalidation
-├── Commit 6: ack 顯示邏輯（原 1.6b，併入這裡）
-│             + E-1: ack 版本 token（防 stale ack）
-└── Commit 7: 觸控手勢（捏合縮放）
-
-worktree B: excel-import (預估 4-5 天)
+Wave 3.B 先：branch `wave-3b/excel-import` (預估 4-5 天)
 ├── Commit 1: §10.1 Excel 解析（exceljs 取代 xlsx — E-16）+ 紅字辨識
 ├── Commit 2: service-name-map.json 模糊匹配
 ├── Commit 3: 灌入邏輯
 │             + E-17 deterministic id（防雙倍）
 │             + E-18 only-demo-tenant guard
 └── Commit 4: 跑進 demo tenant 灌全年資料
+        ↓ PR + Vercel preview + merge to main
+
+Wave 3.A 後：branch `wave-3a/calendar-v3` (預估 10-14 天，主力)
+這條 branch 較長，內部分階段 merge sub-PR 進去（每 2-3 天一次）：
+├── Sub-PR 1: 子元件拆分（DayView, WeekView, MonthView 三檔）
+│             + 新型別整合（service.type, requiresWith）
+├── Sub-PR 2: Day 檢視 + 縮放（PointerEvent + wheel）
+├── Sub-PR 3: Week + Month 檢視
+├── Sub-PR 4: 拖拉改期 + ghost preview + 衝突檢測
+│             + E-5: idempotency key + 真 undo endpoint
+├── Sub-PR 5: ack 顯示邏輯（原 1.6b 併入）
+│             + E-1: ack 版本 token
+└── Sub-PR 6: 觸控手勢（捏合縮放）
 ```
 
-**v1 → v2 變更**：
-- ❌ 原「Wave 3 並行 Wave 2」→ ✅ **Wave 2a 必須先全 merge**
-- ❌ 原 calendar 5-7 天 → ✅ **10-14 天**（單檔 1145 行 + 拖拉 + 新型別整合 + git 新手）
-- ❌ 原「零檔案重疊」→ ✅ 承認兩條 lane 都吃 §1，但 Wave 2a 完成後可獨立並行
-- ➕ 1.6b ack 顯示邏輯併入 calendar Commit 6
-- ➕ Touch 手勢補回（v1 漏掉）
+**v2 → v3 變更**：
+- ❌ 原「2 個 worktree 並存」→ ✅ **branch-only sequential，excel 先 calendar 後**
+- ➕ Calendar 內部拆 6 個 sub-PR 階段 merge（避免單一巨大 PR）
+- ➕ 每天早上 calendar branch `git fetch origin && git rebase origin/main`
 
 **🚧 Blocker**：
 - Wave 2a §1 沒 merge → calendar 跟 excel 都不能開
@@ -1485,54 +1497,57 @@ worktree B: excel-import (預估 4-5 天)
 
 ---
 
-### 13.5 Wave 4：諮詢先 + 付款回購並行（Week 5-6）
+### 13.5 Wave 4：依賴 schema 的功能（Week 5-6）
 
-**模式**：⚙️ **consultation 先做，後 2 個並行**（v1 全 sequential 過度保守，已修正）
+**模式**：⚙️ **三條 branch sequential**，consultation 必須最先
 
 **為什麼順序這樣**：
 - consultation-flow 動 LINE webhook handler，跟 Wave 1.7 關鍵字回覆共用 `src/app/api/webhook/route.ts` + `classify-intent.ts`
 - 必須先把 consultation 的 webhook 整合進去，**不然之後 payment/coupon 改 webhook 會撞**
+- v2 有提「payment + coupon 並行」，v3 修正：solo dev branch-only 模式 sequential 才合身
 
 ```
-Wave 4a: worktree `consultation-flow` (3-4 天)  ← 必須先做
+Wave 4a: branch `wave-4a/consultation-flow` (3-4 天)  ← 必須先做
 └── §3 諮詢 admin UI + 紅點 + 漂髮關鍵字 → 自動建 consultation
     + E-7: Supabase Storage RLS for consultation photos
     + LIFF backward compat（沒上傳照片的舊 consultation 顯示處理）
-            ↓ merge
-            
-Wave 4b + 4c: 2 個 worktree 並存（v1 是 sequential，v2 修正為並行）
-├── worktree `payment-ux` (3-4 天)
-│   └── §6 付款對帳卡 + LIFF 匯款入口 + 結束前 20 分推播
-│       動到：src/app/(liff)/payment/, src/components/admin/payment-*
-└── worktree `coupon-ab` (2-3 天)
-    └── §8 回購券 A/B test (95 折，30 天 vs 45 天並行)
-        + E-15: experimentArm persist to User row
-        動到：src/app/(liff)/, src/lib/booking/post-completion-hook.ts
+            ↓ PR + merge
+
+Wave 4b: branch `wave-4b/payment-ux` (3-4 天)
+└── §6 付款對帳卡 + LIFF 匯款入口 + 結束前 20 分推播
+    動到：src/app/(liff)/payment/, src/components/admin/payment-*
+            ↓ PR + merge
+
+Wave 4c: branch `wave-4c/coupon-ab` (2-3 天)
+└── §8 回購券 A/B test (95 折，30 天 vs 45 天並行)
+    + E-15: experimentArm persist to User row
+    動到：src/app/(liff)/, src/lib/booking/post-completion-hook.ts
+            ↓ PR + merge
 ```
 
-**v1 → v2 變更**：
-- ❌ 原「三個全 sequential」→ ✅ **consultation 先，payment + coupon 並行**
-- ✅ 確認 payment 動 `payment/` + admin payment 區、coupon 動 booking 完成 hook + LIFF —— 檔案不重疊可並行
+**v2 → v3 變更**：
+- ❌ 原「payment + coupon 並行」→ ✅ **三條全 sequential**（branch-only 模式紀律）
+- 時間總和不變（payment 3-4 + coupon 2-3 ≈ 6-7 天，反正人類一次只能做一件）
 
 ---
 
 ### 13.6 Wave 5：報表 + UI Polish + QA（Week 6-7）
 
 ```
-worktree G: reports (4-5 天)
+Wave 5 主力：branch `wave-5/reports` (4-5 天)
 └── §10.2 8 個 widget（用 Wave 3.B 灌好的全年 demo data）
     Demo tenant switcher（盲點補丁）：admin 加 dropdown 切換 production / demo-2025
 
-main 直接做（不開 worktree）:
-├── §9 品牌設計規範套用（CSS 微調，獨立 PR）
-├── §11 AI 圖片替換（asset swap，獨立 PR）
+收尾小 PR（每個獨立 branch）：
+├── branch `wave-5/brand-polish` — §9 品牌設計規範套用（CSS 微調）
+├── branch `wave-5/ai-image-swap` — §11 AI 圖片替換
 └── 全面 QA + /design-review + dogfood **3-5 天**
 ```
 
-**v1 → v2 變更**：
+**v2 → v3 變更**：
+- ❌ 原「main 直接做」純 CSS/asset → ✅ 仍走 branch + PR（branch protection 強制）
 - ➖ Rich Menu 6 格已提前到 Wave 1.8
 - ➕ Demo tenant switcher（v1 盲點，老闆 demo 必需）
-- ✅ Dogfood 明確標 3-5 天（v1 沒講）
 
 ---
 
@@ -1540,15 +1555,18 @@ main 直接做（不開 worktree）:
 
 | 反 pattern | 為什麼錯 |
 |-----------|---------|
-| ❌ 一次開 5 個 worktree | Solo dev 不可能 deep work 5 件事 |
-| ❌ Schema 三併一 worktree | §1 出包連帶 §3/§8 全 rollback |
-| ❌ Calendar worktree 養 3 週 | main 一直在動，最後 rebase 地獄 |
+| ❌ 同時開 2 條以上 active branch | Solo dev sequential，多開純粹注意力碎裂 |
+| ❌ 用 worktree 想「平行」 | Solo sequential dev 用不到 worktree 任何獨特好處，純 overhead |
+| ❌ Schema 三併一 PR | §1 出包連帶 §3/§8 全 rollback |
+| ❌ Calendar branch 養 3 週不分階段 merge | main 一直在動，最後 rebase 地獄；應該每 2-3 天 sub-PR merge |
 | ❌ Wave 3 跟 Wave 2 並行 | calendar/excel 都吃 §1 schema，違反依賴 |
 | ❌ Calendar 估 5-7 天 | 1145 行 + 拖拉 + 新型別 = 真實 10-14 天 |
-| ❌ Wave 4 三全 sequential | payment + coupon 檔案不撞，可並行省 3 天 |
 | ❌ 跳 Wave 順序 | Wave 4 依賴 Wave 2，先做空中樓閣 |
 | ❌ 用 `db:push` 不用 `prisma migrate` | E-20 明確禁止 |
 | ❌ Wave 2 上 production 前不 snapshot DB | 一個 migration 出包就完蛋 |
+| ❌ 直接 push main | GitHub branch protection 會擋（已設定），但別嘗試 |
+| ❌ Pre-push hook 失敗用 `--no-verify` 繞過 | 失去 build/test 安全網 |
+| ❌ PR 沒看 Vercel preview 就 merge | 失去最後一道安全網 |
 | ❌ 5-6 週才給老闆看一次 | 中期方向錯，發現太晚 |
 
 ---
@@ -1557,41 +1575,68 @@ main 直接做（不開 worktree）:
 
 | | 數量 |
 |---|------|
-| Wave 1 PR 數量 | 8（不開 worktree） |
-| 全 V3 worktree 總數 | 5（schema-v3-service, calendar-v3, excel-import, consultation-flow, payment-ux, coupon-ab, reports = 7 個其中 2 個沒 worktree 走 branch + PR） |
-| **同時並存最多** | **2 個** |
-| 每個 worktree 壽命 | 2-14 天（calendar 例外） |
-| 整體預估 | **5-6 週**（v1 估 4-4.5 週是 Plan review 指出的低估，已修正回原 PRD 估時） |
-| 真實 blockers | 老闆服務確認表回傳、service-name-map.json 手工 |
+| Wave 1 PR 數量 | 8 條 branch sequential |
+| Wave 2 PR 數量 | 3 條 branch sequential（每條一個 schema migration）|
+| Wave 3 PR 數量 | 1 + ~6 sub-PR（excel 1 條、calendar 1 條長 branch 內部分 6 階段 merge） |
+| Wave 4 PR 數量 | 3 條 branch sequential |
+| Wave 5 PR 數量 | 3 條 branch（reports + brand polish + AI image swap）|
+| **總 branch 數** | **~18 條**（每條都走 PR + Vercel preview + 你親手 merge） |
+| **同時 active 上限** | **1 條** |
+| 每個 branch 壽命 | 1-3 天（calendar 例外 10-14 天，內部 sub-PR 階段 merge） |
+| Worktree 用量 | **0**（全 branch-only） |
+| 整體預估 | **5-6 週**（v2 修正後估時，sequential 不影響總時程） |
+| 真實 blockers | 老闆服務確認表回傳、service-name-map.json 手工、第三次老闆 demo 約時間 |
 
 ---
 
 ### 13.9 配套追蹤工具
 
 每天開工前看 [`tasks/in-flight.md`](../tasks/in-flight.md)，更新：
-- Active Worktrees（最多 2）
-- Open PRs
+- Active Branch（上限 1）
+- Open PRs（含 Vercel preview URL）
 - Completed This Wave
 - Next Up
 - **🚧 Blockers**（等老闆 / 等 service-name-map / 等 DB snapshot）
 
+### 13.10 GitHub Branch Protection（一次性設定）
+
+**必做**，這是 branch-only 模式的安全底線。
+
+到 GitHub repo → Settings → Branches → Add branch protection rule:
+```
+Branch name pattern: main
+
+✅ Require a pull request before merging
+   ✅ Require approvals: 1 (你自己 self-review)
+✅ Require status checks to pass before merging
+   ✅ Require branches to be up to date before merging
+✅ Do not allow bypassing the above settings
+```
+
+**效果**：你 / Claude / 任何人都**無法** `git push` 直接到 main，必須走 PR + 通過 lint + test 才能 merge。
+
 ---
 
-### 13.10 v1 → v2 修正履歷（為什麼變這樣）
+### 13.11 v1 → v2 → v3 修正履歷
 
-源頭：Plan agent adversarial review (2026-04-25)，評 v1 5.5/10 不核准。
+**v1 → v2** 源頭：Plan agent adversarial review (2026-04-25)，評 v1 5.5/10 不核准。
+- Wave 2 schema 從「1 worktree 三 commit」拆成「3 個獨立 PR sequential」
+- Wave 3「零檔案重疊」承認錯誤，改為「Wave 2a 完成後才能開」
+- Calendar 估時 5-7 天 → 10-14 天
+- Wave 4 順序從全 sequential 改為 consultation 先、payment+coupon 並行（後 v3 又改回 sequential）
+- Wave 1.6 拆成 1.6a 文案、1.6b 併入 Wave 3
+- Rich Menu 6 格從 Wave 5 提前到 Wave 1.8
+- 加跨 Wave 強制配套（CI gate, DB snapshot, feature flag, demo tenant guard, LIFF backward compat, 中期 demo）
+- 時程恢復 5-6 週
 
-**Critical 修正**：
-1. Wave 2 schema 從「1 worktree 三 commit」拆成「3 個獨立 worktree/PR sequential」
-2. Wave 3「零檔案重疊」承認錯誤，改為「Wave 2a 完成後才能開、且 calendar/excel 都依賴 §1」
-3. Calendar 估時 5-7 天 → 10-14 天
-4. Wave 4 順序從 consultation→payment→coupon 改為 consultation 先、payment+coupon 並行
-5. Wave 1.6 拆成 1.6a 文案、1.6b 行事曆顯示（後者併入 Wave 3）
+**v2 → v3** 源頭：CEO + Eng 雙 review (2026-04-25 同日)，雙確認「solo sequential dev 用 worktree 是 over-engineering」。
+- 全面從 worktree 模型改成 branch-only 模型
+- 同時 active 上限從「2 個 worktree」→「1 條 branch」
+- Wave 3 從「2 worktree 並存」→「excel 先 calendar 後 sequential」
+- Wave 4 從「consultation 先 + payment/coupon 並行」→「三條全 sequential」
+- Calendar 從「單一長 worktree」→「長 branch 內部 6 個 sub-PR 階段 merge」
+- 加 §13.10 GitHub branch protection 強制
+- Anti-pattern 重寫為 branch 視角
 
-**High 修正**：
-6. Rich Menu 6 格從 Wave 5 提前到 Wave 1.8
-7. 加跨 Wave 強制配套（CI gate, DB snapshot, feature flag, demo tenant guard, LIFF backward compat, 中期 demo）
-8. 老闆 blocker 明確列入 in-flight.md 追蹤
-
-**整體**：時程從 4-4.5 週恢復到 5-6 週（與 PRD 原估一致）。
+**v3 工作模式總結**：一條 branch、sequential 工作、每條 branch 走 PR + Vercel preview + 你親手 merge，main 永遠保持線上穩定。
 
