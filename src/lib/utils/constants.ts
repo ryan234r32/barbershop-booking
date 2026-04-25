@@ -21,8 +21,8 @@ export function generateAllSlots(startTime: string, endTime: string): string[] {
 export const MAX_VIOLATIONS = 3;
 export const VIOLATION_RESTRICTION_MONTHS = 1;
 
-export const AT_RISK_DAYS = 60;
-export const LAPSED_DAYS = 120;
+export const AT_RISK_DAYS = 100;
+export const LAPSED_DAYS = 180;
 
 export const BOOKING_LOCK_TTL_MS = 10_000;
 

@@ -23,7 +23,7 @@
 
 | Branch | Wave | Status | Open PR # | 預估完成 |
 |--------|------|--------|-----------|----------|
-| _(目前無)_ | | | | |
+| `wave-1.1/crm-thresholds` | 1.1 | PR open，等 review | _待補_ | 2026-04-25 |
 
 ---
 
@@ -59,7 +59,7 @@
 - [x] **切換到 branch-only 工作模式**（CEO + Eng review 雙確認 worktree 是 over-engineering）
 
 ### Wave 1：Phase A 雜事（branch-only sequential）
-- [ ] 1.1 §5 CRM 兩個常數（10 分）
+- [x] 1.1 §5 CRM 兩個常數（10 分）— PR 開立 2026-04-25 `wave-1.1/crm-thresholds`
 - [ ] 1.2 §5 segmentation 邏輯重寫（半天 + E-10 CTE）
 - [ ] 1.3 §11 #2 後台手動新增預約送出鈕修復（30 分）
 - [ ] 1.4 §11 #3a 後台「保持登入 30 天」cookie（30 分）
@@ -92,7 +92,7 @@
 
 ## 🎯 Next Up
 
-**今天**：Wave 1.1 — §5 CRM 兩個常數（**第一個完整 branch + PR + Vercel preview 流程練習**）
+**今天**：Wave 1.1 PR review + merge 後接 Wave 1.2（§5 segmentation 邏輯重寫，整合 E-10 CTE）
 
 ---
 
