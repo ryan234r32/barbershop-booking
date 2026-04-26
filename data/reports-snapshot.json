@@ -1,88 +1,88 @@
 {
-  "generatedAt": "2026-04-26T08:17:05.649Z",
+  "generatedAt": "2026-04-26T10:15:57.449Z",
   "source": "docs/2025預約表Ken老師.xlsx",
   "period": {
     "from": "2025-01",
     "to": "2025-12"
   },
   "totals": {
-    "bookings": 1379,
-    "revenue": 1360300,
-    "uniqueCustomers": 398,
-    "repeatCustomers": 204,
+    "bookings": 1169,
+    "revenue": 1348900,
+    "uniqueCustomers": 378,
+    "repeatCustomers": 187,
     "newCustomers": 224,
-    "repeatRate": 51.3
+    "repeatRate": 49.5
   },
   "monthlyRevenue": [
     {
       "month": "2025-01",
-      "count": 124,
-      "revenue": 136750,
+      "count": 106,
+      "revenue": 132950,
       "newCustomers": 32
     },
     {
       "month": "2025-02",
-      "count": 123,
+      "count": 99,
       "revenue": 125750,
       "newCustomers": 39
     },
     {
       "month": "2025-03",
-      "count": 129,
+      "count": 110,
       "revenue": 120900,
       "newCustomers": 39
     },
     {
       "month": "2025-04",
-      "count": 90,
+      "count": 82,
       "revenue": 89500,
       "newCustomers": 37
     },
     {
       "month": "2025-05",
-      "count": 138,
-      "revenue": 133300,
+      "count": 107,
+      "revenue": 129500,
       "newCustomers": 41
     },
     {
       "month": "2025-06",
-      "count": 110,
+      "count": 91,
       "revenue": 111000,
       "newCustomers": 38
     },
     {
       "month": "2025-07",
-      "count": 120,
+      "count": 102,
       "revenue": 115300,
       "newCustomers": 34
     },
     {
       "month": "2025-08",
-      "count": 99,
+      "count": 89,
       "revenue": 96200,
       "newCustomers": 35
     },
     {
       "month": "2025-09",
-      "count": 120,
+      "count": 99,
       "revenue": 109500,
       "newCustomers": 35
     },
     {
       "month": "2025-10",
-      "count": 111,
-      "revenue": 112400,
+      "count": 95,
+      "revenue": 108600,
       "newCustomers": 34
     },
     {
       "month": "2025-11",
-      "count": 104,
+      "count": 93,
       "revenue": 100700,
       "newCustomers": 33
     },
     {
       "month": "2025-12",
-      "count": 111,
+      "count": 96,
       "revenue": 109000,
       "newCustomers": 47
     }
@@ -90,13 +90,8 @@
   "servicePie": [
     {
       "category": "剪",
-      "count": 917,
-      "revenue": 860450
-    },
-    {
-      "category": "其他",
-      "count": 240,
-      "revenue": 20150
+      "count": 928,
+      "revenue": 862500
     },
     {
       "category": "染",
@@ -110,8 +105,8 @@
     },
     {
       "category": "燙",
-      "count": 40,
-      "revenue": 148500
+      "count": 37,
+      "revenue": 137100
     },
     {
       "category": "洗",
@@ -119,9 +114,19 @@
       "revenue": 17800
     },
     {
+      "category": "其他",
+      "count": 17,
+      "revenue": 13000
+    },
+    {
       "category": "漂",
       "count": 12,
       "revenue": 29600
+    },
+    {
+      "category": "未明",
+      "count": 5,
+      "revenue": 5100
     }
   ],
   "heatmap": {
@@ -146,67 +151,67 @@
     ],
     "data": [
       [
-        20,
+        19,
         18,
-        23,
-        27,
-        24,
+        21,
+        21,
+        16,
+        26,
+        26,
         30,
-        27,
-        36,
-        30
+        27
       ],
       [
+        17,
+        19,
+        22,
+        25,
+        21,
         18,
         22,
-        26,
-        29,
-        28,
-        29,
-        29,
-        31,
-        36
+        25,
+        33
       ],
       [
-        20,
+        19,
         18,
-        27,
-        30,
-        30,
-        32,
-        37,
-        32,
-        31
-      ],
-      [
-        27,
-        23,
-        34,
-        29,
-        34,
-        30,
-        30,
+        24,
+        25,
+        21,
+        25,
         33,
-        37
+        27,
+        29
       ],
       [
-        38,
-        38,
-        44,
-        41,
-        44,
-        42,
-        36,
-        36,
-        26
+        26,
+        21,
+        34,
+        27,
+        29,
+        25,
+        29,
+        27,
+        32
       ],
       [
-        2,
-        3,
-        3,
-        3,
-        2,
-        3,
+        36,
+        34,
+        36,
+        32,
+        31,
+        34,
+        32,
+        31,
+        21
+      ],
+      [
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
         1,
         0,
         0
@@ -225,12 +230,6 @@
       "count": 225,
       "revenue": 206300,
       "avg": 917
-    },
-    {
-      "name": "",
-      "count": 211,
-      "revenue": 5100,
-      "avg": 24
     },
     {
       "name": "新女剪",
@@ -273,169 +272,175 @@
       "count": 34,
       "revenue": 17800,
       "avg": 524
+    },
+    {
+      "name": "補染",
+      "count": 30,
+      "revenue": 61900,
+      "avg": 2063
     }
   ],
   "customerSegments": [
     {
       "segment": "NEW",
-      "count": 60,
-      "pct": 15.1
+      "count": 61,
+      "pct": 16.1
     },
     {
       "segment": "REGULAR",
-      "count": 53,
-      "pct": 13.3
+      "count": 58,
+      "pct": 15.3
     },
     {
       "segment": "VIP",
-      "count": 72,
-      "pct": 18.1
+      "count": 64,
+      "pct": 16.9
     },
     {
       "segment": "AT_RISK",
-      "count": 75,
-      "pct": 18.8
+      "count": 66,
+      "pct": 17.5
     },
     {
       "segment": "LAPSED",
-      "count": 138,
-      "pct": 34.7
+      "count": 129,
+      "pct": 34.1
     }
   ],
   "arpuTrend": [
     {
       "month": "2025-01",
-      "activeCustomers": 81,
-      "avgPerCustomer": 1688,
-      "avgPerBooking": 1103
+      "activeCustomers": 79,
+      "avgPerCustomer": 1683,
+      "avgPerBooking": 1254
     },
     {
       "month": "2025-02",
-      "activeCustomers": 82,
-      "avgPerCustomer": 1534,
-      "avgPerBooking": 1022
+      "activeCustomers": 81,
+      "avgPerCustomer": 1552,
+      "avgPerBooking": 1270
     },
     {
       "month": "2025-03",
-      "activeCustomers": 88,
-      "avgPerCustomer": 1374,
-      "avgPerBooking": 937
+      "activeCustomers": 86,
+      "avgPerCustomer": 1406,
+      "avgPerBooking": 1099
     },
     {
       "month": "2025-04",
-      "activeCustomers": 71,
-      "avgPerCustomer": 1261,
-      "avgPerBooking": 994
+      "activeCustomers": 70,
+      "avgPerCustomer": 1279,
+      "avgPerBooking": 1091
     },
     {
       "month": "2025-05",
-      "activeCustomers": 85,
-      "avgPerCustomer": 1568,
-      "avgPerBooking": 966
+      "activeCustomers": 81,
+      "avgPerCustomer": 1599,
+      "avgPerBooking": 1210
     },
     {
       "month": "2025-06",
-      "activeCustomers": 72,
-      "avgPerCustomer": 1542,
-      "avgPerBooking": 1009
+      "activeCustomers": 71,
+      "avgPerCustomer": 1563,
+      "avgPerBooking": 1220
     },
     {
       "month": "2025-07",
-      "activeCustomers": 87,
-      "avgPerCustomer": 1325,
-      "avgPerBooking": 961
+      "activeCustomers": 83,
+      "avgPerCustomer": 1389,
+      "avgPerBooking": 1130
     },
     {
       "month": "2025-08",
-      "activeCustomers": 68,
-      "avgPerCustomer": 1415,
-      "avgPerBooking": 972
+      "activeCustomers": 67,
+      "avgPerCustomer": 1436,
+      "avgPerBooking": 1081
     },
     {
       "month": "2025-09",
-      "activeCustomers": 81,
-      "avgPerCustomer": 1352,
-      "avgPerBooking": 913
+      "activeCustomers": 77,
+      "avgPerCustomer": 1422,
+      "avgPerBooking": 1106
     },
     {
       "month": "2025-10",
-      "activeCustomers": 78,
-      "avgPerCustomer": 1441,
-      "avgPerBooking": 1013
+      "activeCustomers": 77,
+      "avgPerCustomer": 1410,
+      "avgPerBooking": 1143
     },
     {
       "month": "2025-11",
       "activeCustomers": 76,
       "avgPerCustomer": 1325,
-      "avgPerBooking": 968
+      "avgPerBooking": 1083
     },
     {
       "month": "2025-12",
-      "activeCustomers": 84,
-      "avgPerCustomer": 1298,
-      "avgPerBooking": 982
+      "activeCustomers": 83,
+      "avgPerCustomer": 1313,
+      "avgPerBooking": 1135
     }
   ],
   "cohorts": [
     {
       "cohortMonth": "2025-01",
-      "size": 81,
+      "size": 79,
       "returned30": 12,
       "returned60": 34,
       "returned90": 43
     },
     {
       "cohortMonth": "2025-02",
-      "size": 55,
+      "size": 54,
       "returned30": 7,
       "returned60": 17,
       "returned90": 24
     },
     {
       "cohortMonth": "2025-03",
-      "size": 45,
+      "size": 43,
       "returned30": 4,
       "returned60": 10,
       "returned90": 11
     },
     {
       "cohortMonth": "2025-04",
-      "size": 27,
+      "size": 26,
       "returned30": 1,
       "returned60": 4,
       "returned90": 8
     },
     {
       "cohortMonth": "2025-05",
-      "size": 29,
+      "size": 26,
       "returned30": 3,
       "returned60": 5,
       "returned90": 7
     },
     {
       "cohortMonth": "2025-06",
-      "size": 22,
+      "size": 21,
       "returned30": 1,
       "returned60": 2,
       "returned90": 5
     },
     {
       "cohortMonth": "2025-07",
-      "size": 32,
+      "size": 28,
       "returned30": 1,
       "returned60": 2,
       "returned90": 4
     },
     {
       "cohortMonth": "2025-08",
-      "size": 18,
+      "size": 17,
       "returned30": 1,
       "returned60": 2,
       "returned90": 2
     },
     {
       "cohortMonth": "2025-09",
-      "size": 21,
+      "size": 17,
       "returned30": 2,
       "returned60": 3,
       "returned90": 3
@@ -456,7 +461,7 @@
     },
     {
       "cohortMonth": "2025-12",
-      "size": 29,
+      "size": 28,
       "returned30": 1,
       "returned60": 1,
       "returned90": 1
@@ -465,63 +470,63 @@
   "lapsedTrend": [
     {
       "month": "2025-01",
-      "active": 81,
+      "active": 79,
       "lapsed": 0
     },
     {
       "month": "2025-02",
-      "active": 136,
+      "active": 133,
       "lapsed": 0
     },
     {
       "month": "2025-03",
-      "active": 181,
+      "active": 176,
       "lapsed": 0
     },
     {
       "month": "2025-04",
-      "active": 185,
-      "lapsed": 23
+      "active": 180,
+      "lapsed": 22
     },
     {
       "month": "2025-05",
-      "active": 191,
-      "lapsed": 46
+      "active": 184,
+      "lapsed": 44
     },
     {
       "month": "2025-06",
-      "active": 183,
-      "lapsed": 76
+      "active": 177,
+      "lapsed": 72
     },
     {
       "month": "2025-07",
-      "active": 197,
-      "lapsed": 94
+      "active": 188,
+      "lapsed": 89
     },
     {
       "month": "2025-08",
-      "active": 192,
-      "lapsed": 117
+      "active": 185,
+      "lapsed": 109
     },
     {
       "month": "2025-09",
-      "active": 192,
-      "lapsed": 138
+      "active": 182,
+      "lapsed": 129
     },
     {
       "month": "2025-10",
-      "active": 175,
-      "lapsed": 171
+      "active": 169,
+      "lapsed": 158
     },
     {
       "month": "2025-11",
-      "active": 171,
-      "lapsed": 198
+      "active": 166,
+      "lapsed": 184
     },
     {
       "month": "2025-12",
-      "active": 164,
-      "lapsed": 234
+      "active": 162,
+      "lapsed": 216
     }
   ]
 }
