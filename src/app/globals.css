@@ -124,6 +124,11 @@
   --color-success: #4A7C59;
   --color-warning: #C88B3B;
   --color-danger: #A84A3B;
+
+  /* Service category accents — calendar event chips, service pies. Picked to
+     read clearly against bg + surface in zh-TW typography. */
+  --color-service-perm: #C2410C;  /* orange-700 — 燙髮 */
+  --color-service-color: #7E22CE; /* purple-700 — 染髮 */
 }
 
 /* 本產品不使用 dark mode — 品牌設計規範統一暖色調 */

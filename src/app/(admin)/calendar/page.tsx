@@ -1151,9 +1151,9 @@ export default function CalendarPage() {
                           } else if (svc.includes("漂")) {
                             chipColor = "bg-[var(--color-warning)]/25 text-[var(--color-warning)]";
                           } else if (svc.includes("染")) {
-                            chipColor = "bg-purple-100 text-purple-700";
+                            chipColor = "bg-[var(--color-service-color)]/15 text-[var(--color-service-color)]";
                           } else if (svc.includes("燙")) {
-                            chipColor = "bg-orange-100 text-orange-700";
+                            chipColor = "bg-[var(--color-service-perm)]/15 text-[var(--color-service-perm)]";
                           } else if (svc.includes("剪")) {
                             chipColor = "bg-[var(--color-brand)]/15 text-[var(--color-brand)]";
                           } else {
@@ -1199,11 +1199,11 @@ export default function CalendarPage() {
               <span className="text-[var(--color-text-body)]">剪</span>
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded bg-orange-200" />
+              <span className="w-2.5 h-2.5 rounded bg-[var(--color-service-perm)]/30" />
               <span className="text-[var(--color-text-body)]">燙</span>
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded bg-purple-200" />
+              <span className="w-2.5 h-2.5 rounded bg-[var(--color-service-color)]/30" />
               <span className="text-[var(--color-text-body)]">染</span>
             </span>
             <span className="flex items-center gap-1">

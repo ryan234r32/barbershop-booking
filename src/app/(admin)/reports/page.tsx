@@ -81,11 +81,11 @@ const fetcher = (url: string) =>
 
 const SERVICE_COLORS: Record<string, string> = {
   剪: "bg-[var(--color-brand)]",
-  燙: "bg-orange-400",
-  染: "bg-purple-400",
+  燙: "bg-[var(--color-service-perm)]",
+  染: "bg-[var(--color-service-color)]",
   漂: "bg-[var(--color-warning)]",
   護: "bg-[var(--color-success)]",
-  洗: "bg-cyan-400",
+  洗: "bg-[var(--color-success)]/60",
   其他: "bg-[var(--color-text-muted)]",
 };
 
@@ -336,9 +336,9 @@ export default function ReportsPage() {
 
 const SEGMENT_COLOR: Record<CustomerSegment["segment"], string> = {
   NEW: "var(--color-brand)",
-  REGULAR: "#60a5fa",
-  VIP: "#fbbf24",
-  AT_RISK: "#fb923c",
+  REGULAR: "var(--color-service-color)",
+  VIP: "var(--color-warning)",
+  AT_RISK: "var(--color-service-perm)",
   LAPSED: "var(--color-text-muted)",
 };
 const SEGMENT_LABEL: Record<CustomerSegment["segment"], string> = {
