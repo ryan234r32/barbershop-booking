@@ -64,7 +64,7 @@ export function HorizontalDateStrip({ currentDate, onSelect }: Props) {
   return (
     <div
       ref={containerRef}
-      className="flex items-stretch mb-2 select-none overflow-x-auto scrollbar-hide pb-1 w-full"
+      className="flex items-stretch mb-1.5 select-none overflow-x-auto scrollbar-hide w-full"
       style={{ WebkitOverflowScrolling: "touch" }}
     >
       {dates.map((d) => {
@@ -77,7 +77,7 @@ export function HorizontalDateStrip({ currentDate, onSelect }: Props) {
           <button
             key={dStr}
             onClick={() => onSelect(d)}
-            className={`shrink-0 flex flex-col items-center gap-0.5 py-2 rounded-lg transition-colors ${
+            className={`shrink-0 flex flex-col items-center gap-0 py-1.5 rounded-lg transition-colors relative ${
               selected
                 ? "bg-[var(--color-brand)]"
                 : "hover:bg-[var(--color-surface)]"
@@ -85,7 +85,7 @@ export function HorizontalDateStrip({ currentDate, onSelect }: Props) {
             style={{ width: cellWidth }}
           >
             <span
-              className={`text-[11px] leading-none ${
+              className={`text-[10px] leading-none ${
                 selected
                   ? "text-[var(--color-bg)]/80"
                   : isWeekend
@@ -96,7 +96,7 @@ export function HorizontalDateStrip({ currentDate, onSelect }: Props) {
               {WEEKDAYS[wdIndex]}
             </span>
             <span
-              className={`text-[15px] font-semibold leading-tight ${
+              className={`text-[14px] font-semibold leading-tight mt-0.5 ${
                 selected
                   ? "text-[var(--color-bg)]"
                   : isWeekend
@@ -107,7 +107,7 @@ export function HorizontalDateStrip({ currentDate, onSelect }: Props) {
               {d.getDate()}
             </span>
             {isToday && !selected && (
-              <span className="w-1 h-1 rounded-full bg-[var(--color-brand)]" />
+              <span className="absolute bottom-1 w-1 h-1 rounded-full bg-[var(--color-brand)]" />
             )}
           </button>
         );
