@@ -1,14 +1,27 @@
 import { NextRequest } from "next/server";
-import * as fs from "fs";
-import * as path from "path";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
+import { computeRange, previousPeriod, type RangeType } from "@/lib/reports/time-range";
+import {
+  computeTotals,
+  computeTrend,
+  computeServicePie,
+  computeHeatmap,
+  computeTopServices,
+  computeTopCustomers,
+  computeCustomerSegments,
+  computePaymentMix,
+} from "@/lib/reports/aggregate";
 
 /**
- * GET /api/reports — historical Excel snapshot stats (Wave 5).
+ * GET /api/reports?range=week|month|quarter|year&offset=0
  *
- * Reads pre-generated data/reports-snapshot.json (built via
- * `npm run reports:snapshot`). Live V3 system stats merged in
- * follow-up — for now serves 2025 historical data only.
+ * Live aggregations against Booking + Payment + User. Replaces the static
+ * Excel snapshot once historical data is in DB (PRD-v3 §10).
+ *
+ *   offset = 0  → 本週 / 本月 / 本季 / 今年
+ *   offset = -1 → 上週 / 上月 / 上季 / 去年
+ *
+ * Returns a `previousTotals` block for ±% comparison KPI cards.
  */
 export async function GET(request: NextRequest) {
   const admin = await getAdminFromCookie(request);
@@ -16,28 +29,71 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const snapshotPath = path.join(process.cwd(), "data", "reports-snapshot.json");
-  if (!fs.existsSync(snapshotPath)) {
-    return Response.json(
-      {
-        error: "Snapshot not generated",
-        message: "Run `npm run reports:snapshot` to generate from Excel",
-      },
-      { status: 503 },
-    );
+  const sp = request.nextUrl.searchParams;
+  const rangeParam = (sp.get("range") || "year") as RangeType;
+  const offset = parseInt(sp.get("offset") || "0", 10) || 0;
+
+  if (!["week", "month", "quarter", "year"].includes(rangeParam)) {
+    return Response.json({ error: "invalid range" }, { status: 400 });
   }
 
+  const current = computeRange(rangeParam, offset);
+  const prev = previousPeriod(current);
+  const tenantId = admin.tenantId;
+
   try {
-    const raw = fs.readFileSync(snapshotPath, "utf-8");
-    const snapshot = JSON.parse(raw);
-    return Response.json(snapshot, {
-      headers: {
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
-      },
-    });
-  } catch (err) {
+    const [
+      totals,
+      prevTotals,
+      trend,
+      servicePie,
+      heatmap,
+      topServices,
+      topCustomers,
+      customerSegments,
+      paymentMix,
+    ] = await Promise.all([
+      computeTotals(tenantId, current),
+      computeTotals(tenantId, prev),
+      computeTrend(tenantId, current),
+      computeServicePie(tenantId, current),
+      computeHeatmap(tenantId, current),
+      computeTopServices(tenantId, current, 10),
+      computeTopCustomers(tenantId, current, 20),
+      computeCustomerSegments(tenantId), // segment is point-in-time, no range
+      computePaymentMix(tenantId, current),
+    ]);
+
     return Response.json(
-      { error: "Failed to read snapshot", detail: String(err) },
+      {
+        range: {
+          type: current.type,
+          offset: current.offset,
+          label: current.label,
+          fromIso: current.fromIso,
+          toIso: current.toIso,
+        },
+        previousLabel: prev.label,
+        totals,
+        previousTotals: prevTotals,
+        trend,
+        servicePie,
+        heatmap,
+        topServices,
+        topCustomers,
+        customerSegments,
+        paymentMix,
+      },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+        },
+      },
+    );
+  } catch (err) {
+    console.error("/api/reports failed", err);
+    return Response.json(
+      { error: "Failed to aggregate", detail: String(err) },
       { status: 500 },
     );
   }
