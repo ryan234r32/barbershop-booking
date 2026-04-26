@@ -61,14 +61,53 @@ interface MonthStats {
 // ─── Worksheet parsing ─────────────────────────────────────────────────────
 
 const MONTH_SHEET_PATTERN = /^2025\d{2}$/; // 202501–202512
-const HOUR_ROW_REGEX = /^(\d{1,2})[:：](\d{2})$/;
 
 /**
- * Each month worksheet layout (per PRD §10.1):
- *   Row 1: 時間 | 星期一 (3 cols: 服務/客名/金額) | 星期二 | ... | 星期日
- *   Row 2: 日期 | <date for Mon> | <date for Tue> | ...
- *   Row 3+: <hour like 11:00> | service/customer/amount per weekday slot
+ * Actual Excel layout (verified 2026-04-26 by inspection):
+ *
+ * Each weekly block, weekday columns:
+ *   Mon: 2-4   Tue: 5-7   Wed: col 8 only (closed)   Thu: 9-11
+ *   Fri: 12-14   Sat: 15-17   Sun: 18-20
+ * (Wed gets only 1 col — store usually closed Wednesdays, no booking storage needed)
+ *
+ * Each block of rows:
+ *   R+0: 「時間」header row (column 1 == "時間")
+ *   R+1: 「日期」row with date values per weekday
+ *   R+2 to R+10: 9 hour rows (11:00 → 19:00)
+ *   R+11+: spacer / 日營收 / 貨款 rows
+ *
+ * Find blocks by scanning column 1 for the literal "時間".
  */
+
+interface WeekdayDef { name: string; svc: number; cust: number; amt: number; }
+const WEEKDAYS_LAYOUT: WeekdayDef[] = [
+  { name: "Mon", svc: 2, cust: 3, amt: 4 },
+  { name: "Tue", svc: 5, cust: 6, amt: 7 },
+  // Wed (col 8) intentionally skipped — store closed, no bookings
+  { name: "Thu", svc: 9, cust: 10, amt: 11 },
+  { name: "Fri", svc: 12, cust: 13, amt: 14 },
+  { name: "Sat", svc: 15, cust: 16, amt: 17 },
+  { name: "Sun", svc: 18, cust: 19, amt: 20 },
+];
+
+function readCellString(cell: ExcelJS.Cell): string {
+  const v = cell.value;
+  if (v == null) return "";
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === "object" && "result" in v) return String((v as { result: unknown }).result ?? "").trim();
+  if (typeof v === "object" && "richText" in v) {
+    return (v as { richText: { text: string }[] }).richText.map((r) => r.text).join("").trim();
+  }
+  return String(v).trim();
+}
+
+function readCellDate(cell: ExcelJS.Cell): Date | null {
+  const v = cell.value;
+  if (v instanceof Date) return v;
+  if (typeof v === "number") return new Date(v);
+  return null;
+}
+
 function parseMonthSheet(ws: ExcelJS.Worksheet): {
   bookings: ParsedBooking[];
   warnings: string[];
@@ -76,89 +115,74 @@ function parseMonthSheet(ws: ExcelJS.Worksheet): {
   const bookings: ParsedBooking[] = [];
   const warnings: string[] = [];
 
-  // Step 1: Read row 2 (日期) → build column → date map
-  const dateRow = ws.getRow(2);
-  const colDates = new Map<number, Date | null>();
-  // Cols 2-22 are 7 weekdays × 3 sub-cols. Each weekday's first col is the day.
-  for (let weekdayIdx = 0; weekdayIdx < 7; weekdayIdx++) {
-    const firstColForDay = 2 + weekdayIdx * 3;
-    const cell = dateRow.getCell(firstColForDay);
-    const v = cell.value;
-    let date: Date | null = null;
-    if (v instanceof Date) date = v;
-    else if (typeof v === "number") date = new Date(v); // Excel serial date — exceljs sometimes returns raw number
-    // The 3 sub-cols all map to the same date
-    for (let sub = 0; sub < 3; sub++) {
-      colDates.set(firstColForDay + sub, date);
-    }
+  // Find all weekly block start rows (column 1 == "時間")
+  const blockStartRows: number[] = [];
+  for (let r = 1; r <= ws.rowCount; r++) {
+    if (readCellString(ws.getCell(r, 1)) === "時間") blockStartRows.push(r);
   }
 
-  // Step 2: Walk each hour row (row 3 onwards)
-  for (let rowNum = 3; rowNum <= ws.rowCount; rowNum++) {
-    const row = ws.getRow(rowNum);
-    const hourCell = row.getCell(1).value;
-    if (!hourCell) continue;
-    const hourStr = String(hourCell).trim();
-    const hourMatch = HOUR_ROW_REGEX.exec(hourStr);
-    if (!hourMatch) continue;
-    const hour = parseInt(hourMatch[1], 10);
-    const startTime = `${String(hour).padStart(2, "0")}:00`;
+  for (const blockStart of blockStartRows) {
+    const dateRow = ws.getRow(blockStart + 1);
+    const weekdayDates = new Map<string, Date | null>();
+    for (const wd of WEEKDAYS_LAYOUT) {
+      weekdayDates.set(wd.name, readCellDate(dateRow.getCell(wd.svc)));
+    }
 
-    for (let weekdayIdx = 0; weekdayIdx < 7; weekdayIdx++) {
-      const baseCol = 2 + weekdayIdx * 3;
-      const serviceCell = row.getCell(baseCol).value;
-      const customerCell = row.getCell(baseCol + 1).value;
-      const amountCell = row.getCell(baseCol + 2).value;
+    // 9 hour rows: R+2 to R+10 (11:00 to 19:00)
+    for (let hourOffset = 0; hourOffset < 9; hourOffset++) {
+      const hour = 11 + hourOffset;
+      const rowNum = blockStart + 2 + hourOffset;
+      if (rowNum > ws.rowCount) break;
+      const startTime = `${String(hour).padStart(2, "0")}:00`;
+      const row = ws.getRow(rowNum);
 
-      const serviceRaw = serviceCell ? String(serviceCell).trim() : "";
-      const customerRaw = customerCell ? String(customerCell).trim() : "";
-      const amountRaw = amountCell != null ? String(amountCell).trim() : "";
+      for (const wd of WEEKDAYS_LAYOUT) {
+        const date = weekdayDates.get(wd.name);
+        if (!date) continue; // weekday absent in this block (e.g. Jan 1 Wed → first block has no Mon/Tue)
 
-      if (!serviceRaw && !customerRaw) continue; // empty slot
+        const serviceRaw = readCellString(row.getCell(wd.svc));
+        const customerRaw = readCellString(row.getCell(wd.cust));
+        const amountRaw = readCellString(row.getCell(wd.amt));
 
-      // Parse amount
-      let amount: number | null = null;
-      const amountMatch = /^\d+/.exec(amountRaw);
-      if (amountMatch) amount = parseInt(amountMatch[0], 10);
+        if (!serviceRaw && !customerRaw) continue;
 
-      // Detect 「新」 prefix → new customer
-      const isNewCustomer = serviceRaw.startsWith("新");
+        let amount: number | null = null;
+        const amountMatch = /^(\d+)/.exec(amountRaw);
+        if (amountMatch) amount = parseInt(amountMatch[1], 10);
 
-      // Notes: special markers like 休假 / 體檢 / 掛X門診
-      const notesRegex = /(休假|體檢|門診|請假|公休)/;
-      const notes = notesRegex.test(customerRaw) || notesRegex.test(serviceRaw)
-        ? customerRaw || serviceRaw
-        : null;
+        const isNewCustomer = serviceRaw.startsWith("新");
 
-      // Time override e.g. "16：30 許俊宏"
-      let actualStartTime = startTime;
-      const timeOverrideMatch = /^(\d{1,2})[:：](\d{2})\s*(.+)$/.exec(customerRaw);
-      let customerName = customerRaw;
-      if (timeOverrideMatch) {
-        actualStartTime = `${String(parseInt(timeOverrideMatch[1], 10)).padStart(2, "0")}:${timeOverrideMatch[2]}`;
-        customerName = timeOverrideMatch[3].trim();
-      }
+        const notesRegex = /(休假|體檢|門診|請假|公休|漲價)/;
+        const notes = notesRegex.test(customerRaw) || notesRegex.test(serviceRaw)
+          ? customerRaw || serviceRaw
+          : null;
 
-      const date = colDates.get(baseCol) || null;
-      const weekday = weekdayIdx + 1;
+        let actualStartTime = startTime;
+        const timeOverrideMatch = /^(\d{1,2})[:：](\d{2})\s*(.+)$/.exec(customerRaw);
+        let customerName = customerRaw;
+        if (timeOverrideMatch) {
+          actualStartTime = `${String(parseInt(timeOverrideMatch[1], 10)).padStart(2, "0")}:${timeOverrideMatch[2]}`;
+          customerName = timeOverrideMatch[3].trim();
+        }
 
-      bookings.push({
-        monthSheet: ws.name,
-        date,
-        weekday,
-        startTime: actualStartTime,
-        serviceName: serviceRaw,
-        customerName,
-        amount,
-        isNewCustomer,
-        notes,
-        rawCells: { service: serviceRaw, customer: customerRaw, amount: amountRaw },
-      });
+        bookings.push({
+          monthSheet: ws.name,
+          date,
+          weekday: WEEKDAYS_LAYOUT.indexOf(wd) + 1,
+          startTime: actualStartTime,
+          serviceName: serviceRaw,
+          customerName,
+          amount,
+          isNewCustomer,
+          notes,
+          rawCells: { service: serviceRaw, customer: customerRaw, amount: amountRaw },
+        });
 
-      if (!amount && !notes) {
-        warnings.push(
-          `[${ws.name}] row ${rowNum} col ${baseCol}: missing amount for ${serviceRaw} / ${customerName}`,
-        );
+        if (!amount && !notes && serviceRaw && customerRaw) {
+          warnings.push(
+            `[${ws.name}] row ${rowNum} ${wd.name}: missing amount — ${serviceRaw} / ${customerName}`,
+          );
+        }
       }
     }
   }
