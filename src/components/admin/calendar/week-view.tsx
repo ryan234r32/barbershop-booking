@@ -35,9 +35,10 @@ interface Props {
   setView: (v: "day" | "week" | "month") => void;
   onOpenBookingDetail: (b: Booking) => void;
   mutateBookings: () => void;
+  /** Row height in px — controlled by useZoom (PRD-v3 D-1). */
+  slotHeight: number;
 }
 
-const WEEK_ROW_HEIGHT = 70;
 const WEEK_THEAD_HEIGHT = 34;
 
 export function WeekView({
@@ -50,6 +51,7 @@ export function WeekView({
   setView,
   onOpenBookingDetail,
   mutateBookings,
+  slotHeight,
 }: Props) {
   const { toast } = useToast();
 
@@ -190,7 +192,7 @@ export function WeekView({
           </thead>
           <tbody>
             {HOURS.map((hour) => (
-              <tr key={hour} style={{ height: WEEK_ROW_HEIGHT }}>
+              <tr key={hour} style={{ height: slotHeight }}>
                 <td className="p-0 text-[11px] text-[var(--color-text-muted)] font-mono align-top pt-1 text-center border-t border-[var(--color-surface)]/60">
                   {hour.slice(0, 2)}
                 </td>
@@ -316,7 +318,7 @@ export function WeekView({
           const m = now.getMinutes();
           if (h < 11 || h >= 20) return null;
           if (!weekDates.some((d) => isToday(d))) return null;
-          const top = WEEK_THEAD_HEIGHT + (h - 11 + m / 60) * WEEK_ROW_HEIGHT;
+          const top = WEEK_THEAD_HEIGHT + (h - 11 + m / 60) * slotHeight;
           return (
             <div
               className="absolute left-0 right-0 pointer-events-none z-20 flex items-center"
