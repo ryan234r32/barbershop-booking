@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import useSWR from "swr";
-import { Calendar, MessageSquare, BarChart3, MoreHorizontal } from "lucide-react";
+import { Calendar, MessageSquare, LayoutDashboard, FileBarChart } from "lucide-react";
 
+// V3.5 Phase 3: tab bar promotes 儀表板 (今日對帳) to the bottom-bar so the
+// 8pm settlement workflow is one tap away on mobile. /more was barely used —
+// secondary nav lives in the sidebar (lg:hidden hamburger).
 const TABS = [
   { href: "/calendar", label: "日曆", icon: Calendar },
   { href: "/messages", label: "訊息", icon: MessageSquare },
-  { href: "/analytics", label: "報表", icon: BarChart3 },
-  { href: "/more", label: "更多", icon: MoreHorizontal },
+  { href: "/dashboard", label: "儀表板", icon: LayoutDashboard },
+  { href: "/reports", label: "報表", icon: FileBarChart },
 ] as const;
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
