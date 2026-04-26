@@ -278,6 +278,8 @@ model Booking {
   @@index([tenantId, userId])
   @@index([tenantId, date, startTime])
   @@index([tenantId, status, adminAcknowledgedAt])
+  /// PRD-v3 §5 + E-10: covers CRM segmentation CTE (filter by status+date, GROUP BY userId).
+  @@index([tenantId, userId, status, date])
   @@map("bookings")
 }
 
