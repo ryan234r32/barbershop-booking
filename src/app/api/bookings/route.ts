@@ -46,12 +46,8 @@ export async function GET(request: NextRequest) {
       // LIFF callers can ONLY see their own bookings. Query params userId /
       // lineUserId are ignored — caller identity always comes from the verified
       // ID token, never from URL params.
-      const user = await prisma.user.findUnique({
-        where: { tenantId_lineUserId: { tenantId, lineUserId: auth.lineUserId } },
-        select: { id: true },
-      });
-      if (!user) return Response.json({ bookings: [], total: 0, page, limit });
-      where.userId = user.id;
+      // Use nested where to JOIN in single round trip instead of pre-fetching user.id.
+      where.user = { lineUserId: auth.lineUserId };
     } else {
       // Admin can optionally filter by userId or lineUserId.
       const userId = searchParams.get("userId");

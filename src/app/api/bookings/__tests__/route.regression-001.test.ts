@@ -80,7 +80,6 @@ describe("GET /api/bookings — auth regression (ISSUE-001)", () => {
   it("LIFF caller is scoped to their own bookings — query param lineUserId is IGNORED", async () => {
     getAdminFromCookie.mockResolvedValue(null);
     verifyLiffIdToken.mockResolvedValue({ sub: "Uowner", name: "Me" });
-    userFindUnique.mockResolvedValue({ id: "user-owner" });
 
     // Attacker passes someone else's lineUserId as a query param
     const url = new URL("http://x/api/bookings?lineUserId=Uvictim");
@@ -89,14 +88,16 @@ describe("GET /api/bookings — auth regression (ISSUE-001)", () => {
 
     await GET(attackReq);
 
-    // Must scope to the TOKEN'S user, not the query param's
-    expect(userFindUnique).toHaveBeenCalledWith({
-      where: { tenantId_lineUserId: { tenantId: "t1", lineUserId: "Uowner" } },
-      select: { id: true },
-    });
+    // Must scope to the TOKEN'S sub via Prisma nested where (single round trip).
+    // Pre-fetching user.id (extra query) was the old N+1 pattern; now we let
+    // Prisma JOIN. Security invariant unchanged: lineUserId comes from the
+    // verified token, never from query params.
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ tenantId: "t1", userId: "user-owner" }),
+        where: expect.objectContaining({
+          tenantId: "t1",
+          user: { lineUserId: "Uowner" },
+        }),
       })
     );
   });
@@ -104,13 +105,20 @@ describe("GET /api/bookings — auth regression (ISSUE-001)", () => {
   it("LIFF caller with no user record returns empty list (not 500, not leak)", async () => {
     getAdminFromCookie.mockResolvedValue(null);
     verifyLiffIdToken.mockResolvedValue({ sub: "Unewbie", name: "New" });
-    userFindUnique.mockResolvedValue(null);
+    // No user lookup happens — Prisma JOIN naturally returns [] when the
+    // nested user filter matches no rows.
 
     const res = await GET(req({ liffToken: "token" }));
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.bookings).toEqual([]);
     expect(body.total).toBe(0);
-    expect(findMany).not.toHaveBeenCalled();
+    // findMany IS called (replacing the pre-fetch); JOIN returns [] for unknown
+    // lineUserId — same security/correctness guarantee, one fewer round trip.
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ user: { lineUserId: "Unewbie" } }),
+      })
+    );
   });
 });
