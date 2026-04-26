@@ -9,7 +9,7 @@
  */
 
 import React, { memo } from "react";
-import { WEEKDAYS, abbreviateService, chipClassForService, isPaid } from "./utils";
+import { WEEKDAYS, abbreviateService, chipClassForStatus } from "./utils";
 import type { Booking, MonthlySummary } from "./types";
 
 interface Props {
@@ -76,6 +76,23 @@ function MonthViewBase({
                 .slice(0, 3);
               const isHoliday = holidayDates.has(dateStr);
 
+              // Density bar (B4 designer review): width = bookings / capacity (9).
+              // Color shifts green → amber → red as the day fills up. A full
+              // month's density is readable in one saccade — no counting.
+              const densityRatio = Math.min(1, count / 9);
+              const densityWidth = `${Math.round(densityRatio * 100)}%`;
+              let densityColor = "bg-[var(--color-success)]";
+              if (densityRatio >= 0.85) {
+                densityColor = "bg-[var(--color-danger)]";
+              } else if (densityRatio >= 0.55) {
+                densityColor = "bg-[var(--color-warning)]";
+              }
+
+              // Chips: at 108px cell, max 2 fit comfortably with the date row,
+              // density bar, and the "+N" overflow. Designer review.
+              const visibleChips = dayBookings.slice(0, 2);
+              const overflow = count - visibleChips.length;
+
               cells.push(
                 <button
                   key={day}
@@ -84,40 +101,49 @@ function MonthViewBase({
                     setView("day");
                   }}
                   className={`h-[108px] rounded-lg flex flex-col items-stretch p-1.5 relative transition-colors hover:bg-[var(--color-surface)] ${
-                    today ? "ring-2 ring-[var(--color-brand)]" : ""
-                  } ${isHoliday ? "bg-[var(--color-text-muted)]/10 opacity-70" : ""}`}
+                    isHoliday ? "bg-[var(--color-text-muted)]/10 opacity-70" : ""
+                  }`}
                   title={isHoliday ? "公休日" : undefined}
                 >
+                  {/* Unack: 8px dot in top-right (B4 — designer prefers dot over numeric badge at this size) */}
                   {unackCount > 0 && (
                     <span
-                      className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[var(--color-danger)] text-[10px] font-bold text-white flex items-center justify-center leading-none"
+                      className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[var(--color-danger)]"
                       aria-label={`${unackCount} 筆未讀新預約`}
-                      title={`${unackCount} 筆未讀新預約 — 點進日視圖查看`}
-                    >
-                      {unackCount > 9 ? "9+" : unackCount}
-                    </span>
+                      title={`${unackCount} 筆未讀新預約`}
+                    />
                   )}
 
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span
-                      className={`text-[13px] font-semibold leading-none ${today ? "text-[var(--color-brand)]" : "text-[var(--color-text-primary)]"}`}
-                    >
-                      {day}
-                    </span>
-                    {count > 0 && (
-                      <span className="text-[11px] text-[var(--color-text-muted)] leading-none">
-                        合計 {count}
+                  {/* Date row: today gets a filled brand-color circle (B4 — replaces ring outline) */}
+                  <div className="flex items-center mb-1">
+                    {today ? (
+                      <span className="w-5 h-5 rounded-full bg-[var(--color-brand)] text-[var(--color-bg)] text-[12px] font-semibold leading-none inline-flex items-center justify-center">
+                        {day}
+                      </span>
+                    ) : (
+                      <span className="text-[13px] font-semibold leading-none text-[var(--color-text-primary)]">
+                        {day}
                       </span>
                     )}
                   </div>
 
-                  {/* Event chips Google Calendar style — service-categorized colors */}
+                  {/* Density bar (B4 — replaces "合計 N" text label).
+                      1.5px tall coloured strip; width scales with count/9. */}
+                  {count > 0 && (
+                    <div className="h-[2px] w-full bg-[var(--color-surface)] rounded-full overflow-hidden mb-1">
+                      <div
+                        className={`h-full ${densityColor} transition-all`}
+                        style={{ width: densityWidth }}
+                        aria-label={`今日 ${count} 預約`}
+                      />
+                    </div>
+                  )}
+
+                  {/* Event chips — color = status (B2). Max 2 visible + overflow pill. */}
                   <div className="flex-1 flex flex-col gap-0.5 items-start w-full">
-                    {dayBookings.map((b) => {
-                      const paid = isPaid(b);
+                    {visibleChips.map((b) => {
+                      const chipColor = chipClassForStatus(b);
                       const svc = b.service.name;
-                      const chipColor = chipClassForService(svc, paid);
-                      const initial = (b.user.displayName || "?").charAt(0);
                       const svcAbbr = abbreviateService(svc);
                       return (
                         <div
@@ -127,13 +153,12 @@ function MonthViewBase({
                         >
                           <span className="font-mono shrink-0">{b.startTime.slice(0, 5)}</span>
                           <span className="font-semibold shrink-0">{svcAbbr}</span>
-                          <span className="truncate opacity-75">{initial}</span>
                         </div>
                       );
                     })}
-                    {count > 3 && (
+                    {overflow > 0 && (
                       <span className="text-[10px] text-[var(--color-text-muted)] leading-none pl-0.5">
-                        +{count - 3} more
+                        +{overflow}
                       </span>
                     )}
                   </div>
@@ -146,28 +171,20 @@ function MonthViewBase({
         </div>
       </div>
 
-      {/* Color legend */}
+      {/* Status legend (B2 redesign — colour = status; service shown by 剪/燙/染/漂 prefix) */}
       <div className="bg-[var(--color-surface)] rounded-lg px-3 py-2 mb-3 flex items-center gap-3 flex-wrap text-[10px]">
         <span className="text-[var(--color-text-muted)] font-semibold">顏色：</span>
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded bg-[var(--color-brand)]/30" />
+          <span className="text-[var(--color-text-body)]">未付款</span>
+        </span>
         <span className="flex items-center gap-1">
           <span className="w-2.5 h-2.5 rounded bg-[var(--color-success)]/40" />
           <span className="text-[var(--color-text-body)]">已付款</span>
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded bg-[var(--color-brand)]/30" />
-          <span className="text-[var(--color-text-body)]">剪</span>
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded bg-[var(--color-service-perm)]/30" />
-          <span className="text-[var(--color-text-body)]">燙</span>
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded bg-[var(--color-service-color)]/30" />
-          <span className="text-[var(--color-text-body)]">染</span>
-        </span>
-        <span className="flex items-center gap-1">
           <span className="w-2.5 h-2.5 rounded bg-[var(--color-warning)]/40" />
-          <span className="text-[var(--color-text-body)]">漂</span>
+          <span className="text-[var(--color-text-body)]">待對帳</span>
         </span>
       </div>
 

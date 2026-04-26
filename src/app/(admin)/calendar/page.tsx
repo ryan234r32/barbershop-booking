@@ -39,9 +39,7 @@ const MonthView = dynamic(
 );
 import { ViewToggle } from "@/components/admin/calendar/view-toggle";
 import { CalendarFab } from "@/components/admin/calendar/calendar-fab";
-import { ZoomControls } from "@/components/admin/calendar/zoom-controls";
 import { useViewPersistence } from "@/components/admin/calendar/use-view-persistence";
-import { useZoom } from "@/components/admin/calendar/use-zoom";
 import { useCalendarShortcuts } from "@/components/admin/calendar/use-calendar-shortcuts";
 import {
   RescheduleUndoToast,
@@ -83,18 +81,7 @@ export default function CalendarPage() {
   usePageTitle("日曆");
   const [view, setView] = useViewPersistence();
   const [currentDate, setCurrentDate] = useState(() => toTaipeiDate(new Date()));
-  const {
-    slotHeight: zoomSlotHeight,
-    stopIndex: zoomStopIndex,
-    zoomIn,
-    zoomOut,
-    containerRef: zoomContainerRef,
-    onWheel: onZoomWheel,
-    onPointerDown: onZoomPointerDown,
-    onPointerMove: onZoomPointerMove,
-    onPointerUp: onZoomPointerUp,
-    onPointerCancel: onZoomPointerCancel,
-  } = useZoom();
+  // useZoom retired in B1 — auto-fit (useAutoFit inside DayView/WeekView) replaces it.
 
   // ─── Sheet/modal state ───
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -282,7 +269,9 @@ export default function CalendarPage() {
   };
 
   const todayStr = formatDate(toTaipeiDate(new Date()));
-  const isToday = (d: Date) => formatDate(d) === todayStr;
+  // Stable identity so React.memo on DayView / WeekView isn't broken by a fresh
+  // function reference each render (review finding P2).
+  const isToday = useCallback((d: Date) => formatDate(d) === todayStr, [todayStr]);
 
   // ─── Header text ───
   const headerText = useMemo(() => {
@@ -338,22 +327,12 @@ export default function CalendarPage() {
             <ChevronRight size={20} className="text-[var(--color-text-body)]" />
           </button>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Zoom controls — only visible for time-axis views */}
-          {(view === "day" || view === "week") && (
-            <ZoomControls
-              stopIndex={zoomStopIndex}
-              onZoomIn={zoomIn}
-              onZoomOut={zoomOut}
-            />
-          )}
-          <button
-            onClick={() => setCurrentDate(toTaipeiDate(new Date()))}
-            className="text-xs font-medium text-[var(--color-brand)] border border-[var(--color-brand)] px-3 py-1.5 rounded-lg hover:bg-[var(--color-brand)]/5 transition-colors"
-          >
-            今天
-          </button>
-        </div>
+        <button
+          onClick={() => setCurrentDate(toTaipeiDate(new Date()))}
+          className="text-xs font-medium text-[var(--color-brand)] border border-[var(--color-brand)] px-3 py-1.5 rounded-lg hover:bg-[var(--color-brand)]/5 transition-colors"
+        >
+          今天
+        </button>
       </div>
 
       {/* View toggle */}
@@ -366,50 +345,37 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* Zoomable wrapper for day/week — Ctrl+wheel + 2-pointer pinch */}
-      {(view === "day" || view === "week") && !isLoading && (
-        <div
-          ref={zoomContainerRef}
-          onWheel={onZoomWheel}
-          onPointerDown={onZoomPointerDown}
-          onPointerMove={onZoomPointerMove}
-          onPointerUp={onZoomPointerUp}
-          onPointerCancel={onZoomPointerCancel}
-          className="touch-pan-y"
-          style={{ touchAction: "pan-y" }}
-        >
-          {view === "day" && (
-            <DayView
-              currentDate={currentDate}
-              setCurrentDate={setCurrentDate}
-              bookings={bookings}
-              now={now}
-              isToday={isToday}
-              nearEndBookings={nearEndBookings}
-              onOpenBookingDetail={openBookingDetail}
-              onOpenNewBooking={openNewBooking}
-              slotHeight={zoomSlotHeight}
-              holidayDates={holidayDates}
-              mutateBookings={mutateBookings}
-              onRescheduled={setLastReschedule}
-            />
-          )}
-          {view === "week" && (
-            <WeekView
-              weekDates={weekDates}
-              bookings={bookings}
-              now={now}
-              isToday={isToday}
-              holidayDates={holidayDates}
-              setCurrentDate={setCurrentDate}
-              setView={setView}
-              onOpenBookingDetail={openBookingDetail}
-              mutateBookings={mutateBookings}
-              slotHeight={zoomSlotHeight}
-              onRescheduled={setLastReschedule}
-            />
-          )}
-        </div>
+      {/* Day / week views own their own auto-fit row sizing (B0+B1).
+          Zoom is no longer needed — the layout fills available height
+          within the [44, 72] px clamp; ZoomControls hidden in B1. */}
+      {view === "day" && !isLoading && (
+        <DayView
+          currentDate={currentDate}
+          setCurrentDate={setCurrentDate}
+          bookings={bookings}
+          now={now}
+          isToday={isToday}
+          nearEndBookings={nearEndBookings}
+          onOpenBookingDetail={openBookingDetail}
+          onOpenNewBooking={openNewBooking}
+          holidayDates={holidayDates}
+          mutateBookings={mutateBookings}
+          onRescheduled={setLastReschedule}
+        />
+      )}
+      {view === "week" && !isLoading && (
+        <WeekView
+          weekDates={weekDates}
+          bookings={bookings}
+          now={now}
+          isToday={isToday}
+          holidayDates={holidayDates}
+          setCurrentDate={setCurrentDate}
+          setView={setView}
+          onOpenBookingDetail={openBookingDetail}
+          mutateBookings={mutateBookings}
+          onRescheduled={setLastReschedule}
+        />
       )}
 
       {view === "month" && (

@@ -30,18 +30,25 @@ export async function getIdempotentResult<T>(
   }
 }
 
-/** Stores the result for the given key with a short TTL. Best-effort. */
+/**
+ * Stores the result for the given key with a short TTL.
+ * Returns true on success, false on failure (codex P2 fix). Callers that
+ * gate user-visible features on persistence (e.g. "undo available?") MUST
+ * check the return value and degrade their response if false. Best-effort
+ * write semantics still apply: failure does NOT throw.
+ */
 export async function storeIdempotentResult<T>(
   scope: string,
   idempotencyKey: string,
   value: T,
   ttlSeconds: number = DEFAULT_TTL_SECONDS,
-): Promise<void> {
+): Promise<boolean> {
   try {
     await getRedis().set(key(scope, idempotencyKey), JSON.stringify(value), {
       ex: ttlSeconds,
     });
+    return true;
   } catch {
-    // Idempotency is best-effort; don't fail the request if the cache write fails
+    return false;
   }
 }

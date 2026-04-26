@@ -22,15 +22,30 @@ export function isPaid(b: Booking): boolean {
   return b.payment?.status === "RECEIVED";
 }
 
-/** Returns the card background class based on completion/payment status. */
+/**
+ * Booking display status (B2 redesign — designer review).
+ * Color carries STATUS, not service type. Service is shown via text prefix
+ * (chipClassForStatus / 剪/燙/染/漂 prefix in day+week views).
+ */
+export type BookingStatusKind = "paid" | "needsSettlement" | "confirmed";
+
+export function classifyBookingStatus(b: Booking): BookingStatusKind {
+  if (isPaid(b)) return "paid";
+  if (b.status === "COMPLETED") return "needsSettlement";
+  return "confirmed";
+}
+
+/** Returns the card background class based on payment/completion status. */
 export function cardBgClass(b: Booking): string {
-  if (b.status === "COMPLETED" || isPaid(b)) {
-    return "bg-[var(--color-success)]/15";
+  switch (classifyBookingStatus(b)) {
+    case "paid":
+      return "bg-[var(--color-success)]/15";
+    case "needsSettlement":
+      return "bg-[var(--color-warning)]/15";
+    case "confirmed":
+    default:
+      return "bg-[var(--color-brand)]/10";
   }
-  if (b.slotsOccupied > 1) {
-    return "bg-[var(--color-brand)]/10";
-  }
-  return "bg-[var(--color-surface)]";
 }
 
 function isLiveBooking(b: Booking): boolean {
@@ -166,23 +181,23 @@ export function truncateCustomerName(name: string | null | undefined, maxLen = 3
 }
 
 /**
- * Service-categorised chip color (PRD-v3 §4 / GC-style).
- * Used by both day-view text-rule blocks and month-view chips so colors stay
- * consistent across views. `paid` overrides everything (success green).
+ * Status-based chip color (B2 redesign — designer review).
+ * Color = STATUS (paid / needs settlement / confirmed unpaid). Service type
+ * is communicated separately via text prefix (剪/燙/染/漂 from abbreviateService).
+ *
+ * Why: pre-attentive perception fits "what's this booking's state?" (color)
+ * better than "what service is it?" (text label). Owner scans calendar
+ * looking for unpaid + needs-attention bookings — color answers that in
+ * one glance, no legend lookup.
  */
-export function chipClassForService(serviceName: string, paid: boolean): string {
-  if (paid) return "bg-[var(--color-success)]/25 text-[var(--color-success)]";
-  if (serviceName.includes("漂")) {
-    return "bg-[var(--color-warning)]/25 text-[var(--color-warning)]";
+export function chipClassForStatus(b: Booking): string {
+  switch (classifyBookingStatus(b)) {
+    case "paid":
+      return "bg-[var(--color-success)]/25 text-[var(--color-success)]";
+    case "needsSettlement":
+      return "bg-[var(--color-warning)]/25 text-[var(--color-warning)]";
+    case "confirmed":
+    default:
+      return "bg-[var(--color-brand)]/15 text-[var(--color-brand)]";
   }
-  if (serviceName.includes("染")) {
-    return "bg-[var(--color-service-color)]/15 text-[var(--color-service-color)]";
-  }
-  if (serviceName.includes("燙")) {
-    return "bg-[var(--color-service-perm)]/15 text-[var(--color-service-perm)]";
-  }
-  if (serviceName.includes("剪")) {
-    return "bg-[var(--color-brand)]/15 text-[var(--color-brand)]";
-  }
-  return "bg-[var(--color-text-muted)]/15 text-[var(--color-text-body)]";
 }

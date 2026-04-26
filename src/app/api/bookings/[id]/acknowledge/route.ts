@@ -40,13 +40,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { id } = await params;
 
     // Body is optional — older clients may post no body at all.
-    let parsed: z.infer<typeof ackSchema> = undefined;
-    try {
-      const body = await request.json().catch(() => null);
-      parsed = body ? ackSchema.parse(body) : undefined;
-    } catch (zodErr) {
-      return errorResponse(zodErr);
-    }
+    // Outer try/catch handles ZodError → 400 via errorResponse; we just need
+    // to tolerate a missing body gracefully.
+    const body = await request.json().catch(() => null);
+    const parsed: z.infer<typeof ackSchema> = body ? ackSchema.parse(body) : undefined;
     const expectedUpdatedAt = parsed?.expectedUpdatedAt;
 
     const booking = await prisma.booking.findFirst({
@@ -57,28 +54,26 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return Response.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    // Optimistic-concurrency check (PRD-v3 E-1). We compare to ms precision —
-    // Prisma stores DateTime with millisecond precision so direct comparison
-    // is safe.
-    if (
-      expectedUpdatedAt &&
-      new Date(expectedUpdatedAt).getTime() !== booking.updatedAt.getTime()
-    ) {
-      return Response.json(
-        {
-          error: "stale_ack",
-          message: "此預約已更新，請重新確認",
-          current: {
-            adminAcknowledgedAt: booking.adminAcknowledgedAt,
-            updatedAt: booking.updatedAt,
-          },
-        },
-        { status: 409 },
-      );
-    }
-
-    // Idempotent: only update if not already acked.
+    // Idempotent: short-circuit if already acked (no DB write needed).
     if (booking.adminAcknowledgedAt) {
+      // Still enforce the OCC check so a stale read on an already-acked
+      // booking that has since been rescheduled (and re-set to null) returns 409.
+      if (
+        expectedUpdatedAt &&
+        new Date(expectedUpdatedAt).getTime() !== booking.updatedAt.getTime()
+      ) {
+        return Response.json(
+          {
+            error: "stale_ack",
+            message: "此預約已更新，請重新確認",
+            current: {
+              adminAcknowledgedAt: booking.adminAcknowledgedAt,
+              updatedAt: booking.updatedAt,
+            },
+          },
+          { status: 409 },
+        );
+      }
       return Response.json({
         ok: true,
         adminAcknowledgedAt: booking.adminAcknowledgedAt,
@@ -87,16 +82,49 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    const updated = await prisma.booking.update({
-      where: { id },
-      data: { adminAcknowledgedAt: new Date() },
+    // Conditional update: WHERE id=? AND updatedAt=? (codex P1 fix).
+    // If another transaction (e.g. /reschedule) bumps updatedAt between our
+    // findFirst and update, updateMany returns count=0 and we surface 409.
+    // This closes the TOCTOU between the read and the unconditional write.
+    const ackTime = new Date();
+    const updateResult = await prisma.booking.updateMany({
+      where: {
+        id,
+        tenantId: admin.tenantId,
+        adminAcknowledgedAt: null,
+        ...(expectedUpdatedAt
+          ? { updatedAt: new Date(expectedUpdatedAt) }
+          : { updatedAt: booking.updatedAt }),
+      },
+      data: { adminAcknowledgedAt: ackTime },
+    });
+
+    if (updateResult.count === 0) {
+      // Re-read for the latest state to surface in 409
+      const fresh = await prisma.booking.findFirst({
+        where: { id, tenantId: admin.tenantId },
+        select: { adminAcknowledgedAt: true, updatedAt: true },
+      });
+      return Response.json(
+        {
+          error: "stale_ack",
+          message: "此預約已更新，請重新確認",
+          current: fresh,
+        },
+        { status: 409 },
+      );
+    }
+
+    // Re-fetch to get the post-update updatedAt for the client's next OCC token.
+    const fresh = await prisma.booking.findFirst({
+      where: { id, tenantId: admin.tenantId },
       select: { adminAcknowledgedAt: true, updatedAt: true },
     });
 
     return Response.json({
       ok: true,
-      adminAcknowledgedAt: updated.adminAcknowledgedAt,
-      updatedAt: updated.updatedAt,
+      adminAcknowledgedAt: fresh?.adminAcknowledgedAt ?? ackTime,
+      updatedAt: fresh?.updatedAt,
       wasAlreadyAcked: false,
     });
   } catch (err) {
