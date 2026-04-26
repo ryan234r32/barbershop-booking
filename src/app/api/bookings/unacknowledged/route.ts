@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     if (!admin) throw new UnauthorizedError();
 
     const todayStr = formatDateToISO(nowTaipei());
-    const todayStart = new Date(todayStr + "T00:00:00+08:00");
+    const todayStart = new Date(todayStr + "T00:00:00.000Z");
 
     const bookings = await prisma.booking.findMany({
       where: {

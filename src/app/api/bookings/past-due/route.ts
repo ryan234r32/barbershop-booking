@@ -23,10 +23,10 @@ export async function GET(request: NextRequest) {
         status: "CONFIRMED",
         OR: [
           // Bookings from before today
-          { date: { lt: new Date(todayStr + "T00:00:00+08:00") } },
+          { date: { lt: new Date(todayStr + "T00:00:00.000Z") } },
           // Bookings from today whose endTime has passed
           {
-            date: new Date(todayStr + "T00:00:00+08:00"),
+            date: new Date(todayStr + "T00:00:00.000Z"),
             endTime: { lte: currentTime },
           },
         ],
