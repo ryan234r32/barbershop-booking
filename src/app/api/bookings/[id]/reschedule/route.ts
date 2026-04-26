@@ -113,7 +113,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Calculate new end time
     const newEndTime = addHours(input.startTime, booking.service.slotsNeeded);
-    const newDateObj = new Date(input.date + "T00:00:00+08:00");
+    const newDateObj = new Date(input.date + "T00:00:00.000Z");
 
     // Acquire locks on EVERY hour the new booking will occupy (codex P0 fix).
     // Single-startTime locking would let two 2-slot bookings race into 12:00

@@ -47,7 +47,7 @@ describe("GET /api/bookings/unacknowledged", () => {
           tenantId: "t1",
           status: "CONFIRMED",
           adminAcknowledgedAt: null,
-          date: { gte: new Date("2026-05-15T00:00:00+08:00") },
+          date: { gte: new Date("2026-05-15T00:00:00.000Z") },
         }),
         orderBy: [{ date: "asc" }, { startTime: "asc" }],
       })

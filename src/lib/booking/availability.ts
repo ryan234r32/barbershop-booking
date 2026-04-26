@@ -20,7 +20,7 @@ export async function getAvailableSlots(params: {
   serviceId: string;
 }): Promise<AvailableSlot[]> {
   const { tenantId, date, serviceId } = params;
-  const dateObj = new Date(date + "T00:00:00+08:00");
+  const dateObj = new Date(date + "T00:00:00.000Z");
 
   // 1. Get service to know how many consecutive slots needed
   const service = await prisma.service.findUnique({

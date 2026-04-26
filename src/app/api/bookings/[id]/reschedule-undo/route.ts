@@ -100,7 +100,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      const oldDateObj = new Date(snapshot.oldDate + "T00:00:00+08:00");
+      const oldDateObj = new Date(snapshot.oldDate + "T00:00:00.000Z");
 
       // Lock all hours the booking spanned at the original slot (codex P0 fix).
       const slotLock = await acquireBookingSpanLock({

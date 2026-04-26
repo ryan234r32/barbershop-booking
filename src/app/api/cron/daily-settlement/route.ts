@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     const now = nowTaipei();
     const todayStr = now.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
-    const todayDate = new Date(todayStr + "T00:00:00+08:00");
+    const todayDate = new Date(todayStr + "T00:00:00.000Z");
 
     // Get all tenants (for multi-tenant support)
     const tenants = await prisma.tenant.findMany({ select: { id: true, businessName: true } });

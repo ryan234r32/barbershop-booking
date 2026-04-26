@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const dateObj = new Date(body.date + "T00:00:00+08:00");
+    const dateObj = new Date(body.date + "T00:00:00.000Z");
 
     const holiday = await prisma.holiday.create({
       data: {

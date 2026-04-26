@@ -34,11 +34,11 @@ export async function GET(request: NextRequest) {
     const where: Record<string, unknown> = { tenantId };
     if (from && to) {
       where.date = {
-        gte: new Date(from + "T00:00:00+08:00"),
-        lte: new Date(to + "T23:59:59+08:00"),
+        gte: new Date(from + "T00:00:00.000Z"),
+        lte: new Date(to + "T23:59:59.999Z"),
       };
     } else if (date) {
-      where.date = new Date(date + "T00:00:00+08:00");
+      where.date = new Date(date + "T00:00:00.000Z");
     }
     if (status) where.status = status;
 
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
 
     try {
       // 5. Double-check availability inside the lock
-      const dateObj = new Date(input.date + "T00:00:00+08:00");
+      const dateObj = new Date(input.date + "T00:00:00.000Z");
       const available = await isSlotAvailable({
         tenantId,
         date: dateObj,

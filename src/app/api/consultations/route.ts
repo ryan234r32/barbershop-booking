@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
         currentPhotoUrls: data.currentPhotoUrls,
         targetPhotoUrls: data.targetPhotoUrls,
         lastServiceDate: data.lastServiceDate
-          ? new Date(data.lastServiceDate + "T00:00:00+08:00")
+          ? new Date(data.lastServiceDate + "T00:00:00.000Z")
           : undefined,
         notes: data.notes,
         priority: data.priority ?? 0,

@@ -82,7 +82,7 @@ export async function POST(
     });
     if (!lock) throw new SlotUnavailableError();
 
-    const dateObj = new Date(data.date + "T00:00:00+08:00");
+    const dateObj = new Date(data.date + "T00:00:00.000Z");
     const available = await isSlotAvailable({
       tenantId: auth.tenantId,
       date: dateObj,
