@@ -1082,9 +1082,9 @@ export default function CalendarPage() {
                 const daysInMonth = new Date(year, month + 1, 0).getDate();
                 const cells: React.ReactNode[] = [];
 
-                // Empty cells before first day
+                // Empty cells before first day (must match cell height for grid alignment)
                 for (let i = 0; i < firstDay; i++) {
-                  cells.push(<div key={`empty-${i}`} className="h-[72px]" />);
+                  cells.push(<div key={`empty-${i}`} className="h-[108px]" />);
                 }
 
                 // Day cells
@@ -1103,14 +1103,14 @@ export default function CalendarPage() {
                   const unackCount = dayBookingsAll.filter((b) => !b.adminAcknowledgedAt).length;
                   const dayBookings = dayBookingsAll
                     .sort((a, b) => a.startTime.localeCompare(b.startTime))
-                    .slice(0, 2);
+                    .slice(0, 3); // Wave 3.A sub-4: 3 events 不 2 (Google Calendar style)
                   const isHoliday = holidayDates.has(dateStr);
 
                   cells.push(
                     <button
                       key={day}
                       onClick={() => { setCurrentDate(new Date(year, month, day)); setView("day"); }}
-                      className={`h-[72px] rounded-lg flex flex-col items-stretch p-1 relative transition-colors hover:bg-[var(--color-surface)] ${
+                      className={`h-[108px] rounded-lg flex flex-col items-stretch p-1.5 relative transition-colors hover:bg-[var(--color-surface)] ${
                         today ? "ring-2 ring-[var(--color-brand)]" : ""
                       } ${isHoliday ? "bg-[var(--color-text-muted)]/10 opacity-70" : ""}`}
                       title={isHoliday ? "公休日" : undefined}
@@ -1138,24 +1138,44 @@ export default function CalendarPage() {
                         )}
                       </div>
 
-                      {/* Mini time bars (first 2 bookings) */}
-                      <div className="flex-1 flex flex-col gap-0.5 items-start">
+                      {/* Event chips Google Calendar style — service-categorized colors,
+                          time + customer/service initial. Wave 3.A sub-4 (PRD §4). */}
+                      <div className="flex-1 flex flex-col gap-0.5 items-start w-full">
                         {dayBookings.map((b) => {
                           const paid = isPaid(b);
-                          const barBg = paid
-                            ? "bg-[var(--color-success)]/30 text-[var(--color-success)]"
-                            : "bg-[var(--color-brand)]/15 text-[var(--color-brand)]";
+                          // Service category color (簡單 substring 判斷)
+                          const svc = b.service.name;
+                          let chipColor: string;
+                          if (paid) {
+                            chipColor = "bg-[var(--color-success)]/25 text-[var(--color-success)]";
+                          } else if (svc.includes("漂")) {
+                            chipColor = "bg-[var(--color-warning)]/25 text-[var(--color-warning)]";
+                          } else if (svc.includes("染")) {
+                            chipColor = "bg-purple-100 text-purple-700";
+                          } else if (svc.includes("燙")) {
+                            chipColor = "bg-orange-100 text-orange-700";
+                          } else if (svc.includes("剪")) {
+                            chipColor = "bg-[var(--color-brand)]/15 text-[var(--color-brand)]";
+                          } else {
+                            chipColor = "bg-[var(--color-text-muted)]/15 text-[var(--color-text-body)]";
+                          }
+                          // Customer initial (1 char) for compact display
+                          const initial = (b.user.displayName || "?").charAt(0);
                           return (
                             <div
                               key={b.id}
-                              className={`w-full px-1 py-px rounded text-[11px] font-mono leading-none truncate ${barBg}`}
+                              className={`w-full px-1 py-px rounded text-[10px] font-medium leading-tight truncate flex items-center gap-1 ${chipColor}`}
+                              title={`${b.startTime} ${svc} · ${b.user.displayName || "顧客"}`}
                             >
-                              {b.startTime.slice(0, 5)}
+                              <span className="font-mono shrink-0">{b.startTime.slice(0, 5)}</span>
+                              <span className="truncate opacity-75">{initial}</span>
                             </div>
                           );
                         })}
-                        {count > 2 && (
-                          <span className="text-[11px] text-[var(--color-text-muted)] leading-none">+{count - 2}</span>
+                        {count > 3 && (
+                          <span className="text-[10px] text-[var(--color-text-muted)] leading-none pl-0.5">
+                            +{count - 3} more
+                          </span>
                         )}
                       </div>
                     </button>
