@@ -34,12 +34,14 @@ interface Props {
   onAction: () => void; // refresh calendar after action
 }
 
-type SheetState = "detail" | "notes";
+type SheetState = "detail" | "notes" | "reschedule";
 
 export function BookingDetailSheet({ booking, open, onOpenChange, onAction }: Props) {
   const [state, setState] = useState<SheetState>("detail");
   const [noteText, setNoteText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
   const { toast } = useToast();
 
   if (!booking) return null;
@@ -76,6 +78,42 @@ export function BookingDetailSheet({ booking, open, onOpenChange, onAction }: Pr
       onAction();
     } catch {
       toast({ type: "error", message: "操作失敗" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenReschedule = () => {
+    // Default form values: current booking date + time
+    setRescheduleDate(booking.date.slice(0, 10));
+    setRescheduleTime(booking.startTime);
+    setState("reschedule");
+  };
+
+  const handleConfirmReschedule = async () => {
+    if (!rescheduleDate || !rescheduleTime) {
+      toast({ type: "error", message: "請選擇新日期和時間" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/bookings/${booking.id}/reschedule`, {
+        method: "POST",
+        headers: adminHeaders(),
+        body: JSON.stringify({ date: rescheduleDate, startTime: rescheduleTime }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "改期失敗");
+      }
+      toast({ type: "success", message: "預約已改期" });
+      onOpenChange(false);
+      onAction();
+    } catch (err) {
+      toast({
+        type: "error",
+        message: err instanceof Error ? err.message : "改期失敗",
+      });
     } finally {
       setLoading(false);
     }
@@ -247,6 +285,7 @@ export function BookingDetailSheet({ booking, open, onOpenChange, onAction }: Pr
                         完成（轉帳）
                       </button>
                       <button
+                        onClick={handleOpenReschedule}
                         disabled={loading}
                         className="py-2.5 border border-[var(--color-text-muted)]/30 text-[var(--color-text-body)] rounded-lg text-xs font-medium hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50"
                       >
@@ -325,6 +364,67 @@ export function BookingDetailSheet({ booking, open, onOpenChange, onAction }: Pr
                     className="px-6 py-2.5 bg-[var(--color-brand)] text-[var(--color-bg)] font-semibold rounded-lg text-sm hover:opacity-90 transition-opacity"
                   >
                     儲存筆記
+                  </button>
+                </div>
+              </>
+            )}
+
+            {state === "reschedule" && (
+              <>
+                <h2 className="text-base font-bold text-[var(--color-text-primary)] mb-1">改期</h2>
+                <p className="text-xs text-[var(--color-text-muted)] mb-4">
+                  {booking.user.displayName} · {booking.service.name} · {booking.service.slotsNeeded} 小時
+                </p>
+
+                <div className="mb-3">
+                  <label className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider block mb-1">
+                    新日期
+                  </label>
+                  <input
+                    type="date"
+                    value={rescheduleDate}
+                    onChange={(e) => setRescheduleDate(e.target.value)}
+                    className="w-full border-b border-[var(--color-brand)] bg-transparent py-2 text-sm text-[var(--color-text-body)] outline-none"
+                  />
+                </div>
+
+                <div className="mb-6">
+                  <label className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider block mb-1">
+                    新時段（11:00 - 19:00）
+                  </label>
+                  <select
+                    value={rescheduleTime}
+                    onChange={(e) => setRescheduleTime(e.target.value)}
+                    className="w-full border-b border-[var(--color-brand)] bg-transparent py-2 text-sm text-[var(--color-text-body)] outline-none"
+                  >
+                    {Array.from({ length: 9 }, (_, i) => {
+                      const hour = 11 + i;
+                      const t = `${String(hour).padStart(2, "0")}:00`;
+                      return (
+                        <option key={t} value={t}>{t}</option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <p className="text-[11px] text-[var(--color-text-muted)] mb-4">
+                  改期會檢查時段是否可用 + 重置「我已知道」狀態 + 通知客戶 LINE。
+                </p>
+
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    onClick={() => setState("detail")}
+                    disabled={loading}
+                    className="text-sm text-[var(--color-text-muted)] disabled:opacity-50"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleConfirmReschedule}
+                    disabled={loading || !rescheduleDate || !rescheduleTime}
+                    className="px-6 py-2.5 bg-[var(--color-brand)] text-[var(--color-bg)] font-semibold rounded-lg text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+                  >
+                    {loading ? "改期中..." : "確認改期"}
                   </button>
                 </div>
               </>
