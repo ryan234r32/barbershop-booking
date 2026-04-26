@@ -2157,6 +2157,112 @@ export function serviceInquiryFlexMessage(params: {
   };
 }
 
+/**
+ * 漂髮諮詢 Flex card — replies to keyword 「漂」 (PRD-v3 §3, Wave 4a).
+ *
+ * Bleach is high-judgement: outcome depends on hair condition + history. We
+ * route to the consultation flow (LIFF /consultation) so the customer fills a
+ * structured form and admin can triage in /consultations queue, instead of
+ * lossy LINE-chat back-and-forth.
+ */
+export function bleachConsultationFlexMessage(params: {
+  liffBaseUrl: string;
+  consultationLiffUrl: string;
+  shopName: string;
+}): FlexMessage {
+  const { consultationLiffUrl, shopName } = params;
+
+  const bubble: FlexBubble = {
+    type: "bubble",
+    header: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "text",
+          text: "想漂髮嗎？",
+          weight: "bold",
+          size: "xl",
+          color: "#003D2B",
+        },
+        {
+          type: "text",
+          text: `${shopName}會先確認您的頭髮狀況再報價`,
+          size: "sm",
+          color: "#809A8E",
+          margin: "sm",
+          wrap: true,
+        },
+      ],
+      backgroundColor: "#F3ECE4",
+      paddingAll: "lg",
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      spacing: "md",
+      contents: [
+        {
+          type: "text",
+          text: "漂髮的時間與藥水會依以下條件決定：",
+          size: "sm",
+          color: "#2D3A30",
+          wrap: true,
+        },
+        infoRow("•", "目前髮色 / 上次染燙時間"),
+        infoRow("•", "想漂到的目標度數"),
+        infoRow("•", "頭皮敏感與受損狀況"),
+        {
+          type: "separator",
+          margin: "lg",
+        },
+        {
+          type: "text",
+          text: "請點下方按鈕填寫諮詢表單，我們會在 24 小時內回覆 🙏",
+          size: "xs",
+          color: "#809A8E",
+          wrap: true,
+          margin: "md",
+        },
+      ],
+      paddingAll: "lg",
+    },
+    footer: {
+      type: "box",
+      layout: "vertical",
+      spacing: "sm",
+      contents: [
+        {
+          type: "button",
+          action: {
+            type: "uri",
+            label: "填寫諮詢表單",
+            uri: consultationLiffUrl,
+          },
+          style: "primary",
+          color: "#003D2B",
+          height: "sm",
+        },
+        {
+          type: "text",
+          text: "📷 也可以直接傳照片到聊天室",
+          size: "xxs",
+          color: "#809A8E",
+          align: "center",
+          margin: "sm",
+        },
+      ],
+      paddingAll: "lg",
+    },
+  };
+
+  return {
+    type: "flex",
+    altText: `想漂髮嗎？請點開連結填寫諮詢表單，我們會回覆您`,
+    contents: bubble,
+  };
+}
+
 // Helper: create an info row for Flex Message
 function infoRow(label: string, value: string) {
   return {
