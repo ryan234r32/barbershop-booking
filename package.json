@@ -18,6 +18,8 @@
     "import:excel:dryrun": "npx tsx scripts/import-historical-excel.ts",
     "import:excel": "npx tsx scripts/import-historical-excel.ts --commit",
     "import:excel:reset": "npx tsx scripts/import-historical-excel.ts --commit --reset",
+    "cleanup:dryrun": "npx tsx scripts/clean-test-data.ts",
+    "cleanup:execute": "npx tsx scripts/clean-test-data.ts --commit",
     "reports:snapshot": "npx tsx scripts/generate-reports-snapshot.ts",
     "prepare": "husky"
   },

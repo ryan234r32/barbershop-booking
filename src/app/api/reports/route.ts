@@ -10,6 +10,7 @@ import {
   computeTopCustomers,
   computeCustomerSegments,
   computePaymentMix,
+  computeRetention,
 } from "@/lib/reports/aggregate";
 
 /**
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
       topCustomers,
       customerSegments,
       paymentMix,
+      retention,
     ] = await Promise.all([
       computeTotals(tenantId, current),
       computeTotals(tenantId, prev),
@@ -62,6 +64,7 @@ export async function GET(request: NextRequest) {
       computeTopCustomers(tenantId, current, 20),
       computeCustomerSegments(tenantId), // segment is point-in-time, no range
       computePaymentMix(tenantId, current),
+      computeRetention(tenantId),         // tenant-wide, no range
     ]);
 
     return Response.json(
@@ -83,6 +86,7 @@ export async function GET(request: NextRequest) {
         topCustomers,
         customerSegments,
         paymentMix,
+        retention,
       },
       {
         headers: {
