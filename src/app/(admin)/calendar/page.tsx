@@ -10,6 +10,7 @@ import { NewBookingSheet } from "@/components/admin/new-booking-sheet";
 import { UnacknowledgedModal } from "@/components/admin/unacknowledged-modal";
 import { useCalendarPolling } from "@/lib/hooks/use-calendar-polling";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
+import { useToast } from "@/components/ui/toast";
 
 // ─── Types ───
 interface Booking {
@@ -278,7 +279,37 @@ export default function CalendarPage() {
     setDeepLinkHandled(true);
   }, [searchParams, deepLinkHandled, router, pathname]);
 
+  // ─── Holidays (PRD-v3 §11 / Wave 3.A sub-6) ───
+  // Fetched lazily — calendar can render without it. Used to block new-booking
+  // creation on closed days with an explanatory toast instead of silent UX.
+  const { data: holidaysData } = useSWR(
+    "/api/admin/holidays",
+    (url: string) => fetch(url, { headers: adminHeaders() }).then((r) => r.ok ? r.json() : { holidays: [] }),
+    { revalidateOnFocus: false, dedupingInterval: 5 * 60_000 },
+  );
+  const holidayDates = useMemo(() => {
+    const set = new Set<string>();
+    for (const h of holidaysData?.holidays || []) {
+      // Holiday.date is `@db.Date` → ISO string like "2026-04-30T00:00:00.000Z"
+      const d = String(h.date).slice(0, 10);
+      set.add(d);
+    }
+    return set;
+  }, [holidaysData]);
+
+  const { toast } = useToast();
+
   const openNewBooking = (date: string, time: string, duration: number = 1) => {
+    if (holidayDates.has(date)) {
+      const reason = (holidaysData?.holidays || []).find(
+        (h: { date: string; reason?: string | null }) => String(h.date).slice(0, 10) === date,
+      )?.reason;
+      toast({
+        type: "error",
+        message: reason ? `公休日（${reason}）— 不可新增預約` : "公休日 — 不可新增預約",
+      });
+      return;
+    }
     setNewBookingDate(date);
     setNewBookingTime(time);
     setNewBookingDuration(duration);
@@ -1073,6 +1104,7 @@ export default function CalendarPage() {
                   const dayBookings = dayBookingsAll
                     .sort((a, b) => a.startTime.localeCompare(b.startTime))
                     .slice(0, 2);
+                  const isHoliday = holidayDates.has(dateStr);
 
                   cells.push(
                     <button
@@ -1080,7 +1112,8 @@ export default function CalendarPage() {
                       onClick={() => { setCurrentDate(new Date(year, month, day)); setView("day"); }}
                       className={`h-[72px] rounded-lg flex flex-col items-stretch p-1 relative transition-colors hover:bg-[var(--color-surface)] ${
                         today ? "ring-2 ring-[var(--color-brand)]" : ""
-                      }`}
+                      } ${isHoliday ? "bg-[var(--color-text-muted)]/10 opacity-70" : ""}`}
+                      title={isHoliday ? "公休日" : undefined}
                     >
                       {/* Unack indicator (top-right corner) */}
                       {unackCount > 0 && (
