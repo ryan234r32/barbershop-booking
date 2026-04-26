@@ -61,11 +61,16 @@ export function middleware(request: NextRequest) {
   }
 
   // Admin routes protection (redirect to login if no token)
+  // Cookie-only check — iOS Safari ITP can purge HttpOnly cookies after ~7 days
+  // even though Max-Age is 30d. The login page auto-restores the session from
+  // localStorage if a `from` query param is present.
   const adminPaths = ["/dashboard", "/calendar", "/bookings", "/customers", "/services", "/analytics", "/campaigns", "/settings", "/dev"];
   if (adminPaths.some((p) => pathname.startsWith(p))) {
     const token = request.cookies.get("admin_token");
     if (!token) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("from", pathname + request.nextUrl.search);
+      return NextResponse.redirect(loginUrl);
     }
   }
 
