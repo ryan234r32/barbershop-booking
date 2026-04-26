@@ -12,15 +12,16 @@
  * Extracted from calendar/page.tsx in Wave 3.A / A1 — behavior unchanged.
  */
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { useToast } from "@/components/ui/toast";
+import { useAutoFit } from "./use-auto-fit";
 import {
   HOURS,
   WEEKDAYS,
   abbreviateService,
   buildBookingIndex,
-  chipClassForService,
+  chipClassForStatus,
   formatDate,
   indexBookingAtSlot,
   indexIsSlotOccupied,
@@ -41,13 +42,13 @@ interface Props {
   setView: (v: "day" | "week" | "month") => void;
   onOpenBookingDetail: (b: Booking) => void;
   mutateBookings: () => void;
-  /** Row height in px — controlled by useZoom (PRD-v3 D-1). */
-  slotHeight: number;
   /** Notifies parent of a successful drag-reschedule so the undo toast can show. */
   onRescheduled: (r: RescheduleResult) => void;
 }
 
 const WEEK_THEAD_HEIGHT = 34;
+const WEEK_ROW_MIN_PX = 44;
+const WEEK_ROW_MAX_PX = 64; // designer cap — narrower than day to keep 7 columns readable
 
 function WeekViewBase({
   weekDates,
@@ -59,10 +60,14 @@ function WeekViewBase({
   setView,
   onOpenBookingDetail,
   mutateBookings,
-  slotHeight,
   onRescheduled,
 }: Props) {
   const { toast } = useToast();
+  const gridRef = useRef<HTMLDivElement>(null);
+  // Auto-fit row sizing — replaces useZoom (B1).
+  // Subtracting THEAD height because the observed container also includes the
+  // sticky weekday header, but row math is for the body only.
+  const slotHeight = useAutoFit(gridRef, 9, WEEK_ROW_MIN_PX, WEEK_ROW_MAX_PX);
 
   const [draggedBooking, setDraggedBooking] = useState<Booking | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<{ date: string; hour: string } | null>(null);
@@ -173,10 +178,11 @@ function WeekViewBase({
         </span>
       </div>
 
-      {/* Scrollable grid — Fresha/夯客 style */}
+      {/* Scrollable grid — Fresha/夯客 style. Auto-fit row sizing (B1). */}
       <div
+        ref={gridRef}
         className="rounded-lg overflow-y-auto relative"
-        style={{ maxHeight: "calc(100vh - 260px)" }}
+        style={{ height: "calc(100dvh - 260px)" }}
       >
         <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
           <thead className="sticky top-0 bg-[var(--color-bg)] z-10 shadow-sm">
@@ -235,12 +241,12 @@ function WeekViewBase({
 
                   if (booking) {
                     const paid = isPaid(booking);
-                    // PRD-v3 §4 / 碩展訪談 2.2: when slot height < 32 px we
-                    // can't render service + name comfortably; tap-only mode.
-                    // We also use chipClassForService for service-categorised
-                    // colour so users can tell at a glance: 剪 vs 染 vs 燙 vs 漂.
+                    // B2 redesign: chip colour = STATUS (paid/needs-settlement/
+                    // confirmed); service type is shown via the 剪/燙/染/漂 prefix
+                    // added in the chip body (B3). Pre-attentive scan answers
+                    // "any unpaid?" by colour alone — no legend lookup needed.
                     const compact = slotHeight < 40;
-                    const chipColors = chipClassForService(booking.service.name, paid);
+                    const chipColors = chipClassForStatus(booking);
                     const fullName = booking.user.displayName || "顧客";
                     const truncatedName = truncateCustomerName(
                       fullName,
@@ -280,20 +286,21 @@ function WeekViewBase({
                             />
                           )}
                           {compact ? (
+                            // 32px row: service letter + 2-char name on one line
                             <p className="text-[11px] font-semibold leading-none truncate">
-                              {truncatedName}
+                              <span className="opacity-75">{serviceAbbr}</span> {truncatedName}
                             </p>
                           ) : (
                             <>
                               <p className="text-[10px] font-mono leading-none mb-0.5 truncate opacity-75">
                                 {booking.startTime.slice(0, 5)}
                               </p>
+                              {/* Service letter prefix (B3) — integrated with name
+                                  saves a row vs the old separate pill */}
                               <p className="text-[11px] font-semibold leading-tight truncate">
+                                <span className="opacity-70 mr-0.5">{serviceAbbr}</span>
                                 {truncatedName}
                               </p>
-                              <span className="mt-auto inline-flex items-center gap-0.5 px-1 py-px rounded bg-[var(--color-bg)]/60 text-[10px] leading-tight truncate">
-                                <span className="font-semibold">{serviceAbbr}</span>
-                              </span>
                             </>
                           )}
                         </div>

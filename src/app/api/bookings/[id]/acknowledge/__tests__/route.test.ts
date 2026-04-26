@@ -2,12 +2,12 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const findFirst = vi.fn();
-const update = vi.fn();
+const updateMany = vi.fn();
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     booking: {
       findFirst: (...a: unknown[]) => findFirst(...a),
-      update: (...a: unknown[]) => update(...a),
+      updateMany: (...a: unknown[]) => updateMany(...a),
     },
   },
 }));
@@ -45,19 +45,35 @@ describe("POST /api/bookings/[id]/acknowledge", () => {
     );
   });
 
-  it("acks an unacked booking → writes timestamp + wasAlreadyAcked false", async () => {
+  it("acks an unacked booking → conditional updateMany + 200", async () => {
     getAdminFromCookie.mockResolvedValue(ADMIN);
-    findFirst.mockResolvedValue({ id: "b1", adminAcknowledgedAt: null });
-    const ackedAt = new Date("2026-05-01T10:00:00Z");
-    update.mockResolvedValue({ adminAcknowledgedAt: ackedAt });
+    const initialUpdatedAt = new Date("2026-05-01T09:00:00Z");
+    const postUpdate = new Date("2026-05-01T10:00:00Z");
+    findFirst
+      .mockResolvedValueOnce({
+        id: "b1",
+        adminAcknowledgedAt: null,
+        updatedAt: initialUpdatedAt,
+      })
+      .mockResolvedValueOnce({
+        adminAcknowledgedAt: postUpdate,
+        updatedAt: postUpdate,
+      });
+    updateMany.mockResolvedValue({ count: 1 });
     const res = await POST(req(), params());
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.ok).toBe(true);
     expect(body.wasAlreadyAcked).toBe(false);
-    expect(update).toHaveBeenCalledWith(
+    // PRD-v3 E-1: updateMany must include updatedAt in WHERE for OCC.
+    expect(updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "b1" },
+        where: expect.objectContaining({
+          id: "b1",
+          tenantId: "t1",
+          adminAcknowledgedAt: null,
+          updatedAt: initialUpdatedAt,
+        }),
         data: { adminAcknowledgedAt: expect.any(Date) },
       })
     );
@@ -66,11 +82,37 @@ describe("POST /api/bookings/[id]/acknowledge", () => {
   it("idempotent: re-acking already-acked booking → no update, wasAlreadyAcked true", async () => {
     getAdminFromCookie.mockResolvedValue(ADMIN);
     const existingAck = new Date("2026-04-30T10:00:00Z");
-    findFirst.mockResolvedValue({ id: "b1", adminAcknowledgedAt: existingAck });
+    const updatedAt = new Date("2026-04-30T10:00:00Z");
+    findFirst.mockResolvedValue({
+      id: "b1",
+      adminAcknowledgedAt: existingAck,
+      updatedAt,
+    });
     const res = await POST(req(), params());
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.wasAlreadyAcked).toBe(true);
-    expect(update).not.toHaveBeenCalled();
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it("stale ack (updateMany count=0) → 409", async () => {
+    getAdminFromCookie.mockResolvedValue(ADMIN);
+    const initialUpdatedAt = new Date("2026-05-01T09:00:00Z");
+    const newerUpdatedAt = new Date("2026-05-01T11:00:00Z");
+    findFirst
+      .mockResolvedValueOnce({
+        id: "b1",
+        adminAcknowledgedAt: null,
+        updatedAt: initialUpdatedAt,
+      })
+      .mockResolvedValueOnce({
+        adminAcknowledgedAt: null,
+        updatedAt: newerUpdatedAt,
+      });
+    updateMany.mockResolvedValue({ count: 0 });
+    const res = await POST(req(), params());
+    const body = await res.json();
+    expect(res.status).toBe(409);
+    expect(body.error).toBe("stale_ack");
   });
 });

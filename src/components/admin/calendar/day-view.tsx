@@ -17,6 +17,7 @@ import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { useToast } from "@/components/ui/toast";
 import { SegmentBadge } from "./segment-badge";
 import { HorizontalDateStrip } from "./horizontal-date-strip";
+import { useAutoFit } from "./use-auto-fit";
 import {
   HOURS,
   buildBookingIndex,
@@ -39,13 +40,14 @@ interface Props {
   nearEndBookings: Set<string>;
   onOpenBookingDetail: (b: Booking) => void;
   onOpenNewBooking: (date: string, time: string, duration?: number) => void;
-  /** Row height in px — controlled by useZoom (PRD-v3 D-1). */
-  slotHeight: number;
   holidayDates: Set<string>;
   mutateBookings: () => void;
   /** Notifies parent of a successful drag-reschedule so the undo toast can show. */
   onRescheduled: (r: RescheduleResult) => void;
 }
+
+const DAY_ROW_MIN_PX = 44; // Apple HIG touch target
+const DAY_ROW_MAX_PX = 72; // designer cap — above this, multi-slot wastes pixels
 
 const LONG_PRESS_MS = 500;
 const MOVE_THRESHOLD_PX = 15;
@@ -59,12 +61,14 @@ function DayViewBase({
   nearEndBookings,
   onOpenBookingDetail,
   onOpenNewBooking,
-  slotHeight,
   holidayDates,
   mutateBookings,
   onRescheduled,
 }: Props) {
   const timelineRef = useRef<HTMLDivElement>(null);
+  // Auto-fit replaces the old useZoom slot-height knob (B1 redesign).
+  // Row height is computed from container height ÷ 9, clamped 44–72 px.
+  const slotHeight = useAutoFit(timelineRef, 9, DAY_ROW_MIN_PX, DAY_ROW_MAX_PX);
   const { toast } = useToast();
 
   // Drag-to-create state
@@ -200,6 +204,9 @@ function DayViewBase({
 
   const handleSlotPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>, startHour: number) => {
+      // Don't start a new-booking gesture while a reschedule drag is in flight
+      // — the empty slot doubles as a drop target (review finding P3).
+      if (draggedBooking) return;
       const dateStr = formatDate(currentDate);
       const hourStr = `${String(startHour).padStart(2, "0")}:00`;
       if (indexIsSlotOccupied(bookingIndex, dateStr, hourStr)) return;
@@ -225,7 +232,7 @@ function DayViewBase({
         if ("vibrate" in navigator) navigator.vibrate?.(30);
       }, LONG_PRESS_MS);
     },
-    [bookingIndex, currentDate, cancelMomentum],
+    [bookingIndex, currentDate, cancelMomentum, draggedBooking],
   );
 
   const handleSlotPointerMove = useCallback(
@@ -399,10 +406,14 @@ function DayViewBase({
       </div>
 
       {/* Timeline */}
+      {/* Timeline fills remaining viewport height. The 280px subtraction
+          accounts for: status bar + admin shell header + page top bar +
+          view toggle + date strip + summary + bottom tab bar. Row heights
+          (slotHeight from useAutoFit) auto-distribute within [44, 72] px. */}
       <div
         ref={timelineRef}
         className="relative overflow-y-auto"
-        style={{ maxHeight: "calc(100vh - 280px)", touchAction: "pan-y" }}
+        style={{ height: "calc(100dvh - 280px)", touchAction: "pan-y" }}
       >
         {HOURS.map((hour) => {
           const dateStr = formatDate(currentDate);

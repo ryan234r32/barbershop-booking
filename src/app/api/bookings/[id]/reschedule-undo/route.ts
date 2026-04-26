@@ -11,9 +11,10 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
-  acquireBookingLock,
   acquireBookingRowLock,
+  acquireBookingSpanLock,
   releaseBookingLock,
+  releaseBookingSpanLock,
 } from "@/lib/booking/lock";
 import { isSlotAvailable } from "@/lib/booking/availability";
 import { getIdempotentResult } from "@/lib/booking/idempotency";
@@ -35,6 +36,9 @@ interface UndoSnapshot {
   oldEndTime: string;
   newDate: string;
   newStartTime: string;
+  /** True if the original reschedule was within 2h of appointment and bumped
+   *  the user's violationCount. Undo must reverse it (codex P2 fix). */
+  wasLateReschedule?: boolean;
 }
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -98,11 +102,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       const oldDateObj = new Date(snapshot.oldDate + "T00:00:00+08:00");
 
-      // Lock target (original) slot
-      const slotLock = await acquireBookingLock({
+      // Lock all hours the booking spanned at the original slot (codex P0 fix).
+      const slotLock = await acquireBookingSpanLock({
         tenantId: booking.tenantId,
         date: snapshot.oldDate,
         startTime: snapshot.oldStartTime,
+        slotsNeeded: booking.service.slotsNeeded,
       });
       if (!slotLock) {
         return Response.json(
@@ -121,15 +126,29 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         });
         if (!available) throw new SlotUnavailableError();
 
-        await prisma.booking.update({
-          where: { id },
-          data: {
-            date: oldDateObj,
-            startTime: snapshot.oldStartTime,
-            endTime: snapshot.oldEndTime,
-            adminAcknowledgedAt: null,
-          },
-        });
+        // Atomic restore + (optional) violation rollback (codex P2 fix).
+        // If the original reschedule was within 2h, it bumped violationCount.
+        // Undo must decrement it; otherwise an accidental drag would burn a
+        // strike permanently even after being undone.
+        await prisma.$transaction([
+          prisma.booking.update({
+            where: { id },
+            data: {
+              date: oldDateObj,
+              startTime: snapshot.oldStartTime,
+              endTime: snapshot.oldEndTime,
+              adminAcknowledgedAt: null,
+            },
+          }),
+          ...(snapshot.wasLateReschedule
+            ? [
+                prisma.user.update({
+                  where: { id: booking.userId },
+                  data: { violationCount: { decrement: 1 } },
+                }),
+              ]
+            : []),
+        ]);
 
         // Re-schedule reminders for the original slot
         cancelBookingNotifications(id).catch((err) =>
@@ -181,7 +200,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           undone: true,
         });
       } finally {
-        await releaseBookingLock(slotLock);
+        await releaseBookingSpanLock(slotLock);
       }
     } finally {
       await releaseBookingLock(rowLock);

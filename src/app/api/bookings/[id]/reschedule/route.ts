@@ -3,9 +3,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { isSlotAvailable } from "@/lib/booking/availability";
 import {
-  acquireBookingLock,
   acquireBookingRowLock,
+  acquireBookingSpanLock,
   releaseBookingLock,
+  releaseBookingSpanLock,
 } from "@/lib/booking/lock";
 import { getIdempotentResult, storeIdempotentResult } from "@/lib/booking/idempotency";
 import { cancelBookingNotifications, scheduleReminders } from "@/lib/notifications/scheduler";
@@ -38,17 +39,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const body = await request.json();
     const input = rescheduleWithIdempotencySchema.parse(body);
 
-    // Idempotency short-circuit: re-submit with same key returns cached response.
-    if (input.idempotencyKey) {
-      const cached = await getIdempotentResult<unknown>(
-        `reschedule:${id}`,
-        input.idempotencyKey,
-      );
-      if (cached) {
-        return Response.json(cached);
-      }
-    }
-
     // Acquire the booking-row lock BEFORE any other work, so a concurrent
     // reschedule of the same booking serialises here (PRD-v3 E-6).
     const rowLock = await acquireBookingRowLock(id);
@@ -59,6 +49,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
     try {
+
+    // Idempotency check happens AFTER the row lock so concurrent same-key
+    // requests collapse to one (review finding P1). The first request executes,
+    // stores the result, and releases the lock; the second acquires the lock,
+    // finds the cached result, and returns it without re-executing.
+    if (input.idempotencyKey) {
+      const cached = await getIdempotentResult<unknown>(
+        `reschedule:${id}`,
+        input.idempotencyKey,
+      );
+      if (cached) {
+        return Response.json(cached);
+      }
+    }
 
     const booking = await prisma.booking.findUnique({
       where: { id },
@@ -111,11 +115,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const newEndTime = addHours(input.startTime, booking.service.slotsNeeded);
     const newDateObj = new Date(input.date + "T00:00:00+08:00");
 
-    // Acquire lock on the new slot
-    const lock = await acquireBookingLock({
+    // Acquire locks on EVERY hour the new booking will occupy (codex P0 fix).
+    // Single-startTime locking would let two 2-slot bookings race into 12:00
+    // and 13:00 — both pass isSlotAvailable, both commit, hour 13 is double-booked.
+    const lock = await acquireBookingSpanLock({
       tenantId: booking.tenantId,
       date: input.date,
       startTime: input.startTime,
+      slotsNeeded: booking.service.slotsNeeded,
     });
     if (!lock) {
       return Response.json({ error: "該時段正在被其他人預約，請稍後再試" }, { status: 409 });
@@ -165,15 +172,54 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           : []),
       ]);
 
-      // Store undo snapshot — short TTL covers the toast window. PRD-v3 E-5.
-      await storeIdempotentResult(
+      // ─── Cache writes BEFORE notifications (codex P1 + P2 fix) ───
+      // The 10s row-lock lease can expire if Vercel cold-starts the LINE
+      // notification path. By writing idempotency + undo cache first, a retry
+      // that arrives after lock expiry hits the idempotency cache instead of
+      // re-executing (which would double-increment violations + double-notify).
+
+      // Store undo snapshot, including wasLateReschedule so undo can roll back
+      // the violation (codex P2 fix #5).
+      const undoStored = await storeIdempotentResult(
         UNDO_SCOPE,
         id,
-        { oldDate, oldStartTime, oldEndTime, newDate: input.date, newStartTime: input.startTime },
+        {
+          oldDate,
+          oldStartTime,
+          oldEndTime,
+          newDate: input.date,
+          newStartTime: input.startTime,
+          wasLateReschedule: isVeryLateReschedule,
+        },
         UNDO_TTL_SECONDS,
       );
 
-      // Cancel old notifications and schedule new ones
+      // undoAvailable reflects actual cache persistence (codex P2 fix #6) —
+      // if Redis is down, don't tell the client "you can undo" when they can't.
+      const result = {
+        booking: {
+          id,
+          date: input.date,
+          startTime: input.startTime,
+          endTime: newEndTime,
+          oldDate,
+          oldStartTime,
+        },
+        undoAvailable: undoStored,
+        undoExpiresInSeconds: undoStored ? UNDO_TTL_SECONDS : 0,
+      };
+
+      // Cache the idempotent result EARLY — before any awaited notification work.
+      if (input.idempotencyKey) {
+        await storeIdempotentResult(
+          `reschedule:${id}`,
+          input.idempotencyKey,
+          result,
+          UNDO_TTL_SECONDS,
+        );
+      }
+
+      // ─── Notifications (after cache, so retry-safety is in place) ───
       cancelBookingNotifications(id).catch((err) =>
         logger.error("Failed to cancel old notifications", err, "reschedule")
       );
@@ -188,7 +234,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         logger.error("Failed to schedule new reminders", err, "reschedule")
       );
 
-      // Send LINE reschedule confirmation
       try {
         const lineClient = getLineClient();
         const liffBaseUrl = booking.tenant.liffId
@@ -210,8 +255,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         logger.error("Failed to send reschedule LINE message", lineError, "reschedule");
       }
 
-      // Notify admin (also re-acks via the new bookingId on the new date/time).
-      // Await on Vercel — fire-and-forget promises get killed at response time.
       try {
         await notifyAdminNewBooking({
           tenantId: booking.tenantId,
@@ -227,32 +270,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         logger.error("Failed to notify admin (reschedule)", err, "reschedule");
       }
 
-      const result = {
-        booking: {
-          id,
-          date: input.date,
-          startTime: input.startTime,
-          endTime: newEndTime,
-          oldDate,
-          oldStartTime,
-        },
-        undoAvailable: true,
-        undoExpiresInSeconds: UNDO_TTL_SECONDS,
-      };
-
-      // Cache the result for idempotency (PRD-v3 E-5).
-      if (input.idempotencyKey) {
-        await storeIdempotentResult(
-          `reschedule:${id}`,
-          input.idempotencyKey,
-          result,
-          UNDO_TTL_SECONDS,
-        );
-      }
-
       return Response.json(result);
     } finally {
-      await releaseBookingLock(lock);
+      await releaseBookingSpanLock(lock);
     }
     } finally {
       await releaseBookingLock(rowLock);
