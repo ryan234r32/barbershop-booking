@@ -9,6 +9,7 @@ import {
   paymentGuideMessage,
   adminNewBookingMessage,
   adminCancellationMessage,
+  serviceInquiryFlexMessage,
 } from "@/lib/line/messages";
 
 describe("bookingConfirmationMessage", () => {
@@ -402,5 +403,48 @@ describe("adminCancellationMessage", () => {
     const msg = adminCancellationMessage(params);
     const bodyStr = JSON.stringify(msg.contents);
     expect(bodyStr).toContain("預約取消通知");
+  });
+});
+
+describe("serviceInquiryFlexMessage", () => {
+  const baseParams = {
+    liffBaseUrl: "https://liff.line.me/test",
+    shopName: "測試店",
+  };
+
+  it("perm: title says 想燙嗎？", () => {
+    const msg = serviceInquiryFlexMessage({ ...baseParams, serviceType: "perm" });
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("想燙嗎？");
+    expect(msg.altText).toContain("燙");
+  });
+
+  it("color: title says 想染嗎？", () => {
+    const msg = serviceInquiryFlexMessage({ ...baseParams, serviceType: "color" });
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("想染嗎？");
+    expect(msg.altText).toContain("染");
+  });
+
+  it("asks for the 3 things admin needs (last service date / current photo / target style)", () => {
+    const msg = serviceInquiryFlexMessage({ ...baseParams, serviceType: "perm" });
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("A.");
+    expect(bodyStr).toContain("B.");
+    expect(bodyStr).toContain("C.");
+    expect(bodyStr).toContain("照片");
+    expect(bodyStr).toContain("造型");
+  });
+
+  it("includes shop name in subtitle", () => {
+    const msg = serviceInquiryFlexMessage({ ...baseParams, serviceType: "color" });
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("測試店");
+  });
+
+  it("CTA button links to LIFF", () => {
+    const msg = serviceInquiryFlexMessage({ ...baseParams, serviceType: "perm" });
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("https://liff.line.me/test");
   });
 });

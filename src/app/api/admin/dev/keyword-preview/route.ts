@@ -10,12 +10,15 @@ import {
   paymentGuideMessage,
   welcomeMessage,
   busyNoticeMessage,
+  serviceInquiryFlexMessage,
 } from "@/lib/line/messages";
 import type { Message } from "@line/bot-sdk";
 
 const INTENT_LABELS: Record<KeywordIntent, string> = {
   "my-bookings": "我的預約 (P1)",
   "cancel-reschedule": "取消 / 改期 (P2)",
+  "service-inquiry-perm": "燙髮諮詢 (P2.5)",
+  "service-inquiry-color": "染髮諮詢 (P2.5)",
   "booking": "新預約 (P3)",
   "pricing": "服務價格 (P4)",
   "payment": "付款 / 轉帳 (P5)",
@@ -102,6 +105,14 @@ export async function POST(request: NextRequest) {
       });
       break;
     }
+    case "service-inquiry-perm":
+    case "service-inquiry-color":
+      preview = serviceInquiryFlexMessage({
+        serviceType: intent === "service-inquiry-perm" ? "perm" : "color",
+        liffBaseUrl: liffUrl,
+        shopName,
+      });
+      break;
     case "thanks":
       preview = {
         type: "text",

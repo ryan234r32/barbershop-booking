@@ -17,6 +17,7 @@ import {
   myBookingsEmptyMessage,
   paymentGuideMessage,
   busyNoticeMessage,
+  serviceInquiryFlexMessage,
 } from "@/lib/line/messages";
 import { MessageKind } from "@prisma/client";
 import { classifyIntent } from "./classify-intent";
@@ -386,6 +387,21 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
         shopName,
       }),
       true
+    );
+  }
+
+  // Priority 6.5: Service inquiry — perm / color (PRD-v3 §7)
+  // 漂髮 NOT routed here — it goes through Wave 4a consultation flow which
+  // creates a ConsultationRequest record. Perm/color is lighter touch: ask
+  // the 3 things admin needs (last service date, current photo, target style)
+  // then admin handles via LINE chat or LIFF booking.
+  if (intent === "service-inquiry-perm" || intent === "service-inquiry-color") {
+    return reply(
+      serviceInquiryFlexMessage({
+        serviceType: intent === "service-inquiry-perm" ? "perm" : "color",
+        liffBaseUrl: liffUrl,
+        shopName,
+      })
     );
   }
 
