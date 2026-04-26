@@ -414,7 +414,7 @@ function DayViewBase({
       <div
         ref={timelineRef}
         className="relative overflow-y-auto"
-        style={{ height: "calc(100dvh - 220px)", touchAction: "pan-y" }}
+        style={{ height: "calc(100dvh - 330px)", touchAction: "pan-y" }}
       >
         {HOURS.map((hour) => {
           const dateStr = formatDate(currentDate);
