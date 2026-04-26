@@ -64,7 +64,7 @@ export function HorizontalDateStrip({ currentDate, onSelect }: Props) {
   return (
     <div
       ref={containerRef}
-      className="flex items-stretch mb-3 select-none overflow-x-auto scrollbar-hide pb-1 w-full"
+      className="flex items-stretch mb-2 select-none overflow-x-auto scrollbar-hide pb-1 w-full"
       style={{ WebkitOverflowScrolling: "touch" }}
     >
       {dates.map((d) => {

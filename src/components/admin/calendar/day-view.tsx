@@ -20,6 +20,7 @@ import { HorizontalDateStrip } from "./horizontal-date-strip";
 import { useAutoFit } from "./use-auto-fit";
 import {
   HOURS,
+  abbreviateService,
   buildBookingIndex,
   cardBgClass,
   formatDate,
@@ -396,7 +397,7 @@ function DayViewBase({
       })()}
 
       {/* Summary Strip */}
-      <div className="bg-[var(--color-surface)] rounded-lg px-4 py-2.5 mb-4 flex items-center justify-between text-sm">
+      <div className="bg-[var(--color-surface)] rounded-lg px-4 py-2 mb-2 flex items-center justify-between text-sm">
         <span className="font-semibold text-[var(--color-text-primary)]">
           今日 {todayBookings.length} 預約
         </span>
@@ -406,14 +407,15 @@ function DayViewBase({
       </div>
 
       {/* Timeline */}
-      {/* Timeline fills remaining viewport height. The 280px subtraction
+      {/* Timeline fills remaining viewport height. The 250px subtraction
           accounts for: status bar + admin shell header + page top bar +
           view toggle + date strip + summary + bottom tab bar. Row heights
-          (slotHeight from useAutoFit) auto-distribute within [44, 72] px. */}
+          (slotHeight from useAutoFit) auto-distribute within [44, 72] px.
+          Tightened from 280→250 in B5 fix after spacing reduction. */}
       <div
         ref={timelineRef}
         className="relative overflow-y-auto"
-        style={{ height: "calc(100dvh - 280px)", touchAction: "pan-y" }}
+        style={{ height: "calc(100dvh - 250px)", touchAction: "pan-y" }}
       >
         {HOURS.map((hour) => {
           const dateStr = formatDate(currentDate);
@@ -438,6 +440,10 @@ function DayViewBase({
               </div>
               <div className="flex-1 border-t border-[var(--color-surface)] px-1 pt-1">
                 {booking ? (
+                  // Compact card layout (B5 fix): row height now 44-72px (auto-fit
+                  // clamp), down from old fixed 96px. Content must fit + overflow-hidden
+                  // to prevent leaking into adjacent rows. Multi-slot bookings get a
+                  // third line with the full service name since they have more height.
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -450,37 +456,27 @@ function DayViewBase({
                       setDragOverHour(null);
                     }}
                     onClick={() => onOpenBookingDetail(booking)}
-                    className={`relative rounded-lg p-3 h-full cursor-grab active:cursor-grabbing transition-all hover:opacity-90 flex flex-col ${cardBgClass(booking)} ${draggedBooking?.id === booking.id ? "opacity-40 ring-2 ring-[var(--color-brand)]" : ""}`}
-                    title="點擊查看詳情；拖曳到其他時段可改期"
+                    className={`relative rounded-lg px-2 py-1.5 h-full cursor-grab active:cursor-grabbing transition-all hover:opacity-90 flex flex-col gap-0.5 overflow-hidden ${cardBgClass(booking)} ${draggedBooking?.id === booking.id ? "opacity-40 ring-2 ring-[var(--color-brand)]" : ""}`}
+                    title={`${booking.startTime}-${booking.endTime} ${booking.service.name} · ${booking.user.displayName || "顧客"}${isPaid(booking) ? " (已付款)" : ""}`}
                   >
                     {!booking.adminAcknowledgedAt && (
                       <span
-                        className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[var(--color-danger)] ring-2 ring-[var(--color-bg)]"
+                        className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[var(--color-danger)]"
                         aria-label="未讀新預約"
                         title="未讀 — 點擊查看詳情即標記為已讀"
                       />
                     )}
 
-                    <p className="text-[11px] text-[var(--color-text-muted)] font-mono mb-1">
-                      {booking.startTime} - {booking.endTime}
-                    </p>
-
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-semibold text-[var(--color-text-primary)] text-[16px] leading-tight truncate flex-1">
-                        {booking.user.displayName || "顧客"}
-                      </p>
-                      <SegmentBadge segment={booking.user.segment} />
-                    </div>
-
-                    <div className="mt-auto flex items-center gap-2 pt-2">
-                      <span className="inline-block px-2 py-0.5 rounded bg-[var(--color-bg)]/60 text-[var(--color-text-body)] text-[11px] font-medium">
-                        {booking.service.name}
+                    {/* Line 1: time range + paid checkmark (small, muted) */}
+                    <div className="flex items-center gap-1 text-[10px] text-[var(--color-text-muted)] font-mono leading-none">
+                      <span className="truncate">
+                        {booking.startTime}-{booking.endTime}
                       </span>
                       {isPaid(booking) && (
-                        <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[var(--color-success)]">
+                        <span className="ml-auto inline-flex items-center gap-0.5 text-[var(--color-success)] pr-3">
                           <svg
-                            width="10"
-                            height="10"
+                            width="9"
+                            height="9"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
@@ -490,10 +486,26 @@ function DayViewBase({
                           >
                             <polyline points="20 6 9 17 4 12" />
                           </svg>
-                          已付款
+                          已付
                         </span>
                       )}
                     </div>
+
+                    {/* Line 2: service prefix + customer name + segment badge (B3 pattern) */}
+                    <div className="flex items-center justify-between gap-1.5 min-h-0">
+                      <p className="font-semibold text-[var(--color-text-primary)] text-[13px] leading-tight truncate flex-1">
+                        <span className="opacity-65 mr-1">{abbreviateService(booking.service.name)}</span>
+                        {booking.user.displayName || "顧客"}
+                      </p>
+                      <SegmentBadge segment={booking.user.segment} />
+                    </div>
+
+                    {/* Line 3 (multi-slot only): full service name pill */}
+                    {booking.slotsOccupied > 1 && (
+                      <span className="mt-auto inline-block self-start px-1.5 py-0.5 rounded bg-[var(--color-bg)]/60 text-[var(--color-text-body)] text-[11px] font-medium leading-none truncate max-w-full">
+                        {booking.service.name}
+                      </span>
+                    )}
                   </div>
                 ) : (
                   <div
