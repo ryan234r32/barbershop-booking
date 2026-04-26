@@ -3,10 +3,10 @@
 
 | | |
 |---|---|
-| **版本** | v3.0 (Draft，待審核) |
+| **版本** | v3.2 (post-codex review §13.12 蘖身) |
 | **撰寫日期** | 2026-04-24 |
-| **最後更新** | 2026-04-25（融入碩展訪談） |
-| **狀態** | ⏳ 待 G-stack 審核（CEO / Design / Eng / Autoplan） |
+| **最後更新** | 2026-04-25（碩展訪談 + autoplan 三 phase + §13 branch wave + §13.12 G-Stack 戰術組 → codex review 後蘖身） |
+| **狀態** | ✅ 全 sections 已過審核，可進 Phase A |
 | **產品擁有者** | Ryan |
 | **目標 Demo** | 第三次老闆訪談（時間待定） |
 | **預估開發** | 5-6 週（1 人全職） |
@@ -39,13 +39,14 @@
 
 | 角色 | 姓名 | 狀態 | 日期 | 備註 |
 |---|---|---|---|---|
-| 產品擁有者 | Ryan | ⏳ pending | | |
-| CEO Review | `/plan-ceo-review` | ⏳ pending | | |
-| Design Review | `/plan-design-review` | ⏳ pending | | |
-| Eng Review | `/plan-eng-review` | ⏳ pending | | |
-| Final Gate | `/autoplan` | ⏳ pending | | |
-| Stakeholder | 碩展（顧問）| ⏳ optional | | |
-| Stakeholder | Ken 老闆 | ⏳ optional | | |
+| 產品擁有者 | Ryan | ✅ approved | 2026-04-25 | autoplan 跑完 + §13 + §13.12 |
+| CEO Review | `/plan-ceo-review` | ✅ done via autoplan | 2026-04-25 | 6/8 dimensions consensus，user 已解 |
+| Design Review | `/plan-design-review` | ✅ done via autoplan | 2026-04-25 | 7/7 dimensions consensus，12 項自動補 |
+| Eng Review | `/plan-eng-review` | ✅ done via autoplan | 2026-04-25 | 8/9 dimensions consensus，21 項自動補 |
+| Final Gate | `/autoplan` | ✅ done | 2026-04-25 | 三 phase 跑完 |
+| §13.12 G-Stack 戰術 | `/codex review` | ✅ done | 2026-04-25 | 5 個 high/medium 採納，§13.12 蘖身 |
+| Stakeholder | 碩展（顧問）| ⏳ optional | | 訪談已融入，可選擇給他看 v3.1 |
+| Stakeholder | Ken 老闆 | ⏳ optional | | 第三次訪談時 demo |
 
 ---
 
@@ -678,7 +679,7 @@ model Tenant {
 **執行方式**：
 - 先把所有新元件樣式寫出來
 - 每個 PR 跑 `/design-review` skill 做 QA
-- 老闆在平板 dogfood 前跑 `/autoplan` 最後一關
+- 老闆在平板 dogfood 前跑一次 `/qa` + `/canary` 整體驗收（`/autoplan` 已在 2026-04-25 跑完，PRD-level 不再重跑）
 
 ---
 
@@ -952,16 +953,14 @@ model Tenant {
   3. admin 在 /calendar 拖拉預約 → reschedule API → 客戶收通知 → ack 重置 → modal 再彈
 - **Excel 匯入 + 報表 demo**：跑 `scripts/import-2025-excel.ts --tenant=demo-2025-history --dry-run` → review → 灌入 → 開 /admin/analytics 切到 demo tenant → 看 12 個月趨勢線 + 服務 mix + 熱力圖都有資料
 
-### G-stack 審核
-按順序跑：
-1. `/plan-ceo-review` — 挑戰 scope（要不要砍 §8 回購券（A/B）？）
-2. `/plan-design-review` — 行事曆 + 對帳卡 + 諮詢頁視覺評分
-3. `/plan-eng-review` — 拖拉改期的 race condition、cron 時機、schema migration 安全性
-4. `/autoplan` — 最後一道閘
+### G-stack 審核（2026-04-25 已完成）
+- ✅ `/autoplan` 跑完三 phase（CEO + Design + Eng），結果見 §「/autoplan Phase 1-4 結果」
+- ✅ `/codex review` 跑完 §13.12 G-Stack 戰術工具搭配
+- 之後 V3 開發週期內按需求啟用 §13.12 工具配套
 
 ### 老闆驗收
 - 老闆平板實地 dogfood 1 週
-- 每日老闆回饋 → 立刻修 → `/canary` 監控錯誤
+- 每日老闆回饋 → 立刻修 → 改 → 部署後跑一次 `/canary`（單 pass 檢查，非持續監控）
 
 ---
 
@@ -1336,4 +1335,440 @@ model Tenant {
 
 ## /autoplan 結束。可以進 Phase A 開始寫 code。
 
+---
+
+## 13. 執行計劃（Branch-based Wave 執行模型）
+
+> **產出日期**：2026-04-25（v3：從 worktree 改 branch-only）
+> **執行人**：Ryan（solo dev）
+> **總時程**：**5-6 週**（autoplan 樂觀估 4-4.5 週，Plan agent eng review 修正後恢復）
+> **追蹤檔**：[`tasks/in-flight.md`](../tasks/in-flight.md) — 每天開工前必看
+>
+> **版本演進**：
+> - v1 經 Plan agent eng review 評 5.5/10 不核准 → 修依賴鏈與時程
+> - v2 加入跨 Wave 配套（DB snapshot, feature flag, 中期 demo）
+> - **v3** 經 CEO + Eng 雙 review 確認「solo sequential dev 用 worktree 是 over-engineering」→ 全面改 branch-only 模式
+
+### 13.0 工作紀律（鐵律）
+
+| 規則 | 數值 |
+|------|------|
+| 同時 active branch 上限 | **1 條**（solo dev sequential） |
+| 例外（Wave 3 calendar 期間） | 可開 1 條獨立 polish branch（純 docs/asset，不動 code） |
+| 每個 branch 壽命 | **1–3 天**（calendar 例外 10-14 天，內部分階段 sub-PR） |
+| 跳 Wave 順序 | **絕對禁止**（後波依賴前波 schema/foundation） |
+| 直接 push main | **絕對禁止**（GitHub branch protection 強制） |
+
+**為什麼 1 條 branch 上限**：
+- Solo dev 一次只能 deep work 一件事，多開只是注意力碎裂
+- Branch 切換成本是「commit + checkout」，比 worktree 切資料夾還快
+- Vercel auto-preview 每個 PR 一個獨立 URL，不需要平行跑 dev server
+- Linus Torvalds 30 年 Linux kernel 也很少用 worktree —— 業界共識
+
+**為什麼不用 worktree**（CEO + Eng 雙 review 結論）：
+- Worktree 真正解決的是「同時跑多 dev server / 多 Claude session 並行」
+- Solo sequential dev 兩個都用不到
+- Worktree 帶來的多管理一個資料夾、merge 衝突風險、注意力碎裂 —— 純 overhead
+
+---
+
+### 13.1 跨 Wave 強制配套（每個 PR 都要）
+
+從 Plan agent review 加入，**每個 PR/worktree 都要套用**：
+
+1. **CI 硬性 gate**：每個 PR 必須通過 `npm run test` + `npm run lint` + Vercel preview deploy 才能 merge
+2. **DB snapshot**：Wave 2 任何 migration 上 production 前，先 Supabase dashboard 手動 snapshot
+3. **Feature flag**：所有新功能（諮詢、回購券、付款 UX、新行事曆）都掛 `tenant.featureFlags`，可 0-cost rollback
+4. **Demo tenant 隔離**：Excel 灌歷史資料 → `import-only-demo-tenant guard`（E-18），絕對不能污染 production
+5. **LIFF backward compat**：Wave 2 §1 Service 加新欄位時，**舊 booking 沒新欄位的情境**要寫 fallback 邏輯
+6. **中期 demo（Wave 3 結束時）**：讓老闆看到行事曆 + 歷史資料 demo，避免做 4 週才發現方向錯
+7. **老闆 blocker tracking**：等老闆回的東西獨立列入 `tasks/in-flight.md` 阻塞清單
+
+---
+
+### 13.2 Wave 1：Phase A 雜事 + Rich Menu 提前（Week 1）
+
+**模式**：✅ 直接 branch off main，**不開 worktree**
+
+| # | 任務 | 預估 | PRD § | 整合 E-X |
+|---|------|------|-------|---------|
+| 1.1 | §5 CRM 兩個常數（AT_RISK 60→100、LAPSED 120→180）| 10 分 | §5 | — |
+| 1.2 | §5 segmentation 邏輯重寫（60 天窗口 + CTE 取代 N+1）| 半天 | §5 | **E-10** |
+| 1.3 | §11 #2 後台手動新增預約送出鈕修復 | 30 分 | §11 | — |
+| 1.4 | §11 #3a 後台「保持登入 30 天」cookie | 30 分 | §11 | — |
+| 1.5 | §11 #5「我的預約」按鈕效能 | 1 hr | §11 | — |
+| 1.6a | §2 認知通知**文案 only**（不動 calendar）| 1 hr | §2 | — |
+| 1.7 | §7 關鍵字回覆（燙/染/改/取消，**不含**漂髮）| 1.5 天 | §7 | — |
+| **1.8** | **§11 #1 Rich Menu 4→6 格重構**（從 Wave 5 提前）| 1 天 | §11 | — |
+
+**v1 → v2 變更**：
+- ❌ 原 1.6 (§2 認知通知 + 行事曆顯示邏輯) → ✅ **拆成 1.6a 文案 only**，行事曆 ack 顯示邏輯（1.6b）併入 Wave 3 calendar-v3，避免在 main 上動 calendar/page.tsx 為 Wave 3 埋雷
+- ➕ 新增 1.8 Rich Menu 提前到 Wave 1（原排 Wave 5 太擠）
+
+**8 個 PR，1 週清完**。Wave 1 結束 = main 乾淨，準備進 Wave 2 schema 大改動。
+
+---
+
+### 13.3 Wave 2：Schema 三條獨立 branch（Week 2）
+
+**模式**：⚠️ **三條獨立 branch sequential**（v1 把三個塞同一個分支是地雷，已修正）
+
+**為什麼必須拆**：
+- §1 Service 重構 = high blast radius（動 booking flow + admin + seed.ts + smoke-ecpay）
+- §3 ConsultationRequest = 純加表，零風險
+- §8 Coupon = 純加表，零風險
+- 綁一起 → §1 出包整批 rollback，連帶把 §3/§8 也回滾
+
+```
+Wave 2a: branch `wave-2a/service-schema` (3 天)
+├── §1 Service schema (type, requiresWith, allowStandalone)
+├── seed.ts 重寫（等老闆服務確認表回來才能 finalize）
+├── booking flow 整合新型別
+├── admin new-booking sheet 整合
+├── prisma migrate dev → migration 檔
+├── DB snapshot before deploy
+└── tenant.featureFlags['service-v3'] (E-21)
+        ↓ PR + Vercel preview + merge to main
+Wave 2b: branch `wave-2b/consultation-schema` (1 天)
+├── §3 ConsultationRequest 表 + status enum
+├── prisma migrate dev
+└── tenant.featureFlags['consultation'] (E-21)
+        ↓ PR + Vercel preview + merge to main
+Wave 2c: branch `wave-2c/coupon-schema` (1 天)
+├── §8 Coupon 表 + experimentArm 欄位
+├── prisma migrate dev
+└── tenant.featureFlags['coupon-ab'] (E-21)
+        ↓ PR + Vercel preview + merge to main
+```
+
+**v1 → v2 變更**：
+- ❌ 原「1 個 worktree 三 commit 連著做」 → ✅ **三個獨立 worktree/PR，依序 merge**
+- ➕ 強制 prisma migrate dev（不用 db:push）—— autoplan E-20
+
+**強制驗證**：每個 migration `/codex` 看一次 + DB snapshot + Supabase dev → staging dry run 才上 production。
+
+**🚧 Blocker**：老闆服務項目確認表 ([服務項目確認表-給老闆-2026-04-24.xlsx](服務項目確認表-給老闆-2026-04-24.xlsx)) 沒回來之前，**Wave 2a seed.ts 無法 finalize**，最多只能寫 schema + 留空 seed。
+
+---
+
+### 13.4 Wave 3：Excel 匯入 → Calendar V3（Week 3-5）
+
+**模式**：🎯 **Wave 2a 完全 merge 後**才能開始；兩條 branch sequential（excel 先、calendar 後）
+
+**為什麼這個順序**（v3 修正：branch-only 模式不平行）：
+- 兩條都依賴 Wave 2a §1 schema 完成
+- Excel 4-5 天較小，先做：累積信心 + 灌好 demo data 給後續報表用
+- Calendar 10-14 天最大，後做：有了 demo data 可以一邊測一邊改
+
+```
+Wave 3.B 先：branch `wave-3b/excel-import` (預估 4-5 天)
+├── Commit 1: §10.1 Excel 解析（exceljs 取代 xlsx — E-16）+ 紅字辨識
+├── Commit 2: service-name-map.json 模糊匹配
+├── Commit 3: 灌入邏輯
+│             + E-17 deterministic id（防雙倍）
+│             + E-18 only-demo-tenant guard
+└── Commit 4: 跑進 demo tenant 灌全年資料
+        ↓ PR + Vercel preview + merge to main
+
+Wave 3.A 後：branch `wave-3a/calendar-v3` (預估 10-14 天，主力)
+這條 branch 較長，內部分階段 merge sub-PR 進去（每 2-3 天一次）：
+├── Sub-PR 1: 子元件拆分（DayView, WeekView, MonthView 三檔）
+│             + 新型別整合（service.type, requiresWith）
+├── Sub-PR 2: Day 檢視 + 縮放（PointerEvent + wheel）
+├── Sub-PR 3: Week + Month 檢視
+├── Sub-PR 4: 拖拉改期 + ghost preview + 衝突檢測
+│             + E-5: idempotency key + 真 undo endpoint
+├── Sub-PR 5: ack 顯示邏輯（原 1.6b 併入）
+│             + E-1: ack 版本 token
+└── Sub-PR 6: 觸控手勢（捏合縮放）
+```
+
+**v2 → v3 變更**：
+- ❌ 原「2 個 worktree 並存」→ ✅ **branch-only sequential，excel 先 calendar 後**
+- ➕ Calendar 內部拆 6 個 sub-PR 階段 merge（避免單一巨大 PR）
+- ➕ 每天早上 calendar branch `git fetch origin && git rebase origin/main`
+
+**🚧 Blocker**：
+- Wave 2a §1 沒 merge → calendar 跟 excel 都不能開
+- service-name-map.json 是手工 → 需要老闆確認服務對應後才能寫
+
+**🎯 中期 Demo**：Wave 3 結束、Wave 4 開始前，**必須 demo 給老闆看一次**。如果方向錯，這是最後一個低成本掉頭點。
+
+---
+
+### 13.5 Wave 4：依賴 schema 的功能（Week 5-6）
+
+**模式**：⚙️ **三條 branch sequential**，consultation 必須最先
+
+**為什麼順序這樣**：
+- consultation-flow 動 LINE webhook handler，跟 Wave 1.7 關鍵字回覆共用 `src/app/api/webhook/route.ts` + `classify-intent.ts`
+- 必須先把 consultation 的 webhook 整合進去，**不然之後 payment/coupon 改 webhook 會撞**
+- v2 有提「payment + coupon 並行」，v3 修正：solo dev branch-only 模式 sequential 才合身
+
+```
+Wave 4a: branch `wave-4a/consultation-flow` (3-4 天)  ← 必須先做
+└── §3 諮詢 admin UI + 紅點 + 漂髮關鍵字 → 自動建 consultation
+    + E-7: Supabase Storage RLS for consultation photos
+    + LIFF backward compat（沒上傳照片的舊 consultation 顯示處理）
+            ↓ PR + merge
+
+Wave 4b: branch `wave-4b/payment-ux` (3-4 天)
+└── §6 付款對帳卡 + LIFF 匯款入口 + 結束前 20 分推播
+    動到：src/app/(liff)/payment/, src/components/admin/payment-*
+            ↓ PR + merge
+
+Wave 4c: branch `wave-4c/coupon-ab` (2-3 天)
+└── §8 回購券 A/B test (95 折，30 天 vs 45 天並行)
+    + E-15: experimentArm persist to User row
+    動到：src/app/(liff)/, src/lib/booking/post-completion-hook.ts
+            ↓ PR + merge
+```
+
+**v2 → v3 變更**：
+- ❌ 原「payment + coupon 並行」→ ✅ **三條全 sequential**（branch-only 模式紀律）
+- 時間總和不變（payment 3-4 + coupon 2-3 ≈ 6-7 天，反正人類一次只能做一件）
+
+---
+
+### 13.6 Wave 5：報表 + UI Polish + QA（Week 6-7）
+
+```
+Wave 5 主力：branch `wave-5/reports` (4-5 天)
+└── §10.2 8 個 widget（用 Wave 3.B 灌好的全年 demo data）
+    Demo tenant switcher（盲點補丁）：admin 加 dropdown 切換 production / demo-2025
+
+收尾小 PR（每個獨立 branch）：
+├── branch `wave-5/brand-polish` — §9 品牌設計規範套用（CSS 微調）
+├── branch `wave-5/ai-image-swap` — §11 AI 圖片替換
+└── 全面 QA + /design-review + dogfood **3-5 天**
+```
+
+**v2 → v3 變更**：
+- ❌ 原「main 直接做」純 CSS/asset → ✅ 仍走 branch + PR（branch protection 強制）
+- ➖ Rich Menu 6 格已提前到 Wave 1.8
+- ➕ Demo tenant switcher（v1 盲點，老闆 demo 必需）
+
+---
+
+### 13.7 反 Pattern 清單（看到衝動就回來看）
+
+| 反 pattern | 為什麼錯 |
+|-----------|---------|
+| ❌ 同時開 2 條以上 active branch | Solo dev sequential，多開純粹注意力碎裂 |
+| ❌ 用 worktree 想「平行」 | Solo sequential dev 用不到 worktree 任何獨特好處，純 overhead |
+| ❌ Schema 三併一 PR | §1 出包連帶 §3/§8 全 rollback |
+| ❌ Calendar branch 養 3 週不分階段 merge | main 一直在動，最後 rebase 地獄；應該每 2-3 天 sub-PR merge |
+| ❌ Wave 3 跟 Wave 2 並行 | calendar/excel 都吃 §1 schema，違反依賴 |
+| ❌ Calendar 估 5-7 天 | 1145 行 + 拖拉 + 新型別 = 真實 10-14 天 |
+| ❌ 跳 Wave 順序 | Wave 4 依賴 Wave 2，先做空中樓閣 |
+| ❌ 用 `db:push` 不用 `prisma migrate` | E-20 明確禁止 |
+| ❌ Wave 2 上 production 前不 snapshot DB | 一個 migration 出包就完蛋 |
+| ❌ 直接 push main | GitHub branch protection 會擋（已設定），但別嘗試 |
+| ❌ Pre-push hook 失敗用 `--no-verify` 繞過 | 失去 build/test 安全網 |
+| ❌ PR 沒看 Vercel preview 就 merge | 失去最後一道安全網 |
+| ❌ 5-6 週才給老闆看一次 | 中期方向錯，發現太晚 |
+
+---
+
+### 13.8 整體統計
+
+| | 數量 |
+|---|------|
+| Wave 1 PR 數量 | 8 條 branch sequential |
+| Wave 2 PR 數量 | 3 條 branch sequential（每條一個 schema migration）|
+| Wave 3 PR 數量 | 1 + ~6 sub-PR（excel 1 條、calendar 1 條長 branch 內部分 6 階段 merge） |
+| Wave 4 PR 數量 | 3 條 branch sequential |
+| Wave 5 PR 數量 | 3 條 branch（reports + brand polish + AI image swap）|
+| **總 branch 數** | **~18 條**（每條都走 PR + Vercel preview + 你親手 merge） |
+| **同時 active 上限** | **1 條** |
+| 每個 branch 壽命 | 1-3 天（calendar 例外 10-14 天，內部 sub-PR 階段 merge） |
+| Worktree 用量 | **0**（全 branch-only） |
+| 整體預估 | **5-6 週**（v2 修正後估時，sequential 不影響總時程） |
+| 真實 blockers | 老闆服務確認表回傳、service-name-map.json 手工、第三次老闆 demo 約時間 |
+
+---
+
+### 13.9 配套追蹤工具
+
+每天開工前看 [`tasks/in-flight.md`](../tasks/in-flight.md)，更新：
+- Active Branch（上限 1）
+- Open PRs（含 Vercel preview URL）
+- Completed This Wave
+- Next Up
+- **🚧 Blockers**（等老闆 / 等 service-name-map / 等 DB snapshot）
+
+### 13.10 GitHub Branch Protection（一次性設定）
+
+**必做**，這是 branch-only 模式的安全底線。
+
+到 GitHub repo → Settings → Branches → Add branch protection rule:
+```
+Branch name pattern: main
+
+✅ Require a pull request before merging
+   ✅ Require approvals: 1 (你自己 self-review)
+✅ Require status checks to pass before merging
+   ✅ Require branches to be up to date before merging
+✅ Do not allow bypassing the above settings
+```
+
+**效果**：你 / Claude / 任何人都**無法** `git push` 直接到 main，必須走 PR + 通過 lint + test 才能 merge。
+
+---
+
+### 13.11 v1 → v2 → v3 修正履歷
+
+**v1 → v2** 源頭：Plan agent adversarial review (2026-04-25)，評 v1 5.5/10 不核准。
+- Wave 2 schema 從「1 worktree 三 commit」拆成「3 個獨立 PR sequential」
+- Wave 3「零檔案重疊」承認錯誤，改為「Wave 2a 完成後才能開」
+- Calendar 估時 5-7 天 → 10-14 天
+- Wave 4 順序從全 sequential 改為 consultation 先、payment+coupon 並行（後 v3 又改回 sequential）
+- Wave 1.6 拆成 1.6a 文案、1.6b 併入 Wave 3
+- Rich Menu 6 格從 Wave 5 提前到 Wave 1.8
+- 加跨 Wave 強制配套（CI gate, DB snapshot, feature flag, demo tenant guard, LIFF backward compat, 中期 demo）
+- 時程恢復 5-6 週
+
+**v2 → v3** 源頭：CEO + Eng 雙 review (2026-04-25 同日)，雙確認「solo sequential dev 用 worktree 是 over-engineering」。
+- 全面從 worktree 模型改成 branch-only 模型
+- 同時 active 上限從「2 個 worktree」→「1 條 branch」
+- Wave 3 從「2 worktree 並存」→「excel 先 calendar 後 sequential」
+- Wave 4 從「consultation 先 + payment/coupon 並行」→「三條全 sequential」
+- Calendar 從「單一長 worktree」→「長 branch 內部 6 個 sub-PR 階段 merge」
+- 加 §13.10 GitHub branch protection 強制
+- Anti-pattern 重寫為 branch 視角
+
+**v3 工作模式總結**：一條 branch、sequential 工作、每條 branch 走 PR + Vercel preview + 你親手 merge，main 永遠保持線上穩定。
+
+---
+
+### 13.12 G-Stack 戰術工具搭配（精簡版，post-codex review）
+
+**定位**：§13.0–§13.11 是**戰略**（branch model、wave order、CI gate）。本節列出開發週期會**實際反覆使用**的最小工具組。
+
+> **為什麼這節這麼短？** 2026-04-25 跑 `/codex review` 抓到原版 §13.12「過度發明 G-Stack 工具行為、儀式 overload、跟其他段矛盾」，採納 codex 建議蘖身為「最小默認組 + 條件 gate + 高風險協議」。
+>
+> **本節列入原則**：repo 內已有 artifacts（`.gstack/canary-reports/`、`.gstack/security-reports/`）證明用過的 skill，預設「會用」；其他存在於 `~/.claude/skills/gstack/` 但本 repo 未驗證實際適用性的 skill，不寫進工作流，動工時想用再評估。
+
+#### 13.12.1 Per-PR 默認組（2 個 skill）
+
+每個 PR 提交前都該跑：
+
+| Skill | 觸發時機 | 解決什麼 |
+|---|---|---|
+| **`/health`** | 每個 PR 提交前 | repo 品質檢查：跑 [CLAUDE.md「Health Stack」段](/Users/ryan/Documents/VS_code/理髮廳/CLAUDE.md) 設定的 typecheck + lint + test 三件（dead code 與 shell lint 本 repo 未裝） |
+| **`/review`** | PR diff 完成、merge 前 | Pre-landing review — SQL safety、LLM trust boundary、conditional side effects |
+
+#### 13.12.1b Stage / Conditional Gates（3 個 skill，**不是每 PR**）
+
+只在特定階段觸發：
+
+| Skill | 觸發時機 | 解決什麼 |
+|---|---|---|
+| **`/qa`** | Integration gate — Wave 結束 / demo 前 / 高風險功能整合 | 端對端 QA + 自動修 bug。每 PR 都跑會 ceremony overload |
+| **`/canary`** | 每次 production deploy 後 | 一次性快速檢查（screenshot diff、console errors、performance）。**單一 pass 不是持續監控** |
+| **`/cso`** | Wave 4 之前一次（payment + consultation 動到 PII / bank info / LINE creds）+ V3 launch 前一次 | 安全審計。本 repo 已有 `.gstack/security-reports/2026-04-14-cso.md` 列 3 個 HIGH findings 待修，動 payment / webhook 前必跑 |
+
+#### 13.12.2 高風險協議（不是每 PR）
+
+只在這些**特定情境**觸發：
+
+| 情境 | 額外 skill | 為什麼 |
+|---|---|---|
+| Wave 2 任一 schema migration | `/codex review` | 第二意見挑戰 schema design、migration 順序 |
+| Wave 3 calendar 拖拉 sub-PR | `/codex challenge` | Adversarial 挑戰 race conditions (E-1, E-5, E-6) |
+| Wave 4a consultation webhook + photo upload | `/codex review` | Webhook handler 安全 + Supabase Storage RLS 設定 |
+| Production bug | `/investigate` | 4-phase 系統性 debug |
+| Wave 結束 / 中期 demo 前 | `/qa-only` | 純 report 不改 code，給老闆 / 碩展看 |
+
+#### 13.12.3 §13 鐵律 ↔ 真實對應機制
+
+| §13 鐵律 / 反 pattern | 對應的真實機制 |
+|---|---|
+| §13.0「直接 push main 絕對禁止」 | **GitHub branch protection** §13.10（不是 G-Stack skill）|
+| §13.1 #1「每個 PR 必過 lint/test/preview」 | **`/health` + Vercel preview**（自動）|
+| §13.1 #2「DB snapshot before deploy」 | **手動** Supabase dashboard（無對應 skill）|
+| §13.1 #3「Feature flag 0-cost rollback」 | **手動** 翻 `tenant.featureFlags` JSON（無對應 skill）|
+| §13.1 #4「Demo tenant guard」 | **程式碼內 E-18 guard**（無對應 skill）|
+| §13.7 反 pattern「PR 沒看 Vercel preview 就 merge」 | **自己看** Vercel preview URL（無強制 skill）|
+
+#### 13.12.4 Daily Workflow（簡化版）
+
+```
+PR 完成、要 merge：
+  1. /health  → 通過 baseline
+  2. /review  → 自己漏的 issue 抓出來
+  3. (高風險時才加) /codex review  或  /codex challenge
+  4. 自己手動看 Vercel preview URL
+  5. PR merge
+
+Production deploy 後：
+  6. /canary  → 一次性檢查上線是否健康
+
+Bug 出現：
+  → /investigate  → 別跳到結論，4-phase 走完
+```
+
+**不要做的事**（codex 警告的儀式 overload）：
+- ❌ 每個 PR 都跑 `/canary`（過度，浪費時間）
+- ❌ 每個 PR 都跑 `/qa`（屬於 integration gate 不是 PR gate）
+- ❌ 用 `/freeze`、`/guard`、`/checkpoint` 強制流程化（這些都存在但都是「想用就用」工具，不是工作流核心）
+- ❌ 把 `/canary` 拿來「24h 持續監控」（其實是一次性快速檢查）
+
+#### 13.12.5 Escalation Playbook（首要回應流程）
+
+production bug 出現的標準操作（**取代原版「跳 git tag + force redeploy」naive 路徑**）：
+
+```
+1. Reproduce — 在 staging tenant 或 dev local 重現問題
+2. Scope blast radius — 問「誰受影響？哪些路由？哪個 tenant？」
+3. /investigate — 4-phase 找 root cause（不是先跳 fix）
+4. Hot-fix on a branch — 不要直接 push main
+5. /review + Vercel preview verify
+6. Land via PR
+7. /canary verify production
+8. 若 root cause 來自最近 deploy 且 hot-fix 風險高 → 翻對應 feature flag 回滾
+9. 若 feature flag 不夠 → 走正規 git revert PR（不要 git checkout tag + force redeploy，特別是 migration release）
+```
+
+#### 13.12.6 不在 V3 用的 G-Stack skill
+
+| Skill | 為什麼不用 |
+|---|---|
+| `/office-hours` | 已過 ideation 階段 |
+| `/plan-ceo-review`、`/plan-design-review`、`/plan-eng-review`、`/autoplan` | **2026-04-25 已透過 autoplan 跑完**（簽核欄已標 ✅）。新增子功能再個別跑 |
+| `/design-consultation` / `/design-html` / `/design-shotgun` | 品牌規範已 lock |
+| `/follow-builders` | 不相關 |
+| `/pair-agent` | Solo dev |
+| `/checkpoint` / `/freeze` / `/guard` / `/ship` / `/land-and-deploy` / `/learn` / `/setup-deploy` | 存在於 `~/.claude/skills/gstack/`，但本 repo 沒實際使用 artifact 可參考。動工時想用再個別評估，不寫進 PRD 工作流（避免「以為有支援結果動工卡關」）|
+
+#### 13.12.7 V3 開始前一次性設定
+
+```bash
+# 1. 確認 GitHub branch protection 已設（§13.10 是核心防線，不是 skill）
+gh api repos/ryan234r32/barbershop-booking/branches/main/protection
+
+# 2. 跑 baseline /health 留分數對照
+/health
+
+# 3. Wave 4 之前一次 /cso（也可以現在就跑一次，把 4 月 14 日報告裡的 3 個 HIGH 修掉）
+/cso
+```
+
+### 13.13 v3 → v3.1 → v3.2 修正履歷
+
+**v3 → v3.1** 源頭：用戶 2026-04-25 提問「G-Stack skill 怎麼搭配 §13？」
+
+- ➕ 新增 §13.12 G-Stack 戰術工具搭配（原版 7 個子節 + 對應表 + Wave 套裝 + Daily workflow + Escalation）
+
+**v3.1 → v3.2** 源頭：`/codex review` 2026-04-25 抓到 §13.12「過度發明工具行為、儀式 overload、跟其他段矛盾」（5 個 high/medium findings）
+
+- ✂️ §13.12 蘖身（211 行 → ~110 行）：
+  - 修正 `/health` 描述（拿掉 dead code + shell lint，本 repo 未裝）
+  - 拿掉每 PR `/health + /review + /ship + /land-and-deploy + /canary` ceremony
+  - `/canary` 從「24-48h 持續監控」回正為「一次性快速檢查」
+  - 移除每 Wave 強制套裝（過度規定 `/freeze`/`/guard`/`/checkpoint`）
+  - 加 `/cso`（Wave 4 + launch 前必跑，不再延 V4 — repo 已有 3 個 HIGH security findings 待修）
+  - Escalation 重寫（拿掉「git checkout tag + force redeploy」改 reproduce → investigate → hot-fix → revert PR）
+- ✅ 簽核欄更新：CEO/Design/Eng/Final Gate 改 ✅ done via autoplan
+- ✅ 驗證段更新：G-stack 審核段標 ✅ done
 

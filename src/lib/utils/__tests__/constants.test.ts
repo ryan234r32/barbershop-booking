@@ -33,12 +33,16 @@ describe("business constants", () => {
     expect(VIOLATION_RESTRICTION_MONTHS).toBe(1);
   });
 
-  it("marks at-risk after 60 days inactive", () => {
-    expect(AT_RISK_DAYS).toBe(60);
+  it("marks at-risk after 100 days inactive (PRD-v3 §5)", () => {
+    expect(AT_RISK_DAYS).toBe(100);
   });
 
-  it("marks lapsed after 120 days inactive", () => {
-    expect(LAPSED_DAYS).toBe(120);
+  it("marks lapsed after 180 days inactive (PRD-v3 §5)", () => {
+    expect(LAPSED_DAYS).toBe(180);
+  });
+
+  it("at-risk window precedes lapsed (AT_RISK < LAPSED)", () => {
+    expect(AT_RISK_DAYS).toBeLessThan(LAPSED_DAYS);
   });
 
   it("has 10-second booking lock TTL", () => {
