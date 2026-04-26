@@ -9,6 +9,8 @@ import { cancelBookingSchema } from "@/lib/utils/validation";
 import { errorResponse, CancellationNotAllowedError } from "@/lib/utils/errors";
 import { MAX_VIOLATIONS } from "@/lib/utils/constants";
 import { requireBookingAuth, requireBookingOwnership, requireAdmin } from "@/lib/auth/booking-auth";
+import { issueCouponForCompletedBooking } from "@/lib/coupons/issue";
+import { logger } from "@/lib/utils/logger";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -276,6 +278,19 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         });
       } catch (err) {
         console.error("Failed to schedule follow-up:", err);
+      }
+
+      // Wave 4c: issue repurchase coupon (no-op if tenant feature flag off).
+      // Best-effort — never blocks the complete action.
+      try {
+        await issueCouponForCompletedBooking({
+          bookingId: id,
+          tenantId: booking.tenantId,
+          userId: booking.userId,
+          lineUserId: booking.user.lineUserId,
+        });
+      } catch (err) {
+        logger.error("issueCoupon failed", err, "bookings", { bookingId: id });
       }
 
       return Response.json({ booking: updated });
