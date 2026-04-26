@@ -434,6 +434,10 @@ export default function CalendarPage() {
             refreshUnack();
             mutateBookings();
           }}
+          onStale={() => {
+            refreshUnack();
+            mutateBookings();
+          }}
         />
       )}
     </div>
