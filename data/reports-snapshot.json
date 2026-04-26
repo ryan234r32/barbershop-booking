@@ -1,0 +1,278 @@
+{
+  "generatedAt": "2026-04-26T07:05:01.983Z",
+  "source": "docs/2025預約表Ken老師.xlsx",
+  "period": {
+    "from": "2025-01",
+    "to": "2025-12"
+  },
+  "totals": {
+    "bookings": 1379,
+    "revenue": 1360300,
+    "uniqueCustomers": 398,
+    "repeatCustomers": 204,
+    "newCustomers": 224,
+    "repeatRate": 51.3
+  },
+  "monthlyRevenue": [
+    {
+      "month": "2025-01",
+      "count": 124,
+      "revenue": 136750,
+      "newCustomers": 32
+    },
+    {
+      "month": "2025-02",
+      "count": 123,
+      "revenue": 125750,
+      "newCustomers": 39
+    },
+    {
+      "month": "2025-03",
+      "count": 129,
+      "revenue": 120900,
+      "newCustomers": 39
+    },
+    {
+      "month": "2025-04",
+      "count": 90,
+      "revenue": 89500,
+      "newCustomers": 37
+    },
+    {
+      "month": "2025-05",
+      "count": 138,
+      "revenue": 133300,
+      "newCustomers": 41
+    },
+    {
+      "month": "2025-06",
+      "count": 110,
+      "revenue": 111000,
+      "newCustomers": 38
+    },
+    {
+      "month": "2025-07",
+      "count": 120,
+      "revenue": 115300,
+      "newCustomers": 34
+    },
+    {
+      "month": "2025-08",
+      "count": 99,
+      "revenue": 96200,
+      "newCustomers": 35
+    },
+    {
+      "month": "2025-09",
+      "count": 120,
+      "revenue": 109500,
+      "newCustomers": 35
+    },
+    {
+      "month": "2025-10",
+      "count": 111,
+      "revenue": 112400,
+      "newCustomers": 34
+    },
+    {
+      "month": "2025-11",
+      "count": 104,
+      "revenue": 100700,
+      "newCustomers": 33
+    },
+    {
+      "month": "2025-12",
+      "count": 111,
+      "revenue": 109000,
+      "newCustomers": 47
+    }
+  ],
+  "servicePie": [
+    {
+      "category": "剪",
+      "count": 917,
+      "revenue": 860450
+    },
+    {
+      "category": "其他",
+      "count": 240,
+      "revenue": 20150
+    },
+    {
+      "category": "染",
+      "count": 86,
+      "revenue": 206300
+    },
+    {
+      "category": "護",
+      "count": 50,
+      "revenue": 77500
+    },
+    {
+      "category": "燙",
+      "count": 40,
+      "revenue": 148500
+    },
+    {
+      "category": "洗",
+      "count": 34,
+      "revenue": 17800
+    },
+    {
+      "category": "漂",
+      "count": 12,
+      "revenue": 29600
+    }
+  ],
+  "heatmap": {
+    "weekdays": [
+      "週一",
+      "週二",
+      "週四",
+      "週五",
+      "週六",
+      "週日"
+    ],
+    "hours": [
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19"
+    ],
+    "data": [
+      [
+        20,
+        18,
+        23,
+        27,
+        24,
+        30,
+        27,
+        36,
+        30
+      ],
+      [
+        18,
+        22,
+        26,
+        29,
+        28,
+        29,
+        29,
+        31,
+        36
+      ],
+      [
+        20,
+        18,
+        27,
+        30,
+        30,
+        32,
+        37,
+        32,
+        31
+      ],
+      [
+        27,
+        23,
+        34,
+        29,
+        34,
+        30,
+        30,
+        33,
+        37
+      ],
+      [
+        38,
+        38,
+        44,
+        41,
+        44,
+        42,
+        36,
+        36,
+        26
+      ],
+      [
+        2,
+        3,
+        3,
+        3,
+        2,
+        3,
+        1,
+        0,
+        0
+      ]
+    ]
+  },
+  "topServices": [
+    {
+      "name": "男剪",
+      "count": 386,
+      "revenue": 356950,
+      "avg": 925
+    },
+    {
+      "name": "新男剪",
+      "count": 225,
+      "revenue": 206300,
+      "avg": 917
+    },
+    {
+      "name": "",
+      "count": 211,
+      "revenue": 5100,
+      "avg": 24
+    },
+    {
+      "name": "新女剪",
+      "count": 138,
+      "revenue": 153700,
+      "avg": 1114
+    },
+    {
+      "name": "女剪",
+      "count": 98,
+      "revenue": 99500,
+      "avg": 1015
+    },
+    {
+      "name": "護髮",
+      "count": 48,
+      "revenue": 76300,
+      "avg": 1590
+    },
+    {
+      "name": "新染",
+      "count": 36,
+      "revenue": 91000,
+      "avg": 2528
+    },
+    {
+      "name": "新學童剪",
+      "count": 35,
+      "revenue": 23100,
+      "avg": 660
+    },
+    {
+      "name": "學童剪",
+      "count": 35,
+      "revenue": 20900,
+      "avg": 597
+    },
+    {
+      "name": "洗髮",
+      "count": 34,
+      "revenue": 17800,
+      "avg": 524
+    }
+  ]
+}
