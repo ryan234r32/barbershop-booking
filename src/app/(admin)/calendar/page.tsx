@@ -326,6 +326,63 @@ export default function CalendarPage() {
     active: boolean;
   } | null>(null);
 
+  // Wave 3.A drag-to-reschedule state (PRD-v3 §4)
+  // Distinct from `dragState` (drag-to-create) above: this tracks an existing
+  // Booking being moved to a new slot via HTML5 native drag-and-drop.
+  const [draggedBooking, setDraggedBooking] = useState<Booking | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<{ date: string; hour: string } | null>(null);
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
+
+  const handleDropReschedule = useCallback(
+    async (newDate: string, newStartTime: string) => {
+      if (!draggedBooking || rescheduleSubmitting) return;
+      // Same slot → no-op (user dropped back where they started)
+      const oldDate = draggedBooking.date.slice(0, 10);
+      if (oldDate === newDate && draggedBooking.startTime === newStartTime) {
+        setDraggedBooking(null);
+        setDragOverSlot(null);
+        return;
+      }
+      // Holiday guard
+      if (holidayDates.has(newDate)) {
+        toast({ type: "error", message: "公休日不可改期到此日" });
+        setDraggedBooking(null);
+        setDragOverSlot(null);
+        return;
+      }
+      setRescheduleSubmitting(true);
+      try {
+        const res = await fetch(`/api/bookings/${draggedBooking.id}/reschedule`, {
+          method: "POST",
+          headers: adminHeaders(),
+          body: JSON.stringify({ date: newDate, startTime: newStartTime }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "改期失敗");
+        }
+        toast({
+          type: "success",
+          message: `已改期到 ${newDate.slice(5)} ${newStartTime}`,
+        });
+        mutateBookings();
+      } catch (err) {
+        toast({
+          type: "error",
+          message: err instanceof Error ? err.message : "改期失敗",
+        });
+      } finally {
+        setRescheduleSubmitting(false);
+        setDraggedBooking(null);
+        setDragOverSlot(null);
+      }
+    },
+    // mutateBookings lives further down but the callback only fires post-render,
+    // so the closure resolves it correctly. eslint can't see that ordering.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [draggedBooking, rescheduleSubmitting, holidayDates, toast],
+  );
+
   // ─── Date Calculations ───
   const weekDates = useMemo(() => {
     const start = new Date(currentDate);
@@ -916,6 +973,25 @@ export default function CalendarPage() {
       {/* ═══ WEEK VIEW ═══ */}
       {view === "week" && !isLoading && (
         <>
+          {/* Drag-to-reschedule hint banner — only when actively dragging */}
+          {draggedBooking && (
+            <div className="mb-2 px-3 py-2 rounded-lg bg-[var(--color-brand)]/10 border border-[var(--color-brand)]/30 text-[12px] text-[var(--color-brand)] flex items-center justify-between">
+              <span>
+                正在改期 <strong>{draggedBooking.user.displayName || "顧客"}</strong> · {draggedBooking.startTime}
+                — 拖到目標時段放開
+              </span>
+              <button
+                onClick={() => {
+                  setDraggedBooking(null);
+                  setDragOverSlot(null);
+                }}
+                className="text-[11px] underline"
+              >
+                取消
+              </button>
+            </div>
+          )}
+
           {/* Compact summary — single line */}
           <div className="text-[11px] text-[var(--color-text-muted)] mb-2 flex items-center justify-between">
             <span>
@@ -987,6 +1063,7 @@ export default function CalendarPage() {
                         const serviceShort = booking.service.name.length > 4
                           ? booking.service.name.slice(0, 4)
                           : booking.service.name;
+                        const isDragging = draggedBooking?.id === booking.id;
                         return (
                           <td
                             key={dateStr + hour}
@@ -994,8 +1071,20 @@ export default function CalendarPage() {
                             className="p-0.5 align-top border-t border-[var(--color-surface)]/60"
                           >
                             <div
+                              draggable
+                              onDragStart={(e) => {
+                                setDraggedBooking(booking);
+                                e.dataTransfer.effectAllowed = "move";
+                                // Required for Firefox to fire drag events
+                                e.dataTransfer.setData("text/plain", booking.id);
+                              }}
+                              onDragEnd={() => {
+                                setDraggedBooking(null);
+                                setDragOverSlot(null);
+                              }}
                               onClick={() => openBookingDetail(booking)}
-                              className={`relative w-full h-full rounded p-1 cursor-pointer transition-colors flex flex-col overflow-hidden ${cellBg}`}
+                              className={`relative w-full h-full rounded p-1 cursor-grab active:cursor-grabbing transition-all flex flex-col overflow-hidden ${cellBg} ${isDragging ? "opacity-40 ring-2 ring-[var(--color-brand)]" : ""}`}
+                              title="點擊查看詳情；拖曳到其他時段可改期"
                             >
                               {/* PRD-v3 §2 + 1.6b: 紅點 indicator for unacknowledged */}
                               {!booking.adminAcknowledgedAt && (
@@ -1022,11 +1111,49 @@ export default function CalendarPage() {
                         );
                       }
 
+                      const isDropTarget =
+                        draggedBooking !== null &&
+                        dragOverSlot?.date === dateStr &&
+                        dragOverSlot?.hour === hour;
                       return (
                         <td key={dateStr + hour} className="p-0.5 border-t border-[var(--color-surface)]/60">
                           <div
-                            className="w-full h-full rounded transition-colors cursor-pointer hover:bg-[var(--color-surface)]/50"
-                            onClick={() => { setCurrentDate(d); setView("day"); }}
+                            className={`w-full h-full rounded transition-colors cursor-pointer ${
+                              isDropTarget
+                                ? "bg-[var(--color-brand)]/30 ring-2 ring-[var(--color-brand)]"
+                                : draggedBooking
+                                  ? "hover:bg-[var(--color-brand)]/15"
+                                  : "hover:bg-[var(--color-surface)]/50"
+                            }`}
+                            onClick={() => {
+                              if (draggedBooking) return;
+                              setCurrentDate(d);
+                              setView("day");
+                            }}
+                            onDragOver={(e) => {
+                              if (!draggedBooking) return;
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = "move";
+                              if (
+                                dragOverSlot?.date !== dateStr ||
+                                dragOverSlot?.hour !== hour
+                              ) {
+                                setDragOverSlot({ date: dateStr, hour });
+                              }
+                            }}
+                            onDragLeave={() => {
+                              if (
+                                dragOverSlot?.date === dateStr &&
+                                dragOverSlot?.hour === hour
+                              ) {
+                                setDragOverSlot(null);
+                              }
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              if (!draggedBooking) return;
+                              handleDropReschedule(dateStr, hour);
+                            }}
                           />
                         </td>
                       );
