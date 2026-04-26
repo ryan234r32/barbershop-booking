@@ -1,36 +1,44 @@
 import { NextRequest } from "next/server";
+import * as fs from "fs";
+import * as path from "path";
+import { getAdminFromCookie } from "@/lib/auth/jwt";
 
 /**
- * GET /api/reports — aggregate metrics for the 8 widgets in /reports.
+ * GET /api/reports — historical Excel snapshot stats (Wave 5).
  *
- * Stub for Wave 5 — needs: monthly revenue (YoY), heatmap (hour×weekday),
- * service distribution, customer segments, lapse trend, ARPU trend, cohort
- * retention (30/60/90d), cancellation/no-show ratio.
- *
- * Data sources:
- *   - System bookings (V3 onwards)
- *   - Wave 3.B Excel import (2025 historical, once parser calibrated)
+ * Reads pre-generated data/reports-snapshot.json (built via
+ * `npm run reports:snapshot`). Live V3 system stats merged in
+ * follow-up — for now serves 2025 historical data only.
  */
-export async function GET(_request: NextRequest) {
-  return Response.json(
-    {
-      error: "Not Implemented",
-      message: "Wave 5 not yet built — see docs/PRD-v3.md §10.2",
-      widgets: [
-        "monthlyRevenue",
-        "hourHeatmap",
-        "servicePie",
-        "customerSegments",
-        "lapseTrend",
-        "arpuTrend",
-        "cohortRetention",
-        "cancellationRate",
-      ],
-      dataSource: {
-        systemBookings: "ready",
-        historicalExcel: "pending Wave 3.B parser calibration",
+export async function GET(request: NextRequest) {
+  const admin = await getAdminFromCookie(request);
+  if (!admin) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const snapshotPath = path.join(process.cwd(), "data", "reports-snapshot.json");
+  if (!fs.existsSync(snapshotPath)) {
+    return Response.json(
+      {
+        error: "Snapshot not generated",
+        message: "Run `npm run reports:snapshot` to generate from Excel",
       },
-    },
-    { status: 501 },
-  );
+      { status: 503 },
+    );
+  }
+
+  try {
+    const raw = fs.readFileSync(snapshotPath, "utf-8");
+    const snapshot = JSON.parse(raw);
+    return Response.json(snapshot, {
+      headers: {
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+      },
+    });
+  } catch (err) {
+    return Response.json(
+      { error: "Failed to read snapshot", detail: String(err) },
+      { status: 500 },
+    );
+  }
 }
