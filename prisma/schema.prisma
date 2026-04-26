@@ -43,8 +43,16 @@ model Tenant {
   notifications        Notification[]
   messages             Message[]
   consultationRequests ConsultationRequest[]
+  coupons              Coupon[]
 
   quickReplies Json? @map("quick_replies")
+
+  /// Per-tenant feature toggles. Known keys (PRD-v3 §8 Wave 2c+):
+  /// - couponAbTest: boolean — master switch for the 30d-vs-45d A/B
+  /// - couponStrategyAOnly: boolean — emergency: force everyone to A arm
+  /// - couponStrategyBOnly: boolean — emergency: force everyone to B arm
+  /// Add new keys via PR with this comment block updated.
+  featureFlags Json? @default("{}") @map("feature_flags")
 
   @@map("tenants")
 }
@@ -149,6 +157,7 @@ model User {
   cancellationRecords  CancellationRecord[]
   messages             Message[]
   consultationRequests ConsultationRequest[]
+  coupons              Coupon[]
 
   @@unique([tenantId, lineUserId])
   @@index([tenantId, segment])
@@ -559,4 +568,57 @@ enum ConsultationStatus {
   REPLIED // 已回覆，未轉預約
   CONVERTED // 已轉預約
   ARCHIVED // 忽略 / 失效
+}
+
+// ============================================
+// COUPONS — Repurchase A/B test (PRD-v3 §8, Wave 2c)
+// ============================================
+//
+// On Booking COMPLETED, if tenant.featureFlags.couponAbTest is true, issue a
+// coupon to the customer with one of two strategies:
+//   - STRATEGY_A_30D_95OFF: 30-day expiry (urgency-driven)
+//   - STRATEGY_B_45D_95OFF: 45-day expiry (haircut-cycle-aligned)
+//
+// Both 5% off (95 折). Single variable (expiry length) — A/B comparable.
+// Arm assignment is deterministic via userId hashCode % 2 (stable per user).
+//
+// Routes / cron / LIFF page live in Wave 4c (coupon-ab). This Wave 2c PR is
+// schema additive only — no behavior change until tenant flag flipped.
+model Coupon {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  userId   String @map("user_id")
+  code     String @unique // human-friendly redeem code, generated at issue time
+
+  type          CouponType
+  discountPct   Int        @default(5) // 95 折 = 5% off
+  experimentArm String?    @map("experiment_arm") // "A" or "B" — for A/B analytics
+
+  issuedAt         DateTime  @default(now()) @map("issued_at")
+  expiresAt        DateTime  @map("expires_at")
+  usedAt           DateTime? @map("used_at")
+  usedForBookingId String?   @map("used_for_booking_id")
+
+  issuedReason CouponReason @default(BOOKING_COMPLETED) @map("issued_reason")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, userId, usedAt])
+  @@index([expiresAt, usedAt])
+  @@index([experimentArm, issuedAt])
+  @@map("coupons")
+}
+
+enum CouponType {
+  STRATEGY_A_30D_95OFF
+  STRATEGY_B_45D_95OFF
+  MANUAL
+  CAMPAIGN
+}
+
+enum CouponReason {
+  BOOKING_COMPLETED
+  MANUAL
+  CAMPAIGN
 }
