@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-26T07:05:01.983Z",
+  "generatedAt": "2026-04-26T08:17:05.649Z",
   "source": "docs/2025預約表Ken老師.xlsx",
   "period": {
     "from": "2025-01",
@@ -273,6 +273,255 @@
       "count": 34,
       "revenue": 17800,
       "avg": 524
+    }
+  ],
+  "customerSegments": [
+    {
+      "segment": "NEW",
+      "count": 60,
+      "pct": 15.1
+    },
+    {
+      "segment": "REGULAR",
+      "count": 53,
+      "pct": 13.3
+    },
+    {
+      "segment": "VIP",
+      "count": 72,
+      "pct": 18.1
+    },
+    {
+      "segment": "AT_RISK",
+      "count": 75,
+      "pct": 18.8
+    },
+    {
+      "segment": "LAPSED",
+      "count": 138,
+      "pct": 34.7
+    }
+  ],
+  "arpuTrend": [
+    {
+      "month": "2025-01",
+      "activeCustomers": 81,
+      "avgPerCustomer": 1688,
+      "avgPerBooking": 1103
+    },
+    {
+      "month": "2025-02",
+      "activeCustomers": 82,
+      "avgPerCustomer": 1534,
+      "avgPerBooking": 1022
+    },
+    {
+      "month": "2025-03",
+      "activeCustomers": 88,
+      "avgPerCustomer": 1374,
+      "avgPerBooking": 937
+    },
+    {
+      "month": "2025-04",
+      "activeCustomers": 71,
+      "avgPerCustomer": 1261,
+      "avgPerBooking": 994
+    },
+    {
+      "month": "2025-05",
+      "activeCustomers": 85,
+      "avgPerCustomer": 1568,
+      "avgPerBooking": 966
+    },
+    {
+      "month": "2025-06",
+      "activeCustomers": 72,
+      "avgPerCustomer": 1542,
+      "avgPerBooking": 1009
+    },
+    {
+      "month": "2025-07",
+      "activeCustomers": 87,
+      "avgPerCustomer": 1325,
+      "avgPerBooking": 961
+    },
+    {
+      "month": "2025-08",
+      "activeCustomers": 68,
+      "avgPerCustomer": 1415,
+      "avgPerBooking": 972
+    },
+    {
+      "month": "2025-09",
+      "activeCustomers": 81,
+      "avgPerCustomer": 1352,
+      "avgPerBooking": 913
+    },
+    {
+      "month": "2025-10",
+      "activeCustomers": 78,
+      "avgPerCustomer": 1441,
+      "avgPerBooking": 1013
+    },
+    {
+      "month": "2025-11",
+      "activeCustomers": 76,
+      "avgPerCustomer": 1325,
+      "avgPerBooking": 968
+    },
+    {
+      "month": "2025-12",
+      "activeCustomers": 84,
+      "avgPerCustomer": 1298,
+      "avgPerBooking": 982
+    }
+  ],
+  "cohorts": [
+    {
+      "cohortMonth": "2025-01",
+      "size": 81,
+      "returned30": 12,
+      "returned60": 34,
+      "returned90": 43
+    },
+    {
+      "cohortMonth": "2025-02",
+      "size": 55,
+      "returned30": 7,
+      "returned60": 17,
+      "returned90": 24
+    },
+    {
+      "cohortMonth": "2025-03",
+      "size": 45,
+      "returned30": 4,
+      "returned60": 10,
+      "returned90": 11
+    },
+    {
+      "cohortMonth": "2025-04",
+      "size": 27,
+      "returned30": 1,
+      "returned60": 4,
+      "returned90": 8
+    },
+    {
+      "cohortMonth": "2025-05",
+      "size": 29,
+      "returned30": 3,
+      "returned60": 5,
+      "returned90": 7
+    },
+    {
+      "cohortMonth": "2025-06",
+      "size": 22,
+      "returned30": 1,
+      "returned60": 2,
+      "returned90": 5
+    },
+    {
+      "cohortMonth": "2025-07",
+      "size": 32,
+      "returned30": 1,
+      "returned60": 2,
+      "returned90": 4
+    },
+    {
+      "cohortMonth": "2025-08",
+      "size": 18,
+      "returned30": 1,
+      "returned60": 2,
+      "returned90": 2
+    },
+    {
+      "cohortMonth": "2025-09",
+      "size": 21,
+      "returned30": 2,
+      "returned60": 3,
+      "returned90": 3
+    },
+    {
+      "cohortMonth": "2025-10",
+      "size": 16,
+      "returned30": 1,
+      "returned60": 2,
+      "returned90": 3
+    },
+    {
+      "cohortMonth": "2025-11",
+      "size": 23,
+      "returned30": 0,
+      "returned60": 2,
+      "returned90": 2
+    },
+    {
+      "cohortMonth": "2025-12",
+      "size": 29,
+      "returned30": 1,
+      "returned60": 1,
+      "returned90": 1
+    }
+  ],
+  "lapsedTrend": [
+    {
+      "month": "2025-01",
+      "active": 81,
+      "lapsed": 0
+    },
+    {
+      "month": "2025-02",
+      "active": 136,
+      "lapsed": 0
+    },
+    {
+      "month": "2025-03",
+      "active": 181,
+      "lapsed": 0
+    },
+    {
+      "month": "2025-04",
+      "active": 185,
+      "lapsed": 23
+    },
+    {
+      "month": "2025-05",
+      "active": 191,
+      "lapsed": 46
+    },
+    {
+      "month": "2025-06",
+      "active": 183,
+      "lapsed": 76
+    },
+    {
+      "month": "2025-07",
+      "active": 197,
+      "lapsed": 94
+    },
+    {
+      "month": "2025-08",
+      "active": 192,
+      "lapsed": 117
+    },
+    {
+      "month": "2025-09",
+      "active": 192,
+      "lapsed": 138
+    },
+    {
+      "month": "2025-10",
+      "active": 175,
+      "lapsed": 171
+    },
+    {
+      "month": "2025-11",
+      "active": 171,
+      "lapsed": 198
+    },
+    {
+      "month": "2025-12",
+      "active": 164,
+      "lapsed": 234
     }
   ]
 }

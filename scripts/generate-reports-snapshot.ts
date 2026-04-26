@@ -179,17 +179,147 @@ async function main() {
     .slice(0, 10)
     .map(([name, v]) => ({ name, count: v.count, revenue: v.revenue, avg: Math.round(v.revenue / v.count) }));
 
-  // 5. Customer stats
-  const customers = new Map<string, { visits: number; revenue: number; firstNew: boolean }>();
+  // 5. Customer stats — track per-customer visit history for cohort/segment widgets.
+  interface CustomerProfile {
+    visits: number;
+    revenue: number;
+    firstNew: boolean;
+    firstVisit: Date;
+    lastVisit: Date;
+    visitDates: Date[];
+  }
+  const customers = new Map<string, CustomerProfile>();
   for (const b of allBookings) {
-    const acc = customers.get(b.customerName) ?? { visits: 0, revenue: 0, firstNew: false };
+    const acc = customers.get(b.customerName) ?? {
+      visits: 0,
+      revenue: 0,
+      firstNew: false,
+      firstVisit: b.date,
+      lastVisit: b.date,
+      visitDates: [],
+    };
     acc.visits++;
     acc.revenue += b.amount ?? 0;
     if (b.isNewCustomer) acc.firstNew = true;
+    if (b.date < acc.firstVisit) acc.firstVisit = b.date;
+    if (b.date > acc.lastVisit) acc.lastVisit = b.date;
+    acc.visitDates.push(b.date);
     customers.set(b.customerName, acc);
   }
   const repeatCustomers = Array.from(customers.values()).filter((c) => c.visits >= 2).length;
   const totalCustomers = customers.size;
+
+  // 6. Customer segments — anchor "now" to the dataset's last booking date so
+  // re-running the snapshot is deterministic. (Anchoring to today would have
+  // every customer drift to LAPSED a year later.)
+  const datasetEnd = allBookings.reduce(
+    (max, b) => (b.date > max ? b.date : max),
+    allBookings[0]?.date ?? new Date(),
+  );
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  type Segment = "NEW" | "REGULAR" | "VIP" | "AT_RISK" | "LAPSED";
+  const segCounts: Record<Segment, number> = {
+    NEW: 0, REGULAR: 0, VIP: 0, AT_RISK: 0, LAPSED: 0,
+  };
+  for (const c of customers.values()) {
+    const daysSinceLast = (datasetEnd.getTime() - c.lastVisit.getTime()) / DAY_MS;
+    let seg: Segment;
+    if (daysSinceLast > 180) seg = "LAPSED";
+    else if (daysSinceLast > 100) seg = "AT_RISK";
+    else if (c.visits >= 5) seg = "VIP";
+    else if (c.visits >= 2) seg = "REGULAR";
+    else seg = "NEW";
+    segCounts[seg]++;
+  }
+  const customerSegments = (Object.keys(segCounts) as Segment[]).map((s) => ({
+    segment: s,
+    count: segCounts[s],
+    pct: totalCustomers > 0 ? Math.round((segCounts[s] / totalCustomers) * 1000) / 10 : 0,
+  }));
+
+  // 7. ARPU trend — per month, avg revenue per active customer.
+  const arpuByMonth = new Map<string, { revenue: number; activeCustomers: Set<string>; bookings: number }>();
+  for (const b of allBookings) {
+    const key = b.monthSheet;
+    const acc = arpuByMonth.get(key) ?? { revenue: 0, activeCustomers: new Set(), bookings: 0 };
+    acc.revenue += b.amount ?? 0;
+    acc.activeCustomers.add(b.customerName);
+    acc.bookings++;
+    arpuByMonth.set(key, acc);
+  }
+  const arpuTrend = Array.from(arpuByMonth.entries())
+    .sort()
+    .map(([month, v]) => ({
+      month: `${month.slice(0, 4)}-${month.slice(4)}`,
+      activeCustomers: v.activeCustomers.size,
+      avgPerCustomer: v.activeCustomers.size > 0 ? Math.round(v.revenue / v.activeCustomers.size) : 0,
+      avgPerBooking: v.bookings > 0 ? Math.round(v.revenue / v.bookings) : 0,
+    }));
+
+  // 8. Cohort retention — by first-visit month, % returned within 30/60/90 days.
+  // Honest 90d cohort needs the customer's first visit + 90d window to be inside the dataset,
+  // so we cap cohorts at month 9 (Sep) for the 90d bucket. Earlier months are fine.
+  interface CohortStats {
+    cohortMonth: string;
+    size: number;
+    returned30: number;
+    returned60: number;
+    returned90: number;
+  }
+  const cohortMap = new Map<string, { customers: { firstVisit: Date; visitDates: Date[] }[] }>();
+  for (const [, c] of customers) {
+    const cohortMonth = `${c.firstVisit.getFullYear()}-${String(c.firstVisit.getMonth() + 1).padStart(2, "0")}`;
+    const acc = cohortMap.get(cohortMonth) ?? { customers: [] };
+    acc.customers.push({ firstVisit: c.firstVisit, visitDates: c.visitDates });
+    cohortMap.set(cohortMonth, acc);
+  }
+  const cohorts: CohortStats[] = Array.from(cohortMap.entries())
+    .sort()
+    .map(([month, v]) => {
+      const size = v.customers.length;
+      const r30 = v.customers.filter((c) =>
+        c.visitDates.some((d) => {
+          const days = (d.getTime() - c.firstVisit.getTime()) / DAY_MS;
+          return days > 0 && days <= 30;
+        }),
+      ).length;
+      const r60 = v.customers.filter((c) =>
+        c.visitDates.some((d) => {
+          const days = (d.getTime() - c.firstVisit.getTime()) / DAY_MS;
+          return days > 0 && days <= 60;
+        }),
+      ).length;
+      const r90 = v.customers.filter((c) =>
+        c.visitDates.some((d) => {
+          const days = (d.getTime() - c.firstVisit.getTime()) / DAY_MS;
+          return days > 0 && days <= 90;
+        }),
+      ).length;
+      return {
+        cohortMonth: month,
+        size,
+        returned30: r30,
+        returned60: r60,
+        returned90: r90,
+      };
+    });
+
+  // 9. Lapsed trend — per month, how many customers became 「90+ days inactive」 by end of that month.
+  const monthEnds: { month: string; date: Date }[] = monthlyRevenue.map((m) => {
+    const [y, mo] = m.month.split("-").map(Number);
+    return { month: m.month, date: new Date(y, mo, 0, 23, 59, 59) }; // last day of month
+  });
+  const lapsedTrend = monthEnds.map(({ month, date }) => {
+    let active = 0;
+    let lapsed = 0;
+    for (const c of customers.values()) {
+      if (c.firstVisit > date) continue; // not yet onboarded
+      const daysSinceLast = (date.getTime() - c.lastVisit.getTime()) / DAY_MS;
+      if (daysSinceLast > 90) lapsed++;
+      else active++;
+    }
+    return { month, active, lapsed };
+  });
 
   // ─── Final snapshot ───
 
@@ -213,6 +343,10 @@ async function main() {
       data: heatmap,
     },
     topServices,
+    customerSegments,
+    arpuTrend,
+    cohorts,
+    lapsedTrend,
   };
 
   fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });
