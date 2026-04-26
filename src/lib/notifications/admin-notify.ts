@@ -160,3 +160,45 @@ export async function notifyAdminTransferReported(params: {
     }
   }
 }
+
+/**
+ * Notify admin that a customer submitted a consultation request (Wave 4a).
+ * Same dual-channel mutex pattern.
+ */
+export async function notifyAdminNewConsultation(params: {
+  tenantId?: string;
+  consultationId: string;
+  displayName: string;
+  serviceName: string;
+  hasPhoto: boolean;
+}): Promise<void> {
+  const { tenantId, consultationId, displayName, serviceName, hasPhoto } = params;
+
+  let webPushSent = 0;
+  if (tenantId) {
+    try {
+      const result = await sendWebPushToAdmin(tenantId, {
+        title: "新諮詢請求",
+        body: `${displayName} · ${serviceName}${hasPhoto ? "（含照片）" : ""}`,
+        url: `/consultations?focus=${encodeURIComponent(consultationId)}`,
+        tag: `consultation-${consultationId}`,
+      });
+      webPushSent = result.sent;
+    } catch (err) {
+      logger.error("Web Push consultation failed", err, "admin-notify");
+    }
+  }
+
+  const adminLineUserId = process.env.ADMIN_LINE_USER_ID;
+  if (webPushSent === 0 && adminLineUserId) {
+    try {
+      const lineClient = getLineClient();
+      await lineClient.pushMessage(adminLineUserId, {
+        type: "text",
+        text: `💬 新諮詢請求\n${displayName} · ${serviceName}${hasPhoto ? "\n📷 含照片" : ""}\n\n👉 後台 /consultations 查看`,
+      });
+    } catch (err) {
+      logger.error("LINE push consultation failed", err, "admin-notify");
+    }
+  }
+}

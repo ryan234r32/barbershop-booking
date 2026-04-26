@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAdmin } from "@/lib/admin/auth-context";
 import { useState, useEffect } from "react";
+import useSWR from "swr";
+import { adminHeaders } from "@/lib/auth/admin-fetch";
 import {
   LayoutDashboard,
   Calendar,
@@ -32,7 +34,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/bookings/new", label: "新增預約", Icon: Plus },
   { href: "/customers", label: "顧客管理", Icon: Users },
   { href: "/services", label: "服務項目", Icon: Scissors },
-  { href: "/consultations", label: "諮詢請求", Icon: MessageCircle, badge: "BETA" },
+  { href: "/consultations", label: "諮詢請求", Icon: MessageCircle },
   { href: "/coupons", label: "優惠券", Icon: Ticket, badge: "BETA" },
   { href: "/reports", label: "報表", Icon: FileBarChart, badge: "BETA" },
   { href: "/analytics", label: "數據分析", Icon: BarChart3 },
@@ -41,10 +43,22 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/settings", label: "設定", Icon: Settings },
 ] as const;
 
+const sidebarFetcher = (url: string) =>
+  fetch(url, { headers: adminHeaders() }).then((r) => (r.ok ? r.json() : { pendingCount: 0 }));
+
 export function AdminSidebar() {
   const pathname = usePathname();
   const { admin, logout } = useAdmin();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Live consultation pending count — drives the sidebar red dot.
+  // Refresh every 60s, plus when admin navigates back from /consultations.
+  const { data: consultData } = useSWR<{ pendingCount: number }>(
+    admin ? "/api/consultations?status=PENDING&limit=1" : null,
+    sidebarFetcher,
+    { refreshInterval: 60_000, revalidateOnFocus: true },
+  );
+  const consultationPending = consultData?.pendingCount ?? 0;
 
   useEffect(() => {
     // Reset mobile menu on navigation — intentional setState in effect
@@ -65,6 +79,8 @@ export function AdminSidebar() {
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.Icon;
+          const showConsultBadge =
+            item.href === "/consultations" && consultationPending > 0;
           return (
             <Link
               key={item.href}
@@ -79,7 +95,15 @@ export function AdminSidebar() {
             >
               <Icon size={18} strokeWidth={isActive ? 2.2 : 1.7} />
               <span className="flex-1">{item.label}</span>
-              {item.badge && (
+              {showConsultBadge && (
+                <span
+                  className="text-[10px] font-bold leading-none px-1.5 py-1 rounded-full bg-[var(--color-danger,#dc2626)] text-white min-w-[20px] text-center"
+                  aria-label={`${consultationPending} 筆待回覆諮詢`}
+                >
+                  {consultationPending > 99 ? "99+" : consultationPending}
+                </span>
+              )}
+              {item.badge && !showConsultBadge && (
                 <span className="text-[9px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-[var(--color-brand)]/15 text-[var(--color-brand)]">
                   {item.badge}
                 </span>

@@ -18,6 +18,7 @@ import {
   paymentGuideMessage,
   busyNoticeMessage,
   serviceInquiryFlexMessage,
+  bleachConsultationFlexMessage,
 } from "@/lib/line/messages";
 import { MessageKind } from "@prisma/client";
 import { classifyIntent } from "./classify-intent";
@@ -391,15 +392,23 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
   }
 
   // Priority 6.5: Service inquiry — perm / color (PRD-v3 §7)
-  // 漂髮 NOT routed here — it goes through Wave 4a consultation flow which
-  // creates a ConsultationRequest record. Perm/color is lighter touch: ask
-  // the 3 things admin needs (last service date, current photo, target style)
-  // then admin handles via LINE chat or LIFF booking.
   if (intent === "service-inquiry-perm" || intent === "service-inquiry-color") {
     return reply(
       serviceInquiryFlexMessage({
         serviceType: intent === "service-inquiry-perm" ? "perm" : "color",
         liffBaseUrl: liffUrl,
+        shopName,
+      })
+    );
+  }
+
+  // Priority 6.6: 漂髮 → consultation flow (PRD-v3 §3, Wave 4a).
+  // High-judgement service: route to LIFF form so admin can triage in /consultations.
+  if (intent === "service-inquiry-bleach") {
+    return reply(
+      bleachConsultationFlexMessage({
+        liffBaseUrl: liffUrl,
+        consultationLiffUrl: `${liffUrl}/consultation`,
         shopName,
       })
     );
