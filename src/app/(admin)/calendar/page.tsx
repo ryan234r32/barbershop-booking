@@ -309,7 +309,7 @@ export default function CalendarPage() {
   return (
     <div className="max-w-4xl mx-auto">
       {/* Top Bar */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate(-1)}

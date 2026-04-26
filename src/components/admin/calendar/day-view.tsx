@@ -397,7 +397,7 @@ function DayViewBase({
       })()}
 
       {/* Summary Strip */}
-      <div className="bg-[var(--color-surface)] rounded-lg px-4 py-2 mb-2 flex items-center justify-between text-sm">
+      <div className="bg-[var(--color-surface)] rounded-lg px-3 py-1.5 mb-1.5 flex items-center justify-between text-[13px]">
         <span className="font-semibold text-[var(--color-text-primary)]">
           今日 {todayBookings.length} 預約
         </span>
@@ -407,15 +407,14 @@ function DayViewBase({
       </div>
 
       {/* Timeline */}
-      {/* Timeline fills remaining viewport height. The 250px subtraction
-          accounts for: status bar + admin shell header + page top bar +
-          view toggle + date strip + summary + bottom tab bar. Row heights
-          (slotHeight from useAutoFit) auto-distribute within [44, 72] px.
-          Tightened from 280→250 in B5 fix after spacing reduction. */}
+      {/* Timeline fills remaining viewport height. 220px subtraction for:
+          status bar + admin shell header + page top bar + view toggle +
+          date strip + summary + bottom tab bar. Tightened progressively
+          (280→250→220) so all 9 hours (11–20) fit on iPhone without scroll. */}
       <div
         ref={timelineRef}
         className="relative overflow-y-auto"
-        style={{ height: "calc(100dvh - 250px)", touchAction: "pan-y" }}
+        style={{ height: "calc(100dvh - 220px)", touchAction: "pan-y" }}
       >
         {HOURS.map((hour) => {
           const dateStr = formatDate(currentDate);
