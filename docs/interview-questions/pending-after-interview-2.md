@@ -76,3 +76,22 @@
 
 - [ ] H1. 老闆一天想花多少時間看 App？（決定要不要做「5 分鐘晨報」功能）
 - [ ] H2. 老闆太太負責報表 — 要不要開獨立的帳號 / 只看報表的權限？
+
+## I. 燙 / 染 LINE 自動回覆 Flex 卡片細節（2026-04-26 ryan dogfood 後）
+
+V3 Wave 1.7 PR #6 已上線「燙」「染」keyword 自動回 Flex 卡片問 A/B/C
+（上次時間 / 現況照片 / 期待造型）。Demo 時要跟老闆 confirm：
+
+- [ ] I1. **三項問題的順序**對嗎？目前順序：A. 上次什麼時候燙/染（沒做過也說）→ B. 現況照片（自然光、後腦勺一張）→ C. 期待造型參考照
+- [ ] I2. **「自然光、後腦勺一張」這個指引夠不夠？** 老闆實際看客人傳來的照片，最常缺什麼角度？需不需要加「正面」「側面」「髮根」之類細節？
+- [ ] I3. **客戶問「漂髮」也要走同樣 Flex 嗎？** PRD §13.2 Wave 1.7 明確漂髮**不走** keyword reply 而是走 Wave 4a consultation flow（建 ConsultationRequest 表）。要 confirm 老闆希望漂客也走「自助諮詢」還是「直接打電話來才報價」。
+- [ ] I4. **「先預約看看」CTA 按鈕**現在跳到 LIFF 預約首頁。要不要改成「先選『燙髮』服務直接進入該服務的預約流程」？（會要求 Wave 2a Service schema 先 deploy，且要有 `?serviceId=xxx` 預填參數）
+- [ ] I5. **老闆回覆 SOP** — 客人傳了照片，老闆要在哪裡看 / 怎麼回？目前是 LINE 對話直接看 + 手動回覆。要不要建後台「諮詢隊列」UI（這就是 Wave 4a 的範圍）？
+
+> ⚠️ 暫定：以上 5 個問題先讓老闆「跑一輪假流程」感受，再決定要不要動 Flex 文案 / wiring。
+
+## J. LIFF 效能 / 可用性 bug（2026-04-26 ryan dogfood 發現）
+
+- [ ] J1. **「我的預約」第一次點開要 10 秒以上** — root cause: LiffProvider 阻塞 init（liff.init + getProfile + /api/liff/init 串行）+ 客戶端 cache 等 isReady 才生效。**修復路徑**：v1.5b PR 加 sessionStorage cache（idToken + profile）+ my-bookings 不等 isReady fire fetch。
+- [ ] J2. **「我的預約」要點兩次才有反應** — 推測：第一次點 Rich Menu「我的預約」→ 訊息送出 → webhook reply Flex with LIFF link → 用戶要再點 Flex link。**修復路徑**：Rich Menu「我的預約」改成 URI action 直接跳 LIFF（跳過 webhook 一輪）。但這要等老闆給 6 格素材 + 重 deploy Rich Menu。
+- [ ] J3. demo 時請老闆**實機操作 5 次「我的預約」**，記錄體感（秒數、是否點 1 次有反應），決定 J1+J2 修法是否還要再加碼。

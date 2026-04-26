@@ -21,9 +21,12 @@ interface LiffContextType {
   realName: string | null;
   phone: string | null;
   birthday: string | null;
+  /** Cached LINE ID token. Use this for X-LIFF-ID-Token header without waiting
+      for liff.getIDToken() (which requires SDK fully loaded). */
+  cachedIdToken: string | null;
 }
 
-const LiffContext = createContext<LiffContextType>({
+const defaultState: LiffContextType = {
   liff: null,
   isLoggedIn: false,
   isInClient: false,
@@ -35,25 +38,80 @@ const LiffContext = createContext<LiffContextType>({
   realName: null,
   phone: null,
   birthday: null,
-});
+  cachedIdToken: null,
+};
+
+const LiffContext = createContext<LiffContextType>(defaultState);
 
 export function useLiff() {
   return useContext(LiffContext);
 }
 
+// Session-scoped optimistic cache. LIFF init averages 2-5s in LINE WebView;
+// caching profile + idToken across page navigations within a session lets
+// downstream pages (my-bookings etc.) fire API calls immediately on mount
+// instead of waiting for full SDK boot.
+const LIFF_CACHE_KEY = "liff:cache:v1";
+const LIFF_CACHE_TTL_MS = 30 * 60_000; // 30 min — well within LINE ID token's 1h lifetime
+
+interface CachedLiffData {
+  ts: number;
+  userId: string;
+  displayName: string | null;
+  pictureUrl: string | null;
+  realName: string | null;
+  phone: string | null;
+  birthday: string | null;
+  isLoggedIn: boolean;
+  isInClient: boolean;
+  cachedIdToken: string | null;
+}
+
+function readLiffCache(): CachedLiffData | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(LIFF_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedLiffData;
+    if (Date.now() - parsed.ts > LIFF_CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeLiffCache(data: Omit<CachedLiffData, "ts">): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      LIFF_CACHE_KEY,
+      JSON.stringify({ ts: Date.now(), ...data } satisfies CachedLiffData),
+    );
+  } catch {
+    /* quota exceeded — silent */
+  }
+}
+
 export function LiffProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<LiffContextType>({
-    liff: null,
-    isLoggedIn: false,
-    isInClient: false,
-    isReady: false,
-    error: null,
-    userId: null,
-    displayName: null,
-    pictureUrl: null,
-    realName: null,
-    phone: null,
-    birthday: null,
+  const [state, setState] = useState<LiffContextType>(() => {
+    // Optimistic init: if a recent profile is cached in sessionStorage, paint
+    // immediately as isReady=true. Real LIFF SDK still loads in the background
+    // and overwrites state when done (with fresh idToken).
+    const cached = readLiffCache();
+    if (!cached) return defaultState;
+    return {
+      ...defaultState,
+      isLoggedIn: cached.isLoggedIn,
+      isInClient: cached.isInClient,
+      isReady: true,
+      userId: cached.userId,
+      displayName: cached.displayName,
+      pictureUrl: cached.pictureUrl,
+      realName: cached.realName,
+      phone: cached.phone,
+      birthday: cached.birthday,
+      cachedIdToken: cached.cachedIdToken,
+    };
   });
 
   useEffect(() => {
@@ -151,6 +209,8 @@ export function LiffProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        const idToken = liff.getIDToken?.() || null;
+
         setState({
           liff,
           isLoggedIn: true,
@@ -163,7 +223,23 @@ export function LiffProvider({ children }: { children: ReactNode }) {
           realName,
           phone,
           birthday,
+          cachedIdToken: idToken,
         });
+
+        // Persist for next page navigation in same session
+        if (userId) {
+          writeLiffCache({
+            isLoggedIn: true,
+            isInClient,
+            userId,
+            displayName,
+            pictureUrl,
+            realName,
+            phone,
+            birthday,
+            cachedIdToken: idToken,
+          });
+        }
       } catch (err) {
         console.error("LIFF init error:", err);
         setState((prev) => ({

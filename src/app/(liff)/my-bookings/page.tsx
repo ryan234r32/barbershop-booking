@@ -92,17 +92,19 @@ function writeCache(userId: string, bookings: Booking[]): void {
 }
 
 export default function MyBookingsPage() {
-  const { isReady, error, userId, liff } = useLiff();
+  const { isReady, error, userId, liff, cachedIdToken } = useLiff();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"upcoming" | "history">("upcoming");
 
   // Stale-while-revalidate: paint cached bookings instantly, then refetch in background.
+  // Combined with LiffProvider's sessionStorage cache, this means the second visit
+  // in the same LINE session paints in <100ms (cache hit) instead of 2-5s (LIFF init).
+  //
   // setState within effect is intentional for SWR — cached data is the synchronous
-  // optimistic paint, fetch result overwrites with fresh data. Disabling
-  // react-hooks/set-state-in-effect for this established pattern.
+  // optimistic paint, fetch result overwrites with fresh data.
   useEffect(() => {
-    if (!isReady || !userId) return;
+    if (!userId) return; // need user identity, but don't block on isReady
 
     const cached = readCache(userId);
     if (cached) {
@@ -112,9 +114,13 @@ export default function MyBookingsPage() {
       setLoading(false);
     }
 
-    const idToken = liff?.getIDToken?.() || "";
+    // Use cachedIdToken (sessionStorage from previous LIFF init) so we can fetch
+    // BEFORE the SDK fully boots. Fall back to live SDK if no cache.
+    const idToken = cachedIdToken || liff?.getIDToken?.() || "";
+    if (!idToken) return; // wait for LIFF init to provide token
+
     fetch(`/api/bookings`, {
-      headers: idToken ? { "X-LIFF-ID-Token": idToken } : {},
+      headers: { "X-LIFF-ID-Token": idToken },
     })
       .then((r) => r.json())
       .then((data) => {
@@ -124,7 +130,7 @@ export default function MyBookingsPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [isReady, userId, liff]);
+  }, [isReady, userId, liff, cachedIdToken]);
 
   const liffBaseUrl = typeof window !== "undefined"
     ? `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}`
