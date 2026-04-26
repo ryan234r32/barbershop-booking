@@ -28,6 +28,7 @@ import { CalendarFab } from "@/components/admin/calendar/calendar-fab";
 import { ZoomControls } from "@/components/admin/calendar/zoom-controls";
 import { useViewPersistence } from "@/components/admin/calendar/use-view-persistence";
 import { useZoom } from "@/components/admin/calendar/use-zoom";
+import { useCalendarShortcuts } from "@/components/admin/calendar/use-calendar-shortcuts";
 import {
   RescheduleUndoToast,
   type RescheduleResult,
@@ -288,6 +289,19 @@ export default function CalendarPage() {
     const { date, time } = nextSlotForFab(currentDate);
     openNewBooking(date, time, 1);
   }, [currentDate, openNewBooking]);
+
+  // ─── Keyboard shortcuts (PRD-v3 D-12) ───
+  // Disabled while a sheet/modal is open so escape goes to those handlers,
+  // not the global D/W/M switch.
+  const sheetOrModalOpen =
+    detailSheetOpen || newSheetOpen || unackBookings.length > 0;
+  useCalendarShortcuts({
+    enabled: !sheetOrModalOpen,
+    setView,
+    goToday: () => setCurrentDate(toTaipeiDate(new Date())),
+    navigate: (delta) => navigate(delta),
+    openCreate: handleFabClick,
+  });
 
   return (
     <div className="max-w-4xl mx-auto">

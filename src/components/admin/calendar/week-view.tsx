@@ -223,6 +223,8 @@ export function WeekView({
 
                   if (isContinuation) return null;
 
+                  const isHoliday = holidayDates.has(dateStr);
+
                   if (booking) {
                     const paid = isPaid(booking);
                     // PRD-v3 §4 / 碩展訪談 2.2: when slot height < 32 px we
@@ -298,23 +300,31 @@ export function WeekView({
                   return (
                     <td
                       key={dateStr + hour}
-                      className="p-0.5 border-t border-[var(--color-surface)]/60"
+                      className={`p-0.5 border-t border-[var(--color-surface)]/60 ${
+                        isHoliday ? "bg-[var(--color-text-muted)]/8" : ""
+                      }`}
                     >
                       <div
-                        className={`w-full h-full rounded transition-colors cursor-pointer ${
-                          isDropTarget
-                            ? "bg-[var(--color-brand)]/30 ring-2 ring-[var(--color-brand)]"
-                            : draggedBooking
-                              ? "hover:bg-[var(--color-brand)]/15"
-                              : "hover:bg-[var(--color-surface)]/50"
+                        className={`w-full h-full rounded transition-colors ${
+                          isHoliday
+                            ? "cursor-not-allowed bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,var(--color-text-muted)_4px,var(--color-text-muted)_5px)] opacity-30"
+                            : isDropTarget
+                              ? "bg-[var(--color-brand)]/30 ring-2 ring-[var(--color-brand)] cursor-pointer"
+                              : draggedBooking
+                                ? "hover:bg-[var(--color-brand)]/15 cursor-pointer"
+                                : "hover:bg-[var(--color-surface)]/50 cursor-pointer"
                         }`}
+                        title={isHoliday ? "公休日 — 不可預約" : undefined}
+                        aria-disabled={isHoliday}
                         onClick={() => {
                           if (draggedBooking) return;
+                          if (isHoliday) return;
                           setCurrentDate(d);
                           setView("day");
                         }}
                         onDragOver={(e) => {
                           if (!draggedBooking) return;
+                          if (isHoliday) return; // PRD-v3 D-5 — reject drop on closed days
                           e.preventDefault();
                           e.dataTransfer.dropEffect = "move";
                           if (
