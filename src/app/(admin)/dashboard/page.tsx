@@ -153,9 +153,11 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* Stats cards */}
+      {/* Stats cards — 2 cols on mobile so 「本週預約」 fits on one line and
+          $12,800 doesn't overflow into the next card. 4 cols from sm+ where
+          there's room. */}
       {stats && (
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
           <StatCard label="本週預約" value={stats.totalBookings} />
           <StatCard label="完成" value={stats.completedBookings} />
           <StatCard
@@ -243,9 +245,11 @@ export default function DashboardPage() {
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="bg-card rounded-xl border border-border p-4">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
+    <div className="bg-card rounded-xl border border-border p-4 min-w-0">
+      <p className="text-sm text-muted-foreground whitespace-nowrap">{label}</p>
+      <p className="text-2xl font-bold text-foreground mt-1 tabular-nums truncate">
+        {value}
+      </p>
     </div>
   );
 }
