@@ -25,7 +25,9 @@ import { WeekView } from "@/components/admin/calendar/week-view";
 import { MonthView } from "@/components/admin/calendar/month-view";
 import { ViewToggle } from "@/components/admin/calendar/view-toggle";
 import { CalendarFab } from "@/components/admin/calendar/calendar-fab";
+import { ZoomControls } from "@/components/admin/calendar/zoom-controls";
 import { useViewPersistence } from "@/components/admin/calendar/use-view-persistence";
+import { useZoom } from "@/components/admin/calendar/use-zoom";
 import { fetcher, formatDate, toTaipeiDate, WEEKDAYS } from "@/components/admin/calendar/utils";
 import type { Booking, MonthlySummary } from "@/components/admin/calendar/types";
 
@@ -62,6 +64,18 @@ export default function CalendarPage() {
   usePageTitle("日曆");
   const [view, setView] = useViewPersistence();
   const [currentDate, setCurrentDate] = useState(() => toTaipeiDate(new Date()));
+  const {
+    slotHeight: zoomSlotHeight,
+    stopIndex: zoomStopIndex,
+    zoomIn,
+    zoomOut,
+    containerRef: zoomContainerRef,
+    onWheel: onZoomWheel,
+    onPointerDown: onZoomPointerDown,
+    onPointerMove: onZoomPointerMove,
+    onPointerUp: onZoomPointerUp,
+    onPointerCancel: onZoomPointerCancel,
+  } = useZoom();
 
   // ─── Sheet/modal state ───
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -289,12 +303,22 @@ export default function CalendarPage() {
             <ChevronRight size={20} className="text-[var(--color-text-body)]" />
           </button>
         </div>
-        <button
-          onClick={() => setCurrentDate(toTaipeiDate(new Date()))}
-          className="text-xs font-medium text-[var(--color-brand)] border border-[var(--color-brand)] px-3 py-1.5 rounded-lg hover:bg-[var(--color-brand)]/5 transition-colors"
-        >
-          今天
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Zoom controls — only visible for time-axis views */}
+          {(view === "day" || view === "week") && (
+            <ZoomControls
+              stopIndex={zoomStopIndex}
+              onZoomIn={zoomIn}
+              onZoomOut={zoomOut}
+            />
+          )}
+          <button
+            onClick={() => setCurrentDate(toTaipeiDate(new Date()))}
+            className="text-xs font-medium text-[var(--color-brand)] border border-[var(--color-brand)] px-3 py-1.5 rounded-lg hover:bg-[var(--color-brand)]/5 transition-colors"
+          >
+            今天
+          </button>
+        </div>
       </div>
 
       {/* View toggle */}
@@ -307,31 +331,46 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {view === "day" && !isLoading && (
-        <DayView
-          currentDate={currentDate}
-          setCurrentDate={setCurrentDate}
-          bookings={bookings}
-          now={now}
-          isToday={isToday}
-          nearEndBookings={nearEndBookings}
-          onOpenBookingDetail={openBookingDetail}
-          onOpenNewBooking={openNewBooking}
-        />
-      )}
-
-      {view === "week" && !isLoading && (
-        <WeekView
-          weekDates={weekDates}
-          bookings={bookings}
-          now={now}
-          isToday={isToday}
-          holidayDates={holidayDates}
-          setCurrentDate={setCurrentDate}
-          setView={setView}
-          onOpenBookingDetail={openBookingDetail}
-          mutateBookings={mutateBookings}
-        />
+      {/* Zoomable wrapper for day/week — Ctrl+wheel + 2-pointer pinch */}
+      {(view === "day" || view === "week") && !isLoading && (
+        <div
+          ref={zoomContainerRef}
+          onWheel={onZoomWheel}
+          onPointerDown={onZoomPointerDown}
+          onPointerMove={onZoomPointerMove}
+          onPointerUp={onZoomPointerUp}
+          onPointerCancel={onZoomPointerCancel}
+          className="touch-pan-y"
+          style={{ touchAction: "pan-y" }}
+        >
+          {view === "day" && (
+            <DayView
+              currentDate={currentDate}
+              setCurrentDate={setCurrentDate}
+              bookings={bookings}
+              now={now}
+              isToday={isToday}
+              nearEndBookings={nearEndBookings}
+              onOpenBookingDetail={openBookingDetail}
+              onOpenNewBooking={openNewBooking}
+              slotHeight={zoomSlotHeight}
+            />
+          )}
+          {view === "week" && (
+            <WeekView
+              weekDates={weekDates}
+              bookings={bookings}
+              now={now}
+              isToday={isToday}
+              holidayDates={holidayDates}
+              setCurrentDate={setCurrentDate}
+              setView={setView}
+              onOpenBookingDetail={openBookingDetail}
+              mutateBookings={mutateBookings}
+              slotHeight={zoomSlotHeight}
+            />
+          )}
+        </div>
       )}
 
       {view === "month" && (

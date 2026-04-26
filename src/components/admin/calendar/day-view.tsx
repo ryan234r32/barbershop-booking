@@ -17,7 +17,6 @@ import { SegmentBadge } from "./segment-badge";
 import { HorizontalDateStrip } from "./horizontal-date-strip";
 import {
   HOURS,
-  SLOT_HEIGHT,
   cardBgClass,
   formatDate,
   getBookingAtSlot,
@@ -36,6 +35,8 @@ interface Props {
   nearEndBookings: Set<string>;
   onOpenBookingDetail: (b: Booking) => void;
   onOpenNewBooking: (date: string, time: string, duration?: number) => void;
+  /** Row height in px — controlled by useZoom (PRD-v3 D-1). */
+  slotHeight: number;
 }
 
 const LONG_PRESS_MS = 500;
@@ -50,6 +51,7 @@ export function DayView({
   nearEndBookings,
   onOpenBookingDetail,
   onOpenNewBooking,
+  slotHeight,
 }: Props) {
   const timelineRef = useRef<HTMLDivElement>(null);
 
@@ -67,24 +69,27 @@ export function DayView({
     const h = now.getHours();
     const m = now.getMinutes();
     if (h < 11 || h >= 20) return null;
-    return (h - 11 + m / 60) * SLOT_HEIGHT;
-  }, [now]);
+    return (h - 11 + m / 60) * slotHeight;
+  }, [now, slotHeight]);
 
-  // Auto-scroll to current time when view mounts / day changes
+  // Auto-scroll to current time when view mounts / day changes.
+  // Intentionally NOT depending on `slotHeight` — re-scrolling on every zoom
+  // change would yank the user's scroll position. Only scroll on day switch.
   useEffect(() => {
     if (!timelineRef.current) return;
     const nowHour = now.getHours();
     const nowMin = now.getMinutes();
     if (nowHour >= 11 && nowHour < 20) {
-      const offset = (nowHour - 11 + nowMin / 60) * SLOT_HEIGHT;
+      const offset = (nowHour - 11 + nowMin / 60) * slotHeight;
       timelineRef.current.scrollTo({
-        top: Math.max(0, offset - SLOT_HEIGHT * 2),
+        top: Math.max(0, offset - slotHeight * 2),
         behavior: "smooth",
       });
     } else if (nowHour < 11) {
       timelineRef.current.scrollTo({ top: 0 });
     }
-  }, [now, currentDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDate]);
 
   // ─── Drag-to-create gesture machine ───
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -108,10 +113,13 @@ export function DayView({
     [bookings, currentDate],
   );
 
-  const yToHour = useCallback((y: number): number => {
-    const row = Math.floor(y / SLOT_HEIGHT);
-    return Math.max(11, Math.min(20, 11 + row));
-  }, []);
+  const yToHour = useCallback(
+    (y: number): number => {
+      const row = Math.floor(y / slotHeight);
+      return Math.max(11, Math.min(20, 11 + row));
+    },
+    [slotHeight],
+  );
 
   const cancelMomentum = useCallback(() => {
     if (momentumRafRef.current !== null) {
@@ -340,8 +348,8 @@ export function DayView({
               className="flex"
               style={{
                 height: booking && booking.slotsOccupied > 1
-                  ? SLOT_HEIGHT * booking.slotsOccupied
-                  : SLOT_HEIGHT,
+                  ? slotHeight * booking.slotsOccupied
+                  : slotHeight,
               }}
             >
               <div className="w-14 shrink-0 pr-2 pt-2 text-right">
@@ -435,8 +443,8 @@ export function DayView({
           <div
             className="absolute left-[56px] right-1 pointer-events-none z-20 rounded-lg bg-[var(--color-brand)]/30 border-2 border-[var(--color-brand)] flex items-center justify-center"
             style={{
-              top: (dragState.startHour - 11) * SLOT_HEIGHT,
-              height: (dragState.endHour - dragState.startHour) * SLOT_HEIGHT,
+              top: (dragState.startHour - 11) * slotHeight,
+              height: (dragState.endHour - dragState.startHour) * slotHeight,
             }}
           >
             <span className="text-sm font-bold text-[var(--color-brand)] bg-[var(--color-bg)] px-3 py-1 rounded-full shadow-md">
