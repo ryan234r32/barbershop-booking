@@ -57,6 +57,13 @@ interface BookingRow {
   isNewCustomer: boolean;
 }
 
+/**
+ * Owner's own appointments / vendor calls — these aren't customer bookings.
+ * Match against EITHER service or customer cell (Ken sometimes wrote 「8 點土城法院」
+ * in the customer column with empty service, sometimes the other way around).
+ */
+const NON_BOOKING_PATTERN = /(休假|體檢|門診|請假|公休|漲價|回診|掛|法院|廠商|傢俱|傢具|診所)/;
+
 function parseSheet(ws: ExcelJS.Worksheet): BookingRow[] {
   const out: BookingRow[] = [];
   const blockStarts: number[] = [];
@@ -81,8 +88,14 @@ function parseSheet(ws: ExcelJS.Worksheet): BookingRow[] {
         const amtMatch = /^(\d+)/.exec(amtStr);
         const amount = amtMatch ? parseInt(amtMatch[1], 10) : null;
         const isNew = svc.startsWith("新");
-        // Skip notes-only rows
-        if (/(休假|體檢|門診|請假|公休|漲價)/.test(cust) || /(休假|體檢|門診|請假|公休|漲價)/.test(svc)) return;
+
+        // Owner's own appointments (回診/門診/法院 etc.) — not bookings
+        if (NON_BOOKING_PATTERN.test(cust) || NON_BOOKING_PATTERN.test(svc)) return;
+
+        // Empty service + no amount → placeholder/note, skip silently.
+        // Empty service + has amount → kept as 「未明」 bucket so totals stay accurate.
+        if (!svc && amount == null) return;
+
         out.push({
           monthSheet: ws.name,
           date,
@@ -99,8 +112,11 @@ function parseSheet(ws: ExcelJS.Worksheet): BookingRow[] {
   return out;
 }
 
-function categorizeService(name: string): "剪" | "燙" | "染" | "漂" | "護" | "洗" | "其他" {
+function categorizeService(name: string): "剪" | "燙" | "染" | "漂" | "護" | "洗" | "未明" | "其他" {
+  if (!name) return "未明"; // empty service name with amount — bucket separately, not 「其他」
   if (name.includes("剪")) return "剪";
+  // 修瀏海 = trimming bangs, counts as a haircut variant
+  if (name.includes("瀏海")) return "剪";
   if (name.includes("漂")) return "漂"; // check before 染 (漂染合併也歸漂)
   if (name.includes("染")) return "染";
   if (name.includes("燙")) return "燙";
@@ -169,6 +185,7 @@ async function main() {
   // 4. Top services (raw names, not categorized)
   const serviceMap = new Map<string, { count: number; revenue: number }>();
   for (const b of allBookings) {
+    if (!b.serviceName) continue; // exclude 「未明」 from Top services list
     const acc = serviceMap.get(b.serviceName) ?? { count: 0, revenue: 0 };
     acc.count++;
     acc.revenue += b.amount ?? 0;
