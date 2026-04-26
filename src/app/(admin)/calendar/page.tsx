@@ -964,8 +964,16 @@ export default function CalendarPage() {
                           >
                             <div
                               onClick={() => openBookingDetail(booking)}
-                              className={`w-full h-full rounded p-1 cursor-pointer transition-colors flex flex-col overflow-hidden ${cellBg}`}
+                              className={`relative w-full h-full rounded p-1 cursor-pointer transition-colors flex flex-col overflow-hidden ${cellBg}`}
                             >
+                              {/* PRD-v3 §2 + 1.6b: 紅點 indicator for unacknowledged */}
+                              {!booking.adminAcknowledgedAt && (
+                                <span
+                                  className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-[var(--color-danger)] ring-1 ring-[var(--color-bg)]"
+                                  aria-label="未讀新預約"
+                                  title="未讀 — 點擊查看詳情即標記為已讀"
+                                />
+                              )}
                               {/* Time range */}
                               <p className="text-[11px] text-[var(--color-text-muted)] font-mono leading-none mb-0.5 truncate">
                                 {booking.startTime.slice(0, 5)}
@@ -1055,13 +1063,14 @@ export default function CalendarPage() {
                   const count = summary?.count || 0;
                   const today = dateStr === todayStr;
 
-                  // Get first 2 bookings for mini time bars
-                  const dayBookings = bookings
-                    .filter((b) =>
-                      b.date.startsWith(dateStr) &&
-                      b.status !== "CANCELLED" &&
-                      b.status !== "CANCELLED_BY_ADMIN"
-                    )
+                  // All bookings for this day (PRD-v3 §2 + 1.6b: count unack ones)
+                  const dayBookingsAll = bookings.filter((b) =>
+                    b.date.startsWith(dateStr) &&
+                    b.status !== "CANCELLED" &&
+                    b.status !== "CANCELLED_BY_ADMIN"
+                  );
+                  const unackCount = dayBookingsAll.filter((b) => !b.adminAcknowledgedAt).length;
+                  const dayBookings = dayBookingsAll
                     .sort((a, b) => a.startTime.localeCompare(b.startTime))
                     .slice(0, 2);
 
@@ -1073,6 +1082,17 @@ export default function CalendarPage() {
                         today ? "ring-2 ring-[var(--color-brand)]" : ""
                       }`}
                     >
+                      {/* Unack indicator (top-right corner) */}
+                      {unackCount > 0 && (
+                        <span
+                          className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[var(--color-danger)] text-[10px] font-bold text-white flex items-center justify-center leading-none"
+                          aria-label={`${unackCount} 筆未讀新預約`}
+                          title={`${unackCount} 筆未讀新預約 — 點進日視圖查看`}
+                        >
+                          {unackCount > 9 ? "9+" : unackCount}
+                        </span>
+                      )}
+
                       {/* Date + count */}
                       <div className="flex items-center justify-between mb-0.5">
                         <span className={`text-[13px] font-semibold leading-none ${today ? "text-[var(--color-brand)]" : "text-[var(--color-text-primary)]"}`}>
