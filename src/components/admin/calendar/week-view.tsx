@@ -25,6 +25,8 @@ import {
 } from "./utils";
 import type { Booking } from "./types";
 
+import type { RescheduleResult } from "./reschedule-undo-toast";
+
 interface Props {
   weekDates: Date[];
   bookings: Booking[];
@@ -37,6 +39,8 @@ interface Props {
   mutateBookings: () => void;
   /** Row height in px — controlled by useZoom (PRD-v3 D-1). */
   slotHeight: number;
+  /** Notifies parent of a successful drag-reschedule so the undo toast can show. */
+  onRescheduled: (r: RescheduleResult) => void;
 }
 
 const WEEK_THEAD_HEIGHT = 34;
@@ -52,6 +56,7 @@ export function WeekView({
   onOpenBookingDetail,
   mutateBookings,
   slotHeight,
+  onRescheduled,
 }: Props) {
   const { toast } = useToast();
 
@@ -63,7 +68,9 @@ export function WeekView({
     async (newDate: string, newStartTime: string) => {
       if (!draggedBooking || rescheduleSubmitting) return;
       const oldDate = draggedBooking.date.slice(0, 10);
-      if (oldDate === newDate && draggedBooking.startTime === newStartTime) {
+      const oldStartTime = draggedBooking.startTime;
+      const customerName = draggedBooking.user.displayName || "顧客";
+      if (oldDate === newDate && oldStartTime === newStartTime) {
         setDraggedBooking(null);
         setDragOverSlot(null);
         return;
@@ -76,18 +83,27 @@ export function WeekView({
       }
       setRescheduleSubmitting(true);
       try {
+        // Idempotency key (PRD-v3 E-5): same target on the same booking
+        // collapses to one operation if the user double-taps.
+        const idempotencyKey = `${draggedBooking.id}-${newDate}-${newStartTime}`;
         const res = await fetch(`/api/bookings/${draggedBooking.id}/reschedule`, {
           method: "POST",
           headers: adminHeaders(),
-          body: JSON.stringify({ date: newDate, startTime: newStartTime }),
+          body: JSON.stringify({ date: newDate, startTime: newStartTime, idempotencyKey }),
         });
         const data = await res.json();
         if (!res.ok) {
           throw new Error(data.error || "改期失敗");
         }
-        toast({
-          type: "success",
-          message: `已改期到 ${newDate.slice(5)} ${newStartTime}`,
+        // Hand off to the parent for the undo toast — replaces the inline
+        // success toast which can't be undone.
+        onRescheduled({
+          bookingId: draggedBooking.id,
+          oldDate,
+          oldStartTime,
+          newDate,
+          newStartTime,
+          customerName,
         });
         mutateBookings();
       } catch (err) {
@@ -101,7 +117,7 @@ export function WeekView({
         setDragOverSlot(null);
       }
     },
-    [draggedBooking, rescheduleSubmitting, holidayDates, toast, mutateBookings],
+    [draggedBooking, rescheduleSubmitting, holidayDates, toast, mutateBookings, onRescheduled],
   );
 
   const liveBookings = bookings.filter(

@@ -28,6 +28,10 @@ import { CalendarFab } from "@/components/admin/calendar/calendar-fab";
 import { ZoomControls } from "@/components/admin/calendar/zoom-controls";
 import { useViewPersistence } from "@/components/admin/calendar/use-view-persistence";
 import { useZoom } from "@/components/admin/calendar/use-zoom";
+import {
+  RescheduleUndoToast,
+  type RescheduleResult,
+} from "@/components/admin/calendar/reschedule-undo-toast";
 import { fetcher, formatDate, toTaipeiDate, WEEKDAYS } from "@/components/admin/calendar/utils";
 import type { Booking, MonthlySummary } from "@/components/admin/calendar/types";
 
@@ -179,6 +183,9 @@ export default function CalendarPage() {
   );
 
   const [nearEndBookings, setNearEndBookings] = useState<Set<string>>(new Set());
+
+  // Most recent reschedule, surfaces as the undo toast (Wave 3.A / A3 / E-5).
+  const [lastReschedule, setLastReschedule] = useState<RescheduleResult | null>(null);
 
   // ─── Date Calculations ───
   const weekDates = useMemo(() => {
@@ -354,6 +361,9 @@ export default function CalendarPage() {
               onOpenBookingDetail={openBookingDetail}
               onOpenNewBooking={openNewBooking}
               slotHeight={zoomSlotHeight}
+              holidayDates={holidayDates}
+              mutateBookings={mutateBookings}
+              onRescheduled={setLastReschedule}
             />
           )}
           {view === "week" && (
@@ -368,6 +378,7 @@ export default function CalendarPage() {
               onOpenBookingDetail={openBookingDetail}
               mutateBookings={mutateBookings}
               slotHeight={zoomSlotHeight}
+              onRescheduled={setLastReschedule}
             />
           )}
         </div>
@@ -384,6 +395,16 @@ export default function CalendarPage() {
           setView={setView}
         />
       )}
+
+      {/* Reschedule undo toast — 5s window after a successful drag-reschedule */}
+      <RescheduleUndoToast
+        result={lastReschedule}
+        onDismiss={() => setLastReschedule(null)}
+        onUndone={() => {
+          setLastReschedule(null);
+          mutateBookings();
+        }}
+      />
 
       {/* FAB: quick new booking. Hidden when any sheet/modal is open. */}
       <CalendarFab

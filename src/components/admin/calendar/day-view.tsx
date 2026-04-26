@@ -13,6 +13,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { adminHeaders } from "@/lib/auth/admin-fetch";
+import { useToast } from "@/components/ui/toast";
 import { SegmentBadge } from "./segment-badge";
 import { HorizontalDateStrip } from "./horizontal-date-strip";
 import {
@@ -25,6 +27,7 @@ import {
   isSlotOccupied,
 } from "./utils";
 import type { Booking } from "./types";
+import type { RescheduleResult } from "./reschedule-undo-toast";
 
 interface Props {
   currentDate: Date;
@@ -37,6 +40,10 @@ interface Props {
   onOpenNewBooking: (date: string, time: string, duration?: number) => void;
   /** Row height in px — controlled by useZoom (PRD-v3 D-1). */
   slotHeight: number;
+  holidayDates: Set<string>;
+  mutateBookings: () => void;
+  /** Notifies parent of a successful drag-reschedule so the undo toast can show. */
+  onRescheduled: (r: RescheduleResult) => void;
 }
 
 const LONG_PRESS_MS = 500;
@@ -52,8 +59,12 @@ export function DayView({
   onOpenBookingDetail,
   onOpenNewBooking,
   slotHeight,
+  holidayDates,
+  mutateBookings,
+  onRescheduled,
 }: Props) {
   const timelineRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   // Drag-to-create state
   const [dragState, setDragState] = useState<{
@@ -61,6 +72,61 @@ export function DayView({
     endHour: number;
     active: boolean;
   } | null>(null);
+
+  // Drag-to-reschedule state (Wave 3.A / A3 — PRD-v3 §4 + E-5/E-6)
+  const [draggedBooking, setDraggedBooking] = useState<Booking | null>(null);
+  const [dragOverHour, setDragOverHour] = useState<string | null>(null);
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
+
+  const handleDropReschedule = useCallback(
+    async (newDate: string, newStartTime: string) => {
+      if (!draggedBooking || rescheduleSubmitting) return;
+      const oldDate = draggedBooking.date.slice(0, 10);
+      if (oldDate === newDate && draggedBooking.startTime === newStartTime) {
+        setDraggedBooking(null);
+        setDragOverHour(null);
+        return;
+      }
+      if (holidayDates.has(newDate)) {
+        toast({ type: "error", message: "公休日不可改期到此日" });
+        setDraggedBooking(null);
+        setDragOverHour(null);
+        return;
+      }
+      const oldStartTime = draggedBooking.startTime;
+      const customerName = draggedBooking.user.displayName || "顧客";
+      setRescheduleSubmitting(true);
+      try {
+        const idempotencyKey = `${draggedBooking.id}-${newDate}-${newStartTime}`;
+        const res = await fetch(`/api/bookings/${draggedBooking.id}/reschedule`, {
+          method: "POST",
+          headers: adminHeaders(),
+          body: JSON.stringify({ date: newDate, startTime: newStartTime, idempotencyKey }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "改期失敗");
+        onRescheduled({
+          bookingId: draggedBooking.id,
+          oldDate,
+          oldStartTime,
+          newDate,
+          newStartTime,
+          customerName,
+        });
+        mutateBookings();
+      } catch (err) {
+        toast({
+          type: "error",
+          message: err instanceof Error ? err.message : "改期失敗",
+        });
+      } finally {
+        setRescheduleSubmitting(false);
+        setDraggedBooking(null);
+        setDragOverHour(null);
+      }
+    },
+    [draggedBooking, rescheduleSubmitting, holidayDates, toast, mutateBookings, onRescheduled],
+  );
 
   const todayBookings = getBookingsForDate(bookings, formatDate(currentDate));
   const todayRevenue = todayBookings.reduce((sum, b) => sum + (b.service?.price || 0), 0);
@@ -358,8 +424,19 @@ export function DayView({
               <div className="flex-1 border-t border-[var(--color-surface)] px-1 pt-1">
                 {booking ? (
                   <div
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggedBooking(booking);
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", booking.id);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedBooking(null);
+                      setDragOverHour(null);
+                    }}
                     onClick={() => onOpenBookingDetail(booking)}
-                    className={`relative rounded-lg p-3 h-full cursor-pointer transition-colors hover:opacity-90 flex flex-col ${cardBgClass(booking)}`}
+                    className={`relative rounded-lg p-3 h-full cursor-grab active:cursor-grabbing transition-all hover:opacity-90 flex flex-col ${cardBgClass(booking)} ${draggedBooking?.id === booking.id ? "opacity-40 ring-2 ring-[var(--color-brand)]" : ""}`}
+                    title="點擊查看詳情；拖曳到其他時段可改期"
                   >
                     {!booking.adminAcknowledgedAt && (
                       <span
@@ -409,10 +486,32 @@ export function DayView({
                     onPointerMove={(e) => handleSlotPointerMove(e, parseInt(hour.split(":")[0]))}
                     onPointerUp={(e) => handleSlotPointerUp(e, parseInt(hour.split(":")[0]))}
                     onPointerCancel={handleSlotPointerCancel}
+                    onDragOver={(e) => {
+                      if (!draggedBooking) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      if (dragOverHour !== hour) setDragOverHour(hour);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverHour === hour) setDragOverHour(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (!draggedBooking) return;
+                      handleDropReschedule(formatDate(currentDate), hour);
+                    }}
                     style={{ touchAction: "none" }}
-                    className="h-full rounded-lg border border-dashed border-[var(--color-text-muted)]/20 flex items-center justify-center cursor-pointer hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-brand)]/5 transition-colors select-none"
+                    className={`h-full rounded-lg border border-dashed transition-colors select-none flex items-center justify-center cursor-pointer ${
+                      draggedBooking && dragOverHour === hour
+                        ? "border-[var(--color-brand)] bg-[var(--color-brand)]/20 ring-2 ring-[var(--color-brand)]"
+                        : draggedBooking
+                          ? "border-[var(--color-brand)]/30 hover:bg-[var(--color-brand)]/10"
+                          : "border-[var(--color-text-muted)]/20 hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-brand)]/5"
+                    }`}
                   >
-                    <span className="text-xs text-[var(--color-text-muted)]">點擊新增・長按拖拉</span>
+                    <span className="text-xs text-[var(--color-text-muted)]">
+                      {draggedBooking ? "放這裡改期" : "點擊新增・長按拖拉"}
+                    </span>
                   </div>
                 )}
               </div>
