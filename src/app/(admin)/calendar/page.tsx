@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import useSWR from "swr";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
@@ -22,12 +23,30 @@ import { NewBookingSheet } from "@/components/admin/new-booking-sheet";
 import { UnacknowledgedModal } from "@/components/admin/unacknowledged-modal";
 import { DayView } from "@/components/admin/calendar/day-view";
 import { WeekView } from "@/components/admin/calendar/week-view";
-import { MonthView } from "@/components/admin/calendar/month-view";
+// PRD-v3 A7 perf: month view (chips + grid + holiday colours) is the heaviest
+// codepath but used least often (default view = day). Defer its bundle until
+// the user actually switches to it — meaningful first-paint LCP improvement.
+const MonthView = dynamic(
+  () => import("@/components/admin/calendar/month-view").then((m) => m.MonthView),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex justify-center py-8">
+        <div className="w-6 h-6 border-2 border-[var(--color-brand)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    ),
+  },
+);
 import { ViewToggle } from "@/components/admin/calendar/view-toggle";
 import { CalendarFab } from "@/components/admin/calendar/calendar-fab";
 import { ZoomControls } from "@/components/admin/calendar/zoom-controls";
 import { useViewPersistence } from "@/components/admin/calendar/use-view-persistence";
 import { useZoom } from "@/components/admin/calendar/use-zoom";
+import { useCalendarShortcuts } from "@/components/admin/calendar/use-calendar-shortcuts";
+import {
+  RescheduleUndoToast,
+  type RescheduleResult,
+} from "@/components/admin/calendar/reschedule-undo-toast";
 import { fetcher, formatDate, toTaipeiDate, WEEKDAYS } from "@/components/admin/calendar/utils";
 import type { Booking, MonthlySummary } from "@/components/admin/calendar/types";
 
@@ -180,6 +199,9 @@ export default function CalendarPage() {
 
   const [nearEndBookings, setNearEndBookings] = useState<Set<string>>(new Set());
 
+  // Most recent reschedule, surfaces as the undo toast (Wave 3.A / A3 / E-5).
+  const [lastReschedule, setLastReschedule] = useState<RescheduleResult | null>(null);
+
   // ─── Date Calculations ───
   const weekDates = useMemo(() => {
     const start = new Date(currentDate);
@@ -282,6 +304,19 @@ export default function CalendarPage() {
     openNewBooking(date, time, 1);
   }, [currentDate, openNewBooking]);
 
+  // ─── Keyboard shortcuts (PRD-v3 D-12) ───
+  // Disabled while a sheet/modal is open so escape goes to those handlers,
+  // not the global D/W/M switch.
+  const sheetOrModalOpen =
+    detailSheetOpen || newSheetOpen || unackBookings.length > 0;
+  useCalendarShortcuts({
+    enabled: !sheetOrModalOpen,
+    setView,
+    goToday: () => setCurrentDate(toTaipeiDate(new Date())),
+    navigate: (delta) => navigate(delta),
+    openCreate: handleFabClick,
+  });
+
   return (
     <div className="max-w-4xl mx-auto">
       {/* Top Bar */}
@@ -354,6 +389,9 @@ export default function CalendarPage() {
               onOpenBookingDetail={openBookingDetail}
               onOpenNewBooking={openNewBooking}
               slotHeight={zoomSlotHeight}
+              holidayDates={holidayDates}
+              mutateBookings={mutateBookings}
+              onRescheduled={setLastReschedule}
             />
           )}
           {view === "week" && (
@@ -368,6 +406,7 @@ export default function CalendarPage() {
               onOpenBookingDetail={openBookingDetail}
               mutateBookings={mutateBookings}
               slotHeight={zoomSlotHeight}
+              onRescheduled={setLastReschedule}
             />
           )}
         </div>
@@ -384,6 +423,16 @@ export default function CalendarPage() {
           setView={setView}
         />
       )}
+
+      {/* Reschedule undo toast — 5s window after a successful drag-reschedule */}
+      <RescheduleUndoToast
+        result={lastReschedule}
+        onDismiss={() => setLastReschedule(null)}
+        onUndone={() => {
+          setLastReschedule(null);
+          mutateBookings();
+        }}
+      />
 
       {/* FAB: quick new booking. Hidden when any sheet/modal is open. */}
       <CalendarFab
@@ -410,6 +459,10 @@ export default function CalendarPage() {
         <UnacknowledgedModal
           bookings={unackBookings}
           onAllAcknowledged={() => {
+            refreshUnack();
+            mutateBookings();
+          }}
+          onStale={() => {
             refreshUnack();
             mutateBookings();
           }}

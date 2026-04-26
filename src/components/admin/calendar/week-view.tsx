@@ -12,18 +12,24 @@
  * Extracted from calendar/page.tsx in Wave 3.A / A1 — behavior unchanged.
  */
 
-import { useCallback, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { useToast } from "@/components/ui/toast";
 import {
   HOURS,
   WEEKDAYS,
+  abbreviateService,
+  buildBookingIndex,
+  chipClassForService,
   formatDate,
-  getBookingAtSlot,
+  indexBookingAtSlot,
+  indexIsSlotOccupied,
   isPaid,
-  isSlotOccupied,
+  truncateCustomerName,
 } from "./utils";
 import type { Booking } from "./types";
+
+import type { RescheduleResult } from "./reschedule-undo-toast";
 
 interface Props {
   weekDates: Date[];
@@ -37,11 +43,13 @@ interface Props {
   mutateBookings: () => void;
   /** Row height in px — controlled by useZoom (PRD-v3 D-1). */
   slotHeight: number;
+  /** Notifies parent of a successful drag-reschedule so the undo toast can show. */
+  onRescheduled: (r: RescheduleResult) => void;
 }
 
 const WEEK_THEAD_HEIGHT = 34;
 
-export function WeekView({
+function WeekViewBase({
   weekDates,
   bookings,
   now,
@@ -52,6 +60,7 @@ export function WeekView({
   onOpenBookingDetail,
   mutateBookings,
   slotHeight,
+  onRescheduled,
 }: Props) {
   const { toast } = useToast();
 
@@ -63,7 +72,9 @@ export function WeekView({
     async (newDate: string, newStartTime: string) => {
       if (!draggedBooking || rescheduleSubmitting) return;
       const oldDate = draggedBooking.date.slice(0, 10);
-      if (oldDate === newDate && draggedBooking.startTime === newStartTime) {
+      const oldStartTime = draggedBooking.startTime;
+      const customerName = draggedBooking.user.displayName || "顧客";
+      if (oldDate === newDate && oldStartTime === newStartTime) {
         setDraggedBooking(null);
         setDragOverSlot(null);
         return;
@@ -76,18 +87,27 @@ export function WeekView({
       }
       setRescheduleSubmitting(true);
       try {
+        // Idempotency key (PRD-v3 E-5): same target on the same booking
+        // collapses to one operation if the user double-taps.
+        const idempotencyKey = `${draggedBooking.id}-${newDate}-${newStartTime}`;
         const res = await fetch(`/api/bookings/${draggedBooking.id}/reschedule`, {
           method: "POST",
           headers: adminHeaders(),
-          body: JSON.stringify({ date: newDate, startTime: newStartTime }),
+          body: JSON.stringify({ date: newDate, startTime: newStartTime, idempotencyKey }),
         });
         const data = await res.json();
         if (!res.ok) {
           throw new Error(data.error || "改期失敗");
         }
-        toast({
-          type: "success",
-          message: `已改期到 ${newDate.slice(5)} ${newStartTime}`,
+        // Hand off to the parent for the undo toast — replaces the inline
+        // success toast which can't be undone.
+        onRescheduled({
+          bookingId: draggedBooking.id,
+          oldDate,
+          oldStartTime,
+          newDate,
+          newStartTime,
+          customerName,
         });
         mutateBookings();
       } catch (err) {
@@ -101,11 +121,18 @@ export function WeekView({
         setDragOverSlot(null);
       }
     },
-    [draggedBooking, rescheduleSubmitting, holidayDates, toast, mutateBookings],
+    [draggedBooking, rescheduleSubmitting, holidayDates, toast, mutateBookings, onRescheduled],
   );
 
-  const liveBookings = bookings.filter(
-    (b) => b.status !== "CANCELLED" && b.status !== "CANCELLED_BY_ADMIN",
+  // PRD-v3 A7 perf: precompute lookup index — saves 7×9×3 array scans/render.
+  const bookingIndex = useMemo(() => buildBookingIndex(bookings), [bookings]);
+
+  const liveBookings = useMemo(
+    () =>
+      bookings.filter(
+        (b) => b.status !== "CANCELLED" && b.status !== "CANCELLED_BY_ADMIN",
+      ),
+    [bookings],
   );
 
   return (
@@ -198,23 +225,30 @@ export function WeekView({
                 </td>
                 {weekDates.map((d) => {
                   const dateStr = formatDate(d);
-                  const booking = getBookingAtSlot(bookings, dateStr, hour);
-                  const occupied = isSlotOccupied(bookings, dateStr, hour);
+                  const booking = indexBookingAtSlot(bookingIndex, dateStr, hour);
+                  const occupied = indexIsSlotOccupied(bookingIndex, dateStr, hour);
                   const isContinuation = occupied && !booking;
 
                   if (isContinuation) return null;
 
+                  const isHoliday = holidayDates.has(dateStr);
+
                   if (booking) {
                     const paid = isPaid(booking);
-                    const cellBg = paid
-                      ? "bg-[var(--color-success)]/20 hover:bg-[var(--color-success)]/30"
-                      : "bg-[var(--color-brand)]/10 hover:bg-[var(--color-brand)]/20";
-                    const name = booking.user.displayName || "顧客";
-                    const serviceShort =
-                      booking.service.name.length > 4
-                        ? booking.service.name.slice(0, 4)
-                        : booking.service.name;
+                    // PRD-v3 §4 / 碩展訪談 2.2: when slot height < 32 px we
+                    // can't render service + name comfortably; tap-only mode.
+                    // We also use chipClassForService for service-categorised
+                    // colour so users can tell at a glance: 剪 vs 染 vs 燙 vs 漂.
+                    const compact = slotHeight < 40;
+                    const chipColors = chipClassForService(booking.service.name, paid);
+                    const fullName = booking.user.displayName || "顧客";
+                    const truncatedName = truncateCustomerName(
+                      fullName,
+                      compact ? 2 : 3,
+                    );
+                    const serviceAbbr = abbreviateService(booking.service.name);
                     const isDragging = draggedBooking?.id === booking.id;
+                    const tooltip = `${booking.startTime.slice(0, 5)} ${booking.service.name} · ${fullName}${paid ? " (已付款)" : ""}`;
                     return (
                       <td
                         key={dateStr + hour}
@@ -222,8 +256,9 @@ export function WeekView({
                         className="p-0.5 align-top border-t border-[var(--color-surface)]/60"
                       >
                         <div
-                          draggable
+                          draggable={!compact}
                           onDragStart={(e) => {
+                            if (compact) return;
                             setDraggedBooking(booking);
                             e.dataTransfer.effectAllowed = "move";
                             e.dataTransfer.setData("text/plain", booking.id);
@@ -233,8 +268,9 @@ export function WeekView({
                             setDragOverSlot(null);
                           }}
                           onClick={() => onOpenBookingDetail(booking)}
-                          className={`relative w-full h-full rounded p-1 cursor-grab active:cursor-grabbing transition-all flex flex-col overflow-hidden ${cellBg} ${isDragging ? "opacity-40 ring-2 ring-[var(--color-brand)]" : ""}`}
-                          title="點擊查看詳情；拖曳到其他時段可改期"
+                          className={`relative w-full h-full rounded p-1 transition-all flex flex-col overflow-hidden ${chipColors} ${compact ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"} ${isDragging ? "opacity-40 ring-2 ring-[var(--color-brand)]" : ""}`}
+                          title={tooltip}
+                          aria-label={tooltip}
                         >
                           {!booking.adminAcknowledgedAt && (
                             <span
@@ -243,15 +279,23 @@ export function WeekView({
                               title="未讀 — 點擊查看詳情即標記為已讀"
                             />
                           )}
-                          <p className="text-[11px] text-[var(--color-text-muted)] font-mono leading-none mb-0.5 truncate">
-                            {booking.startTime.slice(0, 5)}
-                          </p>
-                          <p className="text-[11px] font-semibold text-[var(--color-text-primary)] leading-tight truncate">
-                            {name.length > 4 ? name.slice(0, 4) : name}
-                          </p>
-                          <span className="mt-auto inline-block px-1 py-px rounded bg-[var(--color-bg)]/70 text-[11px] text-[var(--color-text-body)] leading-tight truncate">
-                            {serviceShort}
-                          </span>
+                          {compact ? (
+                            <p className="text-[11px] font-semibold leading-none truncate">
+                              {truncatedName}
+                            </p>
+                          ) : (
+                            <>
+                              <p className="text-[10px] font-mono leading-none mb-0.5 truncate opacity-75">
+                                {booking.startTime.slice(0, 5)}
+                              </p>
+                              <p className="text-[11px] font-semibold leading-tight truncate">
+                                {truncatedName}
+                              </p>
+                              <span className="mt-auto inline-flex items-center gap-0.5 px-1 py-px rounded bg-[var(--color-bg)]/60 text-[10px] leading-tight truncate">
+                                <span className="font-semibold">{serviceAbbr}</span>
+                              </span>
+                            </>
+                          )}
                         </div>
                       </td>
                     );
@@ -264,23 +308,31 @@ export function WeekView({
                   return (
                     <td
                       key={dateStr + hour}
-                      className="p-0.5 border-t border-[var(--color-surface)]/60"
+                      className={`p-0.5 border-t border-[var(--color-surface)]/60 ${
+                        isHoliday ? "bg-[var(--color-text-muted)]/8" : ""
+                      }`}
                     >
                       <div
-                        className={`w-full h-full rounded transition-colors cursor-pointer ${
-                          isDropTarget
-                            ? "bg-[var(--color-brand)]/30 ring-2 ring-[var(--color-brand)]"
-                            : draggedBooking
-                              ? "hover:bg-[var(--color-brand)]/15"
-                              : "hover:bg-[var(--color-surface)]/50"
+                        className={`w-full h-full rounded transition-colors ${
+                          isHoliday
+                            ? "cursor-not-allowed bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,var(--color-text-muted)_4px,var(--color-text-muted)_5px)] opacity-30"
+                            : isDropTarget
+                              ? "bg-[var(--color-brand)]/30 ring-2 ring-[var(--color-brand)] cursor-pointer"
+                              : draggedBooking
+                                ? "hover:bg-[var(--color-brand)]/15 cursor-pointer"
+                                : "hover:bg-[var(--color-surface)]/50 cursor-pointer"
                         }`}
+                        title={isHoliday ? "公休日 — 不可預約" : undefined}
+                        aria-disabled={isHoliday}
                         onClick={() => {
                           if (draggedBooking) return;
+                          if (isHoliday) return;
                           setCurrentDate(d);
                           setView("day");
                         }}
                         onDragOver={(e) => {
                           if (!draggedBooking) return;
+                          if (isHoliday) return; // PRD-v3 D-5 — reject drop on closed days
                           e.preventDefault();
                           e.dataTransfer.dropEffect = "move";
                           if (
@@ -335,3 +387,5 @@ export function WeekView({
     </>
   );
 }
+
+export const WeekView = memo(WeekViewBase);

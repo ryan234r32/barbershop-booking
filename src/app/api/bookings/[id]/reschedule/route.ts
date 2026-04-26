@@ -1,7 +1,13 @@
 import { NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { isSlotAvailable } from "@/lib/booking/availability";
-import { acquireBookingLock, releaseBookingLock } from "@/lib/booking/lock";
+import {
+  acquireBookingLock,
+  acquireBookingRowLock,
+  releaseBookingLock,
+} from "@/lib/booking/lock";
+import { getIdempotentResult, storeIdempotentResult } from "@/lib/booking/idempotency";
 import { cancelBookingNotifications, scheduleReminders } from "@/lib/notifications/scheduler";
 import { getLineClient } from "@/lib/line/client";
 import { rescheduleConfirmationMessage } from "@/lib/line/messages";
@@ -12,6 +18,15 @@ import { addHours } from "@/lib/utils/time";
 import { logger } from "@/lib/utils/logger";
 import { requireBookingAuth, requireBookingOwnership } from "@/lib/auth/booking-auth";
 
+const rescheduleWithIdempotencySchema = rescheduleBookingSchema.extend({
+  /** Optional idempotency key — used by drag-reschedule on the calendar to
+   *  guard against accidental double-submit (PRD-v3 E-5). */
+  idempotencyKey: z.string().min(1).max(128).optional(),
+});
+
+const UNDO_SCOPE = "reschedule-undo";
+const UNDO_TTL_SECONDS = 30; // PRD-v3 E-5 — undo toast dismisses at 5s, allow margin
+
 type RouteParams = { params: Promise<{ id: string }> };
 
 /** POST /api/bookings/[id]/reschedule — reschedule an existing booking */
@@ -21,7 +36,29 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params;
     const body = await request.json();
-    const input = rescheduleBookingSchema.parse(body);
+    const input = rescheduleWithIdempotencySchema.parse(body);
+
+    // Idempotency short-circuit: re-submit with same key returns cached response.
+    if (input.idempotencyKey) {
+      const cached = await getIdempotentResult<unknown>(
+        `reschedule:${id}`,
+        input.idempotencyKey,
+      );
+      if (cached) {
+        return Response.json(cached);
+      }
+    }
+
+    // Acquire the booking-row lock BEFORE any other work, so a concurrent
+    // reschedule of the same booking serialises here (PRD-v3 E-6).
+    const rowLock = await acquireBookingRowLock(id);
+    if (!rowLock) {
+      return Response.json(
+        { error: "此預約正在被另一個操作改期，請稍後再試" },
+        { status: 409 },
+      );
+    }
+    try {
 
     const booking = await prisma.booking.findUnique({
       where: { id },
@@ -101,25 +138,40 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // Update booking (preserves ID, payment, history)
       const oldDate = booking.date.toISOString().split("T")[0];
       const oldStartTime = booking.startTime;
+      const oldEndTime = booking.endTime;
 
-      await prisma.booking.update({
-        where: { id },
-        data: {
-          date: newDateObj,
-          startTime: input.startTime,
-          endTime: newEndTime,
-          // Reset admin ack: the time/day moved, so the prior confirmation
-          // doesn't carry over to the new slot. Admin re-acks via the push notif.
-          adminAcknowledgedAt: null,
-        },
-      });
+      // Atomic update + (optional) violation increment (PRD-v3 E-3).
+      // Without a transaction, a partial failure would leave the booking
+      // moved but the violation un-recorded.
+      await prisma.$transaction([
+        prisma.booking.update({
+          where: { id },
+          data: {
+            date: newDateObj,
+            startTime: input.startTime,
+            endTime: newEndTime,
+            // Reset admin ack: the time/day moved, so the prior confirmation
+            // doesn't carry over to the new slot. Admin re-acks via the push notif.
+            adminAcknowledgedAt: null,
+          },
+        }),
+        ...(isVeryLateReschedule
+          ? [
+              prisma.user.update({
+                where: { id: booking.userId },
+                data: { violationCount: { increment: 1 } },
+              }),
+            ]
+          : []),
+      ]);
 
-      if (isVeryLateReschedule) {
-        await prisma.user.update({
-          where: { id: booking.userId },
-          data: { violationCount: { increment: 1 } },
-        });
-      }
+      // Store undo snapshot — short TTL covers the toast window. PRD-v3 E-5.
+      await storeIdempotentResult(
+        UNDO_SCOPE,
+        id,
+        { oldDate, oldStartTime, oldEndTime, newDate: input.date, newStartTime: input.startTime },
+        UNDO_TTL_SECONDS,
+      );
 
       // Cancel old notifications and schedule new ones
       cancelBookingNotifications(id).catch((err) =>
@@ -175,7 +227,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         logger.error("Failed to notify admin (reschedule)", err, "reschedule");
       }
 
-      return Response.json({
+      const result = {
         booking: {
           id,
           date: input.date,
@@ -184,9 +236,26 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           oldDate,
           oldStartTime,
         },
-      });
+        undoAvailable: true,
+        undoExpiresInSeconds: UNDO_TTL_SECONDS,
+      };
+
+      // Cache the result for idempotency (PRD-v3 E-5).
+      if (input.idempotencyKey) {
+        await storeIdempotentResult(
+          `reschedule:${id}`,
+          input.idempotencyKey,
+          result,
+          UNDO_TTL_SECONDS,
+        );
+      }
+
+      return Response.json(result);
     } finally {
       await releaseBookingLock(lock);
+    }
+    } finally {
+      await releaseBookingLock(rowLock);
     }
   } catch (error) {
     return errorResponse(error);

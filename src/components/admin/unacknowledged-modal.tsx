@@ -9,6 +9,12 @@ interface UnackBooking {
   date: string;
   startTime: string;
   endTime: string;
+  /**
+   * PRD-v3 E-1 — sent back as `expectedUpdatedAt` on ack so the server can
+   * reject stale acks (e.g. the booking was rescheduled from another device
+   * while this modal was open).
+   */
+  updatedAt?: string;
   service: { name: string; price: number };
   user: {
     displayName: string | null;
@@ -22,6 +28,11 @@ interface Props {
   bookings: UnackBooking[];
   /** Called after every booking has been acknowledged (or skipped via dismiss). */
   onAllAcknowledged: () => void;
+  /**
+   * Called when the server returns 409 stale_ack — parent should refetch the
+   * unack queue so the user sees the up-to-date booking and re-confirms.
+   */
+  onStale?: () => void;
 }
 
 const SEGMENT_LABEL: Record<string, string> = {
@@ -65,9 +76,10 @@ function formatDateTW(iso: string): string {
  * On idempotent re-ack (same booking already acked from another device), server
  * returns 200 with `wasAlreadyAcked: true` — we still advance the queue.
  */
-export function UnacknowledgedModal({ bookings, onAllAcknowledged }: Props) {
+export function UnacknowledgedModal({ bookings, onAllAcknowledged, onStale }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [processing, setProcessing] = useState(false);
+  const [staleNotice, setStaleNotice] = useState<string | null>(null);
   const total = bookings.length;
 
   if (total === 0) return null;
@@ -80,17 +92,27 @@ export function UnacknowledgedModal({ bookings, onAllAcknowledged }: Props) {
 
   const handleAcknowledge = async () => {
     setProcessing(true);
+    setStaleNotice(null);
     try {
       const res = await fetch(`/api/bookings/${current.id}/acknowledge`, {
         method: "POST",
-        headers: adminHeaders(),
+        headers: { ...adminHeaders(), "Content-Type": "application/json" },
+        body: current.updatedAt
+          ? JSON.stringify({ expectedUpdatedAt: current.updatedAt })
+          : undefined,
       });
 
-      // 404 / 410 / etc — the booking might have been cancelled while modal was
-      // open. Treat any non-success the same: advance the queue rather than
-      // wedging the user. They'll see the truth on the calendar.
+      // PRD-v3 E-1: stale ack — booking was mutated since this modal opened.
+      // Don't advance; surface a notice and ask parent to refetch.
+      if (res.status === 409) {
+        setStaleNotice("此預約剛剛被更新，請重新確認");
+        onStale?.();
+        return;
+      }
+
+      // 404 / other non-success — booking might have been cancelled. Advance
+      // the queue rather than wedging the user; they'll see truth on the calendar.
       if (!res.ok && res.status !== 404) {
-        // Soft warning, but still advance to avoid blocking on a transient.
         // eslint-disable-next-line no-console
         console.warn(`acknowledge failed: ${res.status}`);
       }
@@ -101,7 +123,6 @@ export function UnacknowledgedModal({ bookings, onAllAcknowledged }: Props) {
         setCurrentIndex((i) => i + 1);
       }
     } catch {
-      // Network error — let user retry by leaving them on the same item.
       alert("網路錯誤，請稍後再試");
     } finally {
       setProcessing(false);
@@ -156,6 +177,13 @@ export function UnacknowledgedModal({ bookings, onAllAcknowledged }: Props) {
             </p>
           </div>
         </div>
+
+        {/* Stale-ack notice (PRD-v3 E-1) */}
+        {staleNotice && (
+          <div className="rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30 px-3 py-2 text-xs text-[var(--color-warning)]">
+            {staleNotice}
+          </div>
+        )}
 
         {/* Action button */}
         <button

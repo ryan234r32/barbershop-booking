@@ -8,8 +8,8 @@
  * Extracted from calendar/page.tsx in Wave 3.A / A1 — behavior unchanged.
  */
 
-import React from "react";
-import { WEEKDAYS, isPaid } from "./utils";
+import React, { memo } from "react";
+import { WEEKDAYS, abbreviateService, chipClassForService, isPaid } from "./utils";
 import type { Booking, MonthlySummary } from "./types";
 
 interface Props {
@@ -22,7 +22,7 @@ interface Props {
   setView: (v: "day" | "week" | "month") => void;
 }
 
-export function MonthView({
+function MonthViewBase({
   monthYear,
   bookings,
   monthlySummary,
@@ -116,24 +116,9 @@ export function MonthView({
                     {dayBookings.map((b) => {
                       const paid = isPaid(b);
                       const svc = b.service.name;
-                      let chipColor: string;
-                      if (paid) {
-                        chipColor = "bg-[var(--color-success)]/25 text-[var(--color-success)]";
-                      } else if (svc.includes("漂")) {
-                        chipColor = "bg-[var(--color-warning)]/25 text-[var(--color-warning)]";
-                      } else if (svc.includes("染")) {
-                        chipColor =
-                          "bg-[var(--color-service-color)]/15 text-[var(--color-service-color)]";
-                      } else if (svc.includes("燙")) {
-                        chipColor =
-                          "bg-[var(--color-service-perm)]/15 text-[var(--color-service-perm)]";
-                      } else if (svc.includes("剪")) {
-                        chipColor = "bg-[var(--color-brand)]/15 text-[var(--color-brand)]";
-                      } else {
-                        chipColor =
-                          "bg-[var(--color-text-muted)]/15 text-[var(--color-text-body)]";
-                      }
+                      const chipColor = chipClassForService(svc, paid);
                       const initial = (b.user.displayName || "?").charAt(0);
+                      const svcAbbr = abbreviateService(svc);
                       return (
                         <div
                           key={b.id}
@@ -141,6 +126,7 @@ export function MonthView({
                           title={`${b.startTime} ${svc} · ${b.user.displayName || "顧客"}`}
                         >
                           <span className="font-mono shrink-0">{b.startTime.slice(0, 5)}</span>
+                          <span className="font-semibold shrink-0">{svcAbbr}</span>
                           <span className="truncate opacity-75">{initial}</span>
                         </div>
                       );
@@ -198,3 +184,5 @@ export function MonthView({
     </>
   );
 }
+
+export const MonthView = memo(MonthViewBase);
