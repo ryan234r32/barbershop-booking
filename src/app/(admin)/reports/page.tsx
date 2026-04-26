@@ -106,11 +106,26 @@ const PAYMENT_LABELS: Record<string, string> = {
 
 // ─── Page ────────────────────────────────────────────────────────────────
 
+// Localised labels for the prev/next button so user knows what they'll get.
+const PREV_LABEL: Record<RangeType, string> = {
+  week: "上一週",
+  month: "上一月",
+  quarter: "上一季",
+  year: "上一年",
+};
+const NEXT_LABEL: Record<RangeType, string> = {
+  week: "下一週",
+  month: "下一月",
+  quarter: "下一季",
+  year: "下一年",
+};
+
 export default function ReportsPage() {
   usePageTitle("報表");
   const [range, setRange] = useState<RangeType>("year");
-  // offset: 0 = current period; -1 = previous; etc. 預設 -1 因為今年 (2026) 還沒資料，
-  // demo 進去看不到東西；2025 才是 import 的資料所在。
+  // 預設 offset=-1（去年/上月/上季/上週），因為 2026 系統剛上線資料還少；
+  // 2025 才是 Excel 匯入的歷史資料所在。切換 range 時保留 offset，
+  // 不要 reset 成 0 — 不然點「年」會跳到 2026 空畫面，沒辦法回頭。
   const [offset, setOffset] = useState<number>(-1);
 
   const { data, error, isLoading } = useSWR<ReportsResponse>(
@@ -121,61 +136,67 @@ export default function ReportsPage() {
 
   return (
     <main className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4">
-      <div className="flex items-baseline gap-3 flex-wrap">
-        <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">營收報表</h1>
-        {data && (
-          <span className="text-sm text-[var(--color-text-muted)]">
-            {data.range.label} ({data.range.fromIso} ~ {data.range.toIso})
-          </span>
-        )}
+      <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">營收報表</h1>
+
+      {/* Range type tabs — 週 / 月 / 季 / 年 */}
+      <div className="grid grid-cols-4 gap-1 p-1 bg-[var(--color-surface)] rounded-lg">
+        {(["week", "month", "quarter", "year"] as const).map((r) => (
+          <button
+            key={r}
+            onClick={() => setRange(r)}
+            className={`py-2 text-sm rounded-md transition-colors ${
+              range === r
+                ? "bg-[var(--color-bg)] text-[var(--color-text-primary)] font-semibold shadow-sm"
+                : "text-[var(--color-text-muted)]"
+            }`}
+          >
+            {RANGE_LABELS[r]}
+          </button>
+        ))}
       </div>
 
-      {/* Time range switcher: 週 / 月 / 季 / 年 + period nav */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="inline-flex p-1 bg-[var(--color-surface)] rounded-lg">
-          {(["week", "month", "quarter", "year"] as const).map((r) => (
-            <button
-              key={r}
-              onClick={() => {
-                setRange(r);
-                setOffset(0);
-              }}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                range === r
-                  ? "bg-[var(--color-bg)] text-[var(--color-text-primary)] font-semibold shadow-sm"
-                  : "text-[var(--color-text-muted)]"
-              }`}
-            >
-              {RANGE_LABELS[r]}
-            </button>
-          ))}
+      {/* Period nav — explicit 上/下 一週/月/季/年 buttons + current label */}
+      <div className="flex items-stretch gap-2">
+        <button
+          onClick={() => setOffset((o) => o - 1)}
+          className="shrink-0 px-3 sm:px-4 py-2 rounded-lg bg-[var(--color-surface)] text-[var(--color-text-primary)] text-sm font-medium hover:bg-[var(--color-text-muted)]/10 transition-colors flex items-center gap-1"
+        >
+          <span>←</span>
+          <span className="hidden sm:inline">{PREV_LABEL[range]}</span>
+        </button>
+
+        <div className="flex-1 min-w-0 text-center bg-[var(--color-bg)] border border-[var(--color-text-muted)]/15 rounded-lg px-2 py-2">
+          <div className="text-sm font-bold text-[var(--color-text-primary)] truncate">
+            {data?.range.label ?? "載入中"}
+          </div>
+          {data && (
+            <div className="text-[10px] text-[var(--color-text-muted)] tabular-nums truncate">
+              {data.range.fromIso} ~ {data.range.toIso}
+            </div>
+          )}
         </div>
 
-        <div className="inline-flex items-center gap-1 ml-2">
-          <button
-            onClick={() => setOffset((o) => o - 1)}
-            className="w-8 h-8 rounded-lg border border-[var(--color-text-muted)]/20 text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] transition-colors"
-            aria-label="上一個期間"
-          >
-            ←
-          </button>
+        <button
+          onClick={() => setOffset((o) => o + 1)}
+          disabled={offset >= 0}
+          className="shrink-0 px-3 sm:px-4 py-2 rounded-lg bg-[var(--color-surface)] text-[var(--color-text-primary)] text-sm font-medium hover:bg-[var(--color-text-muted)]/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+        >
+          <span className="hidden sm:inline">{NEXT_LABEL[range]}</span>
+          <span>→</span>
+        </button>
+      </div>
+
+      {/* Quick "回到本期" link — only when offset != 0 */}
+      {offset !== 0 && (
+        <div className="text-right -mt-2">
           <button
             onClick={() => setOffset(0)}
-            disabled={offset === 0}
-            className="px-3 h-8 text-xs rounded-lg border border-[var(--color-text-muted)]/20 text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] disabled:opacity-40 transition-colors"
+            className="text-xs text-[var(--color-brand)] hover:underline"
           >
-            回到本期
-          </button>
-          <button
-            onClick={() => setOffset((o) => o + 1)}
-            disabled={offset >= 0}
-            className="w-8 h-8 rounded-lg border border-[var(--color-text-muted)]/20 text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] disabled:opacity-40 transition-colors"
-            aria-label="下一個期間"
-          >
-            →
+            回到本{RANGE_LABELS[range]}
           </button>
         </div>
-      </div>
+      )}
 
       {isLoading && (
         <div className="animate-pulse space-y-4">
