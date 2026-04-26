@@ -31,6 +31,8 @@ interface Booking {
   };
   payment?: { status: string; method: string | null } | null;
   createdAt?: string;
+  /// PRD-v3 §2 + 1.6b: NULL = admin hasn't seen this booking yet → 紅點 indicator
+  adminAcknowledgedAt?: string | null;
 }
 
 function isPaid(b: Booking): boolean {
@@ -778,8 +780,18 @@ export default function CalendarPage() {
                     {booking ? (
                       <div
                         onClick={() => openBookingDetail(booking)}
-                        className={`rounded-lg p-3 h-full cursor-pointer transition-colors hover:opacity-90 flex flex-col ${cardBgClass(booking)}`}
+                        className={`relative rounded-lg p-3 h-full cursor-pointer transition-colors hover:opacity-90 flex flex-col ${cardBgClass(booking)}`}
                       >
+                        {/* PRD-v3 §2 + 1.6b: 紅點 indicator for unacknowledged bookings (admin hasn't seen yet).
+                            Auto-clears when admin opens the BookingDetailSheet (server-side ack). */}
+                        {!booking.adminAcknowledgedAt && (
+                          <span
+                            className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[var(--color-danger)] ring-2 ring-[var(--color-bg)]"
+                            aria-label="未讀新預約"
+                            title="未讀 — 點擊查看詳情即標記為已讀"
+                          />
+                        )}
+
                         {/* Time range */}
                         <p className="text-[11px] text-[var(--color-text-muted)] font-mono mb-1">
                           {booking.startTime} - {booking.endTime}
