@@ -12,18 +12,19 @@
  * Extracted from calendar/page.tsx in Wave 3.A / A1 — behavior unchanged.
  */
 
-import { useCallback, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { useToast } from "@/components/ui/toast";
 import {
   HOURS,
   WEEKDAYS,
   abbreviateService,
+  buildBookingIndex,
   chipClassForService,
   formatDate,
-  getBookingAtSlot,
+  indexBookingAtSlot,
+  indexIsSlotOccupied,
   isPaid,
-  isSlotOccupied,
   truncateCustomerName,
 } from "./utils";
 import type { Booking } from "./types";
@@ -48,7 +49,7 @@ interface Props {
 
 const WEEK_THEAD_HEIGHT = 34;
 
-export function WeekView({
+function WeekViewBase({
   weekDates,
   bookings,
   now,
@@ -123,8 +124,15 @@ export function WeekView({
     [draggedBooking, rescheduleSubmitting, holidayDates, toast, mutateBookings, onRescheduled],
   );
 
-  const liveBookings = bookings.filter(
-    (b) => b.status !== "CANCELLED" && b.status !== "CANCELLED_BY_ADMIN",
+  // PRD-v3 A7 perf: precompute lookup index — saves 7×9×3 array scans/render.
+  const bookingIndex = useMemo(() => buildBookingIndex(bookings), [bookings]);
+
+  const liveBookings = useMemo(
+    () =>
+      bookings.filter(
+        (b) => b.status !== "CANCELLED" && b.status !== "CANCELLED_BY_ADMIN",
+      ),
+    [bookings],
   );
 
   return (
@@ -217,8 +225,8 @@ export function WeekView({
                 </td>
                 {weekDates.map((d) => {
                   const dateStr = formatDate(d);
-                  const booking = getBookingAtSlot(bookings, dateStr, hour);
-                  const occupied = isSlotOccupied(bookings, dateStr, hour);
+                  const booking = indexBookingAtSlot(bookingIndex, dateStr, hour);
+                  const occupied = indexIsSlotOccupied(bookingIndex, dateStr, hour);
                   const isContinuation = occupied && !booking;
 
                   if (isContinuation) return null;
@@ -379,3 +387,5 @@ export function WeekView({
     </>
   );
 }
+
+export const WeekView = memo(WeekViewBase);

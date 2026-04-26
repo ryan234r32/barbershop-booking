@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import useSWR from "swr";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
@@ -22,7 +23,20 @@ import { NewBookingSheet } from "@/components/admin/new-booking-sheet";
 import { UnacknowledgedModal } from "@/components/admin/unacknowledged-modal";
 import { DayView } from "@/components/admin/calendar/day-view";
 import { WeekView } from "@/components/admin/calendar/week-view";
-import { MonthView } from "@/components/admin/calendar/month-view";
+// PRD-v3 A7 perf: month view (chips + grid + holiday colours) is the heaviest
+// codepath but used least often (default view = day). Defer its bundle until
+// the user actually switches to it — meaningful first-paint LCP improvement.
+const MonthView = dynamic(
+  () => import("@/components/admin/calendar/month-view").then((m) => m.MonthView),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex justify-center py-8">
+        <div className="w-6 h-6 border-2 border-[var(--color-brand)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    ),
+  },
+);
 import { ViewToggle } from "@/components/admin/calendar/view-toggle";
 import { CalendarFab } from "@/components/admin/calendar/calendar-fab";
 import { ZoomControls } from "@/components/admin/calendar/zoom-controls";

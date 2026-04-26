@@ -8,7 +8,7 @@
  * Extracted from calendar/page.tsx in Wave 3.A / A1 — behavior unchanged.
  */
 
-import React from "react";
+import React, { memo } from "react";
 import { WEEKDAYS, abbreviateService, chipClassForService, isPaid } from "./utils";
 import type { Booking, MonthlySummary } from "./types";
 
@@ -22,7 +22,7 @@ interface Props {
   setView: (v: "day" | "week" | "month") => void;
 }
 
-export function MonthView({
+function MonthViewBase({
   monthYear,
   bookings,
   monthlySummary,
@@ -184,3 +184,5 @@ export function MonthView({
     </>
   );
 }
+
+export const MonthView = memo(MonthViewBase);

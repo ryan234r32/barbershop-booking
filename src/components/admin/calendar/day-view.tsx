@@ -12,19 +12,20 @@
  * Extracted from calendar/page.tsx in Wave 3.A / A1 — behavior unchanged.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { useToast } from "@/components/ui/toast";
 import { SegmentBadge } from "./segment-badge";
 import { HorizontalDateStrip } from "./horizontal-date-strip";
 import {
   HOURS,
+  buildBookingIndex,
   cardBgClass,
   formatDate,
-  getBookingAtSlot,
-  getBookingsForDate,
+  indexBookingAtSlot,
+  indexBookingsForDate,
+  indexIsSlotOccupied,
   isPaid,
-  isSlotOccupied,
 } from "./utils";
 import type { Booking } from "./types";
 import type { RescheduleResult } from "./reschedule-undo-toast";
@@ -49,7 +50,7 @@ interface Props {
 const LONG_PRESS_MS = 500;
 const MOVE_THRESHOLD_PX = 15;
 
-export function DayView({
+function DayViewBase({
   currentDate,
   setCurrentDate,
   bookings,
@@ -128,7 +129,10 @@ export function DayView({
     [draggedBooking, rescheduleSubmitting, holidayDates, toast, mutateBookings, onRescheduled],
   );
 
-  const todayBookings = getBookingsForDate(bookings, formatDate(currentDate));
+  // Pre-built lookup index: 1 pass over bookings, then O(1) lookups in the
+  // 9-hour render loop instead of 9× filter/find/some scans (PRD-v3 A7 perf).
+  const bookingIndex = useMemo(() => buildBookingIndex(bookings), [bookings]);
+  const todayBookings = indexBookingsForDate(bookingIndex, formatDate(currentDate));
   const todayRevenue = todayBookings.reduce((sum, b) => sum + (b.service?.price || 0), 0);
 
   const timeIndicatorTop = useMemo(() => {
@@ -172,11 +176,11 @@ export function DayView({
       for (let h = startHour + 1; h <= 20; h++) {
         if (h === 20) return 20;
         const hourStr = `${String(h).padStart(2, "0")}:00`;
-        if (isSlotOccupied(bookings, dateStr, hourStr)) return h;
+        if (indexIsSlotOccupied(bookingIndex, dateStr, hourStr)) return h;
       }
       return 20;
     },
-    [bookings, currentDate],
+    [bookingIndex, currentDate],
   );
 
   const yToHour = useCallback(
@@ -198,7 +202,7 @@ export function DayView({
     (e: React.PointerEvent<HTMLDivElement>, startHour: number) => {
       const dateStr = formatDate(currentDate);
       const hourStr = `${String(startHour).padStart(2, "0")}:00`;
-      if (isSlotOccupied(bookings, dateStr, hourStr)) return;
+      if (indexIsSlotOccupied(bookingIndex, dateStr, hourStr)) return;
 
       cancelMomentum();
 
@@ -221,7 +225,7 @@ export function DayView({
         if ("vibrate" in navigator) navigator.vibrate?.(30);
       }, LONG_PRESS_MS);
     },
-    [bookings, currentDate, cancelMomentum],
+    [bookingIndex, currentDate, cancelMomentum],
   );
 
   const handleSlotPointerMove = useCallback(
@@ -402,8 +406,8 @@ export function DayView({
       >
         {HOURS.map((hour) => {
           const dateStr = formatDate(currentDate);
-          const booking = getBookingAtSlot(bookings, dateStr, hour);
-          const occupied = isSlotOccupied(bookings, dateStr, hour);
+          const booking = indexBookingAtSlot(bookingIndex, dateStr, hour);
+          const occupied = indexIsSlotOccupied(bookingIndex, dateStr, hour);
           const isMultiSlotContinuation = occupied && !booking;
 
           if (isMultiSlotContinuation) return null;
@@ -561,3 +565,7 @@ export function DayView({
     </>
   );
 }
+
+// PRD-v3 A7 perf: parent re-renders that don't change the props (e.g. SWR
+// poll returning identical bookings) shouldn't re-render the whole grid.
+export const DayView = memo(DayViewBase);
