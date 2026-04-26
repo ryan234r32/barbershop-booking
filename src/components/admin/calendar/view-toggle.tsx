@@ -17,7 +17,7 @@ const LABELS: Record<CalendarView, string> = { day: "日", week: "週", month: "
 
 export function ViewToggle({ view, onChange }: Props) {
   return (
-    <div className="grid grid-cols-3 mb-4 border border-[var(--color-brand)] rounded-lg overflow-hidden w-full">
+    <div className="grid grid-cols-3 mb-2 border border-[var(--color-brand)] rounded-lg overflow-hidden w-full">
       {(["day", "week", "month"] as const).map((v) => (
         <button
           key={v}

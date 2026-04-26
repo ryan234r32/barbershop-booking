@@ -182,7 +182,7 @@ function WeekViewBase({
       <div
         ref={gridRef}
         className="rounded-lg overflow-y-auto relative"
-        style={{ height: "calc(100dvh - 260px)" }}
+        style={{ height: "calc(100dvh - 220px)" }}
       >
         <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
           <thead className="sticky top-0 bg-[var(--color-bg)] z-10 shadow-sm">
