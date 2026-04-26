@@ -1187,6 +1187,31 @@ export default function CalendarPage() {
             </div>
           </div>
 
+          {/* Color legend (Wave 3.A sub-7: 顯示 Google Calendar style 顏色 mapping) */}
+          <div className="bg-[var(--color-surface)] rounded-lg px-3 py-2 mb-3 flex items-center gap-3 flex-wrap text-[10px]">
+            <span className="text-[var(--color-text-muted)] font-semibold">顏色：</span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded bg-[var(--color-success)]/40" />
+              <span className="text-[var(--color-text-body)]">已付款</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded bg-[var(--color-brand)]/30" />
+              <span className="text-[var(--color-text-body)]">剪</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded bg-orange-200" />
+              <span className="text-[var(--color-text-body)]">燙</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded bg-purple-200" />
+              <span className="text-[var(--color-text-body)]">染</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded bg-[var(--color-warning)]/40" />
+              <span className="text-[var(--color-text-body)]">漂</span>
+            </span>
+          </div>
+
           {/* Month summary */}
           <div className="bg-[var(--color-surface)] rounded-lg px-4 py-2.5 text-sm flex items-center justify-between">
             <span className="font-semibold text-[var(--color-text-primary)]">
