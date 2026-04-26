@@ -44,17 +44,22 @@ function formatDateTW(iso: string): string {
 
 /**
  * Forced queue modal that shows EACH unacknowledged booking one at a time
- * and requires admin to click "✓ 已確認" before moving to the next.
+ * and requires admin to click "✓ 知道了" before moving to the next.
+ *
+ * Semantic note (PRD-v3 §2): ack is a READ RECEIPT, not a gate. Bookings
+ * always go on the calendar regardless of ack state — this modal only ensures
+ * the owner doesn't miss a new booking via push notifications. Click "知道了"
+ * marks it as seen; it does NOT change the booking status.
  *
  *   ┌─────────────────────────────────┐
- *   │   1 / 3        新預約待確認     │
+ *   │   1 / 3        新預約通知       │
  *   ├─────────────────────────────────┤
  *   │   👤 王小明  (新客 · 0 次)      │
  *   │   📞 0912-345-678               │
  *   │   ✂️  漂髮  NT$2,600            │
  *   │   📅 5月15日 週四  14:00–17:00  │
  *   ├─────────────────────────────────┤
- *   │   [    ✓ 我已確認知道    ]      │
+ *   │   [      ✓ 知道了        ]      │
  *   └─────────────────────────────────┘
  *
  * On idempotent re-ack (same booking already acked from another device), server
@@ -108,12 +113,12 @@ export function UnacknowledgedModal({ bookings, onAllAcknowledged }: Props) {
     SEGMENT_LABEL[current.user.segment] || current.user.segment;
 
   return (
-    <Modal isOpen={true} title="新預約待確認">
+    <Modal isOpen={true} title="新預約通知">
       <div className="space-y-5">
         {/* Progress */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            有 {total} 筆新預約等你確認
+            有 {total} 筆新預約，請逐筆查看
           </p>
           <span className="text-sm font-medium text-foreground">
             {currentIndex + 1} / {total}
@@ -158,11 +163,11 @@ export function UnacknowledgedModal({ bookings, onAllAcknowledged }: Props) {
           disabled={processing}
           className="w-full h-[52px] bg-[var(--color-brand)] text-[var(--color-bg)] rounded-lg font-bold text-sm disabled:opacity-50 active:scale-[0.98] transition-transform"
         >
-          {processing ? "確認中…" : "✓ 我已確認知道"}
+          {processing ? "處理中…" : "✓ 知道了"}
         </button>
 
         <p className="text-xs text-muted-foreground text-center">
-          確認後不可取消。要看詳細請到日曆點該筆預約。
+          這只是讀過提醒，不影響預約狀態。要看詳細請到日曆點該筆預約。
         </p>
       </div>
     </Modal>
