@@ -13,15 +13,28 @@ import {
   BarChart3,
   Megaphone,
   Wallet,
+  MessageCircle,
+  Ticket,
+  FileBarChart,
   Settings,
 } from "lucide-react";
 
-const NAV_ITEMS = [
+interface NavItem {
+  href: string;
+  label: string;
+  Icon: typeof LayoutDashboard;
+  badge?: string;
+}
+
+const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard", label: "儀表板", Icon: LayoutDashboard },
   { href: "/calendar", label: "行事曆", Icon: Calendar },
   { href: "/bookings/new", label: "新增預約", Icon: Plus },
   { href: "/customers", label: "顧客管理", Icon: Users },
   { href: "/services", label: "服務項目", Icon: Scissors },
+  { href: "/consultations", label: "諮詢請求", Icon: MessageCircle, badge: "BETA" },
+  { href: "/coupons", label: "優惠券", Icon: Ticket, badge: "BETA" },
+  { href: "/reports", label: "報表", Icon: FileBarChart, badge: "BETA" },
   { href: "/analytics", label: "數據分析", Icon: BarChart3 },
   { href: "/campaigns", label: "行銷推播", Icon: Megaphone },
   { href: "/payments", label: "付款對帳", Icon: Wallet },
@@ -65,7 +78,12 @@ export function AdminSidebar() {
               `}
             >
               <Icon size={18} strokeWidth={isActive ? 2.2 : 1.7} />
-              <span>{item.label}</span>
+              <span className="flex-1">{item.label}</span>
+              {item.badge && (
+                <span className="text-[9px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-[var(--color-brand)]/15 text-[var(--color-brand)]">
+                  {item.badge}
+                </span>
+              )}
             </Link>
           );
         })}
