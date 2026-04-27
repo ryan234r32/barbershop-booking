@@ -371,7 +371,8 @@ function WeekViewBase({
           </tbody>
         </table>
 
-        {/* Current time indicator (red line across all columns) */}
+        {/* Current time indicator — line only, no text label
+            (matches day-view, avoids text overlapping gutter). */}
         {(() => {
           const h = now.getHours();
           const m = now.getMinutes();
@@ -380,14 +381,9 @@ function WeekViewBase({
           const top = WEEK_THEAD_HEIGHT + (h - 11 + m / 60) * slotHeight;
           return (
             <div
-              className="absolute left-0 right-0 pointer-events-none z-20 flex items-center"
+              className="absolute left-0 right-0 h-px bg-[var(--color-danger)] pointer-events-none z-20"
               style={{ top }}
-            >
-              <span className="text-[11px] font-semibold text-[var(--color-danger)] font-mono w-8 text-center">
-                {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}
-              </span>
-              <div className="flex-1 h-px bg-[var(--color-danger)]" />
-            </div>
+            />
           );
         })()}
       </div>

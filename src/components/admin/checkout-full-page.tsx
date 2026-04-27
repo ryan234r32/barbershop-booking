@@ -182,7 +182,11 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-[var(--color-text-body)]/60 z-[60] backdrop-blur-sm" />
-        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[60] bg-[var(--color-bg)] rounded-t-2xl h-[92vh] outline-none flex flex-col">
+        {/* `h-[92dvh]` (dynamic viewport height) so the drawer shrinks when
+            the iOS keyboard opens during 結帳備註 / 加購商品 input. The legacy
+            `vh` unit stays at full-screen height, causing the textarea + flex
+            content to scroll above the visible area when the keyboard appears. */}
+        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[60] bg-[var(--color-bg)] rounded-t-2xl h-[92dvh] outline-none flex flex-col">
           <div className="mx-auto w-10 h-1 rounded-full bg-[var(--color-surface)] mt-3 mb-2 flex-shrink-0" />
 
           <div className="flex items-center justify-between px-5 pb-2 flex-shrink-0">

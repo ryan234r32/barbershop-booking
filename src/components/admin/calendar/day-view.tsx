@@ -545,22 +545,14 @@ function DayViewBase({
           );
         })}
 
-        {/* Red current-time indicator */}
+        {/* Red current-time indicator — line only, no text label.
+            (Per UX feedback: red text overlapped the slot's hour gutter when
+             the minute fell near :00.) */}
         {timeIndicatorTop !== null && isToday(currentDate) && (
-          <>
-            <div
-              className="absolute left-0 pointer-events-none z-10 w-14 pr-2 text-right"
-              style={{ top: timeIndicatorTop - 8 }}
-            >
-              <span className="text-xs font-semibold text-[var(--color-danger)] font-mono">
-                {String(now.getHours()).padStart(2, "0")}:{String(now.getMinutes()).padStart(2, "0")}
-              </span>
-            </div>
-            <div
-              className="absolute left-14 right-0 h-px bg-[var(--color-danger)] pointer-events-none z-10"
-              style={{ top: timeIndicatorTop }}
-            />
-          </>
+          <div
+            className="absolute left-0 right-0 h-px bg-[var(--color-danger)] pointer-events-none z-10"
+            style={{ top: timeIndicatorTop }}
+          />
         )}
 
         {/* Drag preview overlay */}

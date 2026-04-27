@@ -306,8 +306,11 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
       >
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 bg-[var(--color-text-body)]/50 z-50 backdrop-blur-sm" />
-          {/* iOS bottom sheet feel — sits at ~92vh so the calendar peeks behind. */}
-          <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--color-bg)] rounded-t-2xl h-[92vh] outline-none flex flex-col">
+          {/* iOS bottom sheet feel — sits at ~92dvh so the calendar peeks behind.
+              `dvh` (not `vh`) so the drawer shrinks when the iOS keyboard opens
+              during 改期 date-picker / 筆記 textarea — otherwise the content
+              scrolls above the visible viewport. */}
+          <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--color-bg)] rounded-t-2xl h-[92dvh] outline-none flex flex-col">
             <div className="mx-auto w-10 h-1 rounded-full bg-[var(--color-surface)] mt-3 mb-2 flex-shrink-0" />
 
             {/* Header bar with X close */}
