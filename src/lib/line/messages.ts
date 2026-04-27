@@ -139,7 +139,12 @@ export function bookingConfirmationMessage(params: {
   };
 }
 
-/** Transfer reported Flex Message — sent after customer submits last-5 digits */
+/**
+ * Transfer reported Flex Message — sent after customer submits last-5 digits.
+ *
+ * 2026-04-27 v2: 客人匯款都是「服務完成後」，這張卡片是整段服務的最後一棒
+ * → 拿掉「查看我的預約」(沒意義)，改成 Google 五星評論 CTA (最佳評價時機)。
+ */
 export function transferReportedMessage(params: {
   serviceName: string;
   date: string;
@@ -147,22 +152,23 @@ export function transferReportedMessage(params: {
   endTime: string;
   price: number;
   transferLastFive: string;
-  liffBaseUrl?: string;
+  googleReviewUrl?: string;
 }): FlexMessage {
-  const { serviceName, date, startTime, endTime, price, transferLastFive, liffBaseUrl } = params;
+  const { serviceName, date, startTime, endTime, price, transferLastFive, googleReviewUrl } = params;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const footerButtons: any[] = [];
-  if (liffBaseUrl) {
+  if (googleReviewUrl) {
     footerButtons.push({
       type: "button" as const,
       action: {
         type: "uri" as const,
-        label: "查看我的預約",
-        uri: `${liffBaseUrl}/my-bookings`,
+        label: "⭐ 給我們五星好評",
+        uri: googleReviewUrl,
       },
-      style: "secondary" as const,
-      height: "sm" as const,
+      style: "primary" as const,
+      color: "#C88B3B", // 金黃色 — 慶祝/感謝感
+      height: "md" as const,
     });
   }
 
@@ -174,7 +180,7 @@ export function transferReportedMessage(params: {
       contents: [
         { type: "text", text: "已收到轉帳資訊 ✓", weight: "bold", size: "lg", color: "#003D2B" },
       ],
-      backgroundColor: "#FFF8F1",
+      backgroundColor: "#FAF1E0",
     },
     body: {
       type: "box",
@@ -193,13 +199,29 @@ export function transferReportedMessage(params: {
           ],
         },
         {
+          type: "separator",
+          margin: "lg",
+        },
+        {
           type: "text",
-          text: "老闆核對完成後會再通知您。如需修改末五碼，請直接聯絡店家。",
+          text: "老闆對帳完成後會再通知您 🙏",
           size: "xs",
           color: "#809A8E",
-          margin: "xl",
+          margin: "lg",
           wrap: true,
         },
+        ...(googleReviewUrl
+          ? [
+              {
+                type: "text" as const,
+                text: "若服務滿意，懇請花 30 秒給我們評價，是對我們最大的支持 💚",
+                size: "xs" as const,
+                color: "#809A8E" as const,
+                margin: "md" as const,
+                wrap: true,
+              },
+            ]
+          : []),
       ],
     },
     footer: footerButtons.length
@@ -208,7 +230,7 @@ export function transferReportedMessage(params: {
           layout: "vertical",
           spacing: "sm",
           contents: footerButtons,
-          backgroundColor: "#FFF8F1",
+          backgroundColor: "#FAF1E0",
         }
       : undefined,
   };
@@ -1509,7 +1531,12 @@ export function paymentGuideMessage(params: {
     clipboardText,
   });
 
-  const footerButtons: FlexButton[] = [
+  // Footer 兩段式視覺層級：
+  //   Step 1 (複製帳號)        — 森林綠 primary，size sm
+  //   分隔線 + 「完成轉帳後 →」 hint
+  //   Step 2 (確定完成匯款)    — 金黃 primary，size md（更明顯）
+  // 確定完成匯款是整個 flow 的關鍵 CTA，所以用更暖、更大的視覺強調
+  const footerContents: (FlexButton | FlexComponent)[] = [
     {
       type: "button",
       action: clipboardAction("📋 點此複製帳號", cleanAccount) as unknown as FlexButton["action"],
@@ -1518,17 +1545,29 @@ export function paymentGuideMessage(params: {
       height: "sm",
     },
     {
-      // 2026-04-27: 客人按下這顆 → bot 引導輸入末五碼。
-      // 用 message action 故意讓 chat 留下「確定完成匯款」氣泡 — 提供「我做完了」
-      // 的明確 timestamp，老闆翻訊息歷史時也看得到客人按下的時間點。
+      type: "separator",
+      margin: "md",
+    },
+    {
+      type: "text",
+      text: "✅ 完成轉帳後請點下方",
+      size: "xs",
+      color: "#809A8E",
+      align: "center",
+      margin: "md",
+    },
+    {
+      // 2026-04-27 v2: 視覺升級。message action 故意讓 chat 留下
+      // 「確定完成匯款」氣泡，作為客人完成轉帳的明確 timestamp
       type: "button",
       action: {
         type: "message",
         label: "✓ 確定完成匯款",
         text: "確定完成匯款",
       },
-      style: "secondary",
-      height: "sm",
+      style: "primary",
+      color: "#C88B3B", // 金黃色強調 — 與 brand 既有 accent 色一致
+      height: "md",
     },
   ];
 
@@ -1557,7 +1596,7 @@ export function paymentGuideMessage(params: {
       type: "box",
       layout: "vertical",
       spacing: "sm",
-      contents: footerButtons,
+      contents: footerContents as FlexComponent[],
     },
   };
 

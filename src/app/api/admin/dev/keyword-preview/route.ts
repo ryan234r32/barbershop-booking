@@ -25,7 +25,6 @@ const INTENT_LABELS: Record<KeywordIntent, string> = {
   "pricing": "服務價格 (P4)",
   "payment": "匯款 / 轉帳 (P5) — 帶最近一筆 booking 金額",
   "payment-confirm-done": "✓ 確定完成匯款 (P5a — 按鈕，引導輸入末五碼)",
-  "payment-cancel": "取消輸入末五碼 (P5a-cancel — Quick Reply)",
   "payment-copy-account": "複製帳號 (P5b — fallback for old LINE)",
   "payment-copy-amount": "複製金額 (P5b — fallback for old LINE)",
   "payment-last5": "後五碼回報 (P5c — 純 5 碼數字 → 寫 DB)",

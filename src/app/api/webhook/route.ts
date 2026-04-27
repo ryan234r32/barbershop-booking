@@ -366,34 +366,13 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
   }
 
   // Priority 4a-pre: 「✓ 確定完成匯款」按鈕 → 引導客人輸入末五碼
-  // 客人按按鈕 → bot 回 prompt 訊息（含 Quick Reply 取消鍵）→ 客人打 5 碼 → 走 payment-last5
+  // 客人匯款是服務完成後才會做，沒有「取消」場景，所以拿掉 Quick Reply
   if (intent === "payment-confirm-done") {
     return reply({
       type: "text",
       text:
-        "📝 請輸入您的「匯款後五碼」(5 位數字)\n\n" +
-        "例如：12345\n\n" +
-        "（若還沒實際轉帳，請先完成轉帳再回來輸入）",
-      quickReply: {
-        items: [
-          {
-            type: "action",
-            action: {
-              type: "message",
-              label: "取消",
-              text: "取消輸入末五碼",
-            },
-          },
-        ],
-      },
-    });
-  }
-
-  // Priority 4a-pre2: 「取消輸入末五碼」Quick Reply
-  if (intent === "payment-cancel") {
-    return reply({
-      type: "text",
-      text: "已取消。完成轉帳後再點「確定完成匯款」即可重新開始 🙏",
+        "📝 請輸入您匯款的後 5 碼數字\n\n" +
+        "例：12345",
     });
   }
 
@@ -565,6 +544,13 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
     }).catch((err) => logger.error("notifyAdminTransferReported failed", err, "webhook"));
 
     const dateStr = target.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+    // Google 評論連結：優先讀環境變數 GOOGLE_REVIEW_URL（老闆貼自家 Place ID 連結），
+    // 沒設則 fallback 到 Google Maps 搜尋 URL（用 tenant.address 或店名）
+    const googleReviewUrl =
+      process.env.GOOGLE_REVIEW_URL ||
+      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        tenant?.address || shopName,
+      )}`;
     return reply(
       transferReportedMessage({
         serviceName: target.service.name,
@@ -573,7 +559,7 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
         endTime: target.endTime,
         price: payment.amount,
         transferLastFive,
-        liffBaseUrl: liffUrl,
+        googleReviewUrl,
       }),
       true, // usePush — DB write delayed reply, avoid 1s webhook timeout
     );
