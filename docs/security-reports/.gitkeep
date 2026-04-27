@@ -1,0 +1,2 @@
+# Daily security reports land here from `.github/workflows/security-daily.yml`.
+# Each filename is YYYY-MM-DD.md. This .gitkeep ensures the dir exists in git.
