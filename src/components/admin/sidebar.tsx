@@ -15,6 +15,7 @@ import {
   BarChart3,
   Megaphone,
   Wallet,
+  Coins,
   MessageCircle,
   Ticket,
   FileBarChart,
@@ -40,6 +41,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/analytics", label: "數據分析", Icon: BarChart3 },
   { href: "/campaigns", label: "行銷推播", Icon: Megaphone },
   { href: "/payments", label: "付款對帳", Icon: Wallet },
+  { href: "/cash-flow", label: "每日現金流", Icon: Coins, badge: "V3.5" },
   { href: "/settings", label: "設定", Icon: Settings },
 ] as const;
 
