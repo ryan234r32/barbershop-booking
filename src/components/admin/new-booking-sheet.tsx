@@ -132,7 +132,8 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-[var(--color-text-body)]/50 z-50" />
-        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--color-bg)] rounded-t-2xl max-h-[85vh] outline-none flex flex-col">
+        {/* `dvh` so drawer shrinks when iOS keyboard opens (姓名/電話/備註 inputs). */}
+        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--color-bg)] rounded-t-2xl max-h-[85dvh] outline-none flex flex-col">
           <div className="mx-auto w-10 h-1 rounded-full bg-[var(--color-surface)] mt-3 mb-4 flex-shrink-0" />
           <div className="px-5 pb-4 overflow-y-auto flex-1">
             <h2 className="text-lg font-bold text-[var(--color-text-primary)] mb-1">新增預約</h2>
