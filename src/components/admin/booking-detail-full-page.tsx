@@ -163,6 +163,47 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
     }
   };
 
+  /** Acknowledge — same optimistic-update pattern as checkin (Codex P2,
+   *  2026-04-27): without merging the response, the badge stays hidden and
+   *  「我已確認知道」 stays visible until the sheet is reopened. */
+  const handleAcknowledge = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/bookings/${view.id}/acknowledge`, {
+        method: "POST",
+        headers: adminHeaders(),
+        body: JSON.stringify(
+          view.updatedAt ? { expectedUpdatedAt: view.updatedAt } : {},
+        ),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "確認失敗");
+      }
+      const data = await res.json();
+      setLiveBooking((prev) =>
+        prev
+          ? {
+              ...prev,
+              adminAcknowledgedAt:
+                typeof data.adminAcknowledgedAt === "string"
+                  ? data.adminAcknowledgedAt
+                  : new Date().toISOString(),
+              updatedAt:
+                typeof data.updatedAt === "string" ? data.updatedAt : prev.updatedAt,
+            }
+          : prev,
+      );
+      toast({ type: "success", message: "已確認" });
+      onAction();
+    } catch (err) {
+      toast({ type: "error", message: err instanceof Error ? err.message : "確認失敗" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   /** Mark as 爽約 (per plan §C2: confirm dialog — irreversible, +1 violation). */
   const handleNoShow = async () => {
     if (loading) return;
@@ -337,6 +378,7 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
                   currentSegment={currentSegment}
                   isFinal={isFinal}
                   loading={loading}
+                  onAcknowledge={handleAcknowledge}
                   onCheckin={handleCheckin}
                   onNoShow={handleNoShow}
                   onOpenCheckout={() => setCheckoutOpen(true)}
@@ -388,6 +430,7 @@ function DetailView({
   currentSegment,
   isFinal,
   loading,
+  onAcknowledge,
   onCheckin,
   onNoShow,
   onOpenCheckout,
@@ -398,6 +441,7 @@ function DetailView({
   currentSegment: ReturnType<typeof segmentForBooking>;
   isFinal: boolean;
   loading: boolean;
+  onAcknowledge: () => void;
   onCheckin: (desired: "checked_in" | "not_yet") => void;
   onNoShow: () => void;
   onOpenCheckout: () => void;
@@ -485,22 +529,12 @@ function DetailView({
         </div>
       )}
 
-      {/* Acknowledge button — same UX as legacy sheet */}
+      {/* Acknowledge button — calls parent handler so liveBooking gets the
+          merged response (otherwise the badge stays hidden until the sheet
+          is reopened — Codex P2 fix, 2026-04-27). */}
       {booking.status === "CONFIRMED" && !booking.adminAcknowledgedAt && (
         <button
-          onClick={async () => {
-            try {
-              await fetch(`/api/bookings/${booking.id}/acknowledge`, {
-                method: "POST",
-                headers: adminHeaders(),
-                body: JSON.stringify(
-                  booking.updatedAt ? { expectedUpdatedAt: booking.updatedAt } : {},
-                ),
-              });
-            } catch {
-              /* swallow — calendar will refresh */
-            }
-          }}
+          onClick={onAcknowledge}
           disabled={loading}
           className="w-full mb-3 py-3 bg-[var(--color-brand)]/10 border border-[var(--color-brand)] text-[var(--color-brand)] font-semibold rounded-lg text-sm hover:bg-[var(--color-brand)]/20 transition-colors disabled:opacity-50"
         >

@@ -19,9 +19,12 @@ const checkoutSchema = z.object({
   method: z.enum(["CASH", "BANK_TRANSFER", "ECPAY_ATM"]),
   /**
    * Override amount when admin grants a discount or adds tip. Defaults to
-   * the service price if not provided.
+   * the service price if not provided. `nonnegative` (not `positive`) so
+   * a fully-comped visit (NT$0, e.g. friend / 100% discount) goes through
+   * — the UI lets admins enter 0 and we don't want a 400 mismatch
+   * (Codex P2, 2026-04-27).
    */
-  amount: z.number().int().positive().optional(),
+  amount: z.number().int().nonnegative().optional(),
   notes: z.string().max(500).optional(),
   expectedUpdatedAt: z.string().datetime().optional(),
 });

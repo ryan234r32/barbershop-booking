@@ -68,28 +68,28 @@ describe("GET /api/admin/cash-flow", () => {
     );
   });
 
-  it("buckets COMPLETED bookings as fromCheckout, others as fromDeposit", async () => {
+  it("buckets ECPAY_ATM as fromDeposit, CASH+BANK_TRANSFER as fromCheckout (method-based, status-independent)", async () => {
     getAdminFromCookie.mockResolvedValue(ADMIN);
     findMany.mockResolvedValue([
-      { amount: 1000, method: "CASH", receivedAt: new Date(), booking: { status: "COMPLETED" } },
-      { amount: 500, method: "CASH", receivedAt: new Date(), booking: { status: "COMPLETED" } },
-      { amount: 800, method: "BANK_TRANSFER", receivedAt: new Date(), booking: { status: "CONFIRMED" } },
-      { amount: 600, method: "ECPAY_ATM", receivedAt: new Date(), booking: { status: "CONFIRMED" } },
+      { amount: 1000, method: "CASH", receivedAt: new Date() },
+      { amount: 500, method: "CASH", receivedAt: new Date() },
+      { amount: 800, method: "BANK_TRANSFER", receivedAt: new Date() },
+      { amount: 600, method: "ECPAY_ATM", receivedAt: new Date() },
     ]);
     const res = await GET(req("?date=2026-04-27"));
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.totalReceived).toBe(2900);
-    expect(body.fromCheckout).toBe(1500);
-    expect(body.fromDeposit).toBe(1400);
+    expect(body.fromCheckout).toBe(2300); // CASH 1500 + BANK 800
+    expect(body.fromDeposit).toBe(600); // ECPay only
     expect(body.byMethod.CASH).toEqual({
       fromCheckout: 1500,
       fromDeposit: 0,
       total: 1500,
     });
     expect(body.byMethod.BANK_TRANSFER).toEqual({
-      fromCheckout: 0,
-      fromDeposit: 800,
+      fromCheckout: 800,
+      fromDeposit: 0,
       total: 800,
     });
     expect(body.byMethod.ECPAY_ATM).toEqual({
@@ -98,6 +98,27 @@ describe("GET /api/admin/cash-flow", () => {
       total: 600,
     });
     expect(body.count).toBe(4);
+  });
+
+  it("classifier is status-independent — old deposits don't reclassify when bookings flip to COMPLETED", async () => {
+    // Codex P1 regression: previously, a deposit collected before service was
+    // reclassified into fromCheckout once its booking flipped to COMPLETED,
+    // retroactively rewriting historical reports. Method-based classification
+    // is stable: no booking.status field is read at all.
+    getAdminFromCookie.mockResolvedValue(ADMIN);
+    findMany.mockResolvedValue([
+      // Same ECPay deposit, regardless of whether the booking later completed,
+      // must still classify as fromDeposit:
+      { amount: 600, method: "ECPAY_ATM", receivedAt: new Date() },
+    ]);
+    const res = await GET(req("?date=2026-04-27"));
+    const body = await res.json();
+    expect(body.fromDeposit).toBe(600);
+    expect(body.fromCheckout).toBe(0);
+    // Verify findMany is NOT selecting booking status anymore (regression
+    // pin — the old impl included `booking: { select: { status: true } }`).
+    const selectArg = findMany.mock.calls[0]?.[0]?.select;
+    expect(selectArg.booking).toBeUndefined();
   });
 
   it("uses Taipei-day window for receivedAt filter", async () => {

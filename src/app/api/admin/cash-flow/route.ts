@@ -51,9 +51,9 @@ export async function GET(request: NextRequest) {
     const start = new Date(Date.UTC(y, m - 1, d, -8, 0, 0)); // 00:00 Taipei
     const end = new Date(Date.UTC(y, m - 1, d + 1, -8, 0, 0)); // 24:00 Taipei
 
-    // Pull all RECEIVED payments in the window for this tenant, with the
-    // booking status so we can split checkout vs deposit. Tenant scope is
-    // enforced via the nested booking relation.
+    // Pull all RECEIVED payments in the window for this tenant. Tenant scope
+    // is enforced via the nested booking relation. We deliberately don't read
+    // booking.status here — see the source-classification comment below.
     const payments = await prisma.payment.findMany({
       where: {
         status: "RECEIVED",
@@ -64,7 +64,6 @@ export async function GET(request: NextRequest) {
         amount: true,
         method: true,
         receivedAt: true,
-        booking: { select: { status: true } },
       },
     });
 
@@ -81,16 +80,31 @@ export async function GET(request: NextRequest) {
     let fromCheckout = 0;
     let fromDeposit = 0;
 
+    // Source classification — method-based, not status-based.
+    //
+    // The intuition: in this shop today, only ECPay produces a "deposit" (Tier
+    // S virtual ATM account = pre-pay before the service). CASH + BANK_TRANSFER
+    // are recorded by the admin at checkout time. So `method === "ECPAY_ATM"`
+    // is the deterministic signal for "this is a deposit".
+    //
+    // Why not the original `booking.status === "COMPLETED"` heuristic? It was
+    // unstable: a deposit collected for a CONFIRMED booking would silently
+    // reclassify into `fromCheckout` once the booking flipped to COMPLETED at
+    // checkout time, retroactively rewriting an old day's report even though
+    // `receivedAt` never moved. (Codex P1, 2026-04-27.)
+    //
+    // If/when the shop starts accepting bank-transfer deposits separately
+    // from on-site checkout, switch to a persisted `Payment.source` enum.
     for (const p of payments) {
-      const isCheckout = p.booking?.status === "COMPLETED";
       const bucket = byMethod[p.method as MethodKey];
       if (!bucket) continue; // unknown enum value (forward compat) — skip
-      if (isCheckout) {
-        bucket.fromCheckout += p.amount;
-        fromCheckout += p.amount;
-      } else {
+      const isDeposit = p.method === "ECPAY_ATM";
+      if (isDeposit) {
         bucket.fromDeposit += p.amount;
         fromDeposit += p.amount;
+      } else {
+        bucket.fromCheckout += p.amount;
+        fromCheckout += p.amount;
       }
       bucket.total += p.amount;
       totalReceived += p.amount;
