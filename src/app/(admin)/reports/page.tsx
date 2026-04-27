@@ -18,6 +18,19 @@ interface Totals {
   occupancyRate: number;
   cancellationRate: number;
   noShowRate: number;
+  // V3.5 additions
+  visitFrequency: number;
+  oneTimerRate: number;
+  avgGapDays: number;
+  medianGapDays: number;
+  shopNewCustomers: number;
+  shopOldCustomers: number;
+}
+
+interface GlobalRetention {
+  retention30Days: number;
+  retention60Days: number;
+  retention90Days: number;
 }
 
 interface TrendPoint {
@@ -73,6 +86,7 @@ interface ReportsResponse {
   topCustomers: TopCustomerEntry[];
   customerSegments: SegmentEntry[];
   paymentMix: PaymentMixEntry[];
+  retention: GlobalRetention;
 }
 
 const fetcher = (url: string) =>
@@ -232,11 +246,14 @@ function ReportsContent({ data }: { data: ReportsResponse }) {
 
   return (
     <>
-      {/* KPI cards with ±% comparison */}
+      {/* KPI cards with ±% comparison. `primary` = the big readable headline
+          (e.g. "NT$135萬"), `secondary` = full-precision context underneath
+          ("1,348,900 元"). Stops 7-figure revenue from getting clipped. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard
           label="營收"
-          value={`NT$${data.totals.revenue.toLocaleString()}`}
+          primary={formatRevenuePrimary(data.totals.revenue)}
+          secondary={`${data.totals.revenue.toLocaleString()} 元`}
           prevValue={data.previousTotals.revenue}
           curValue={data.totals.revenue}
           previousLabel={data.previousLabel}
@@ -244,21 +261,22 @@ function ReportsContent({ data }: { data: ReportsResponse }) {
         />
         <KpiCard
           label="預約數"
-          value={data.totals.bookings.toLocaleString()}
+          primary={data.totals.bookings.toLocaleString()}
           prevValue={data.previousTotals.bookings}
           curValue={data.totals.bookings}
           previousLabel={data.previousLabel}
         />
         <KpiCard
           label="客單價"
-          value={`NT$${data.totals.arpu.toLocaleString()}`}
+          primary={`NT$${data.totals.arpu.toLocaleString()}`}
           prevValue={data.previousTotals.arpu}
           curValue={data.totals.arpu}
           previousLabel={data.previousLabel}
         />
         <KpiCard
           label="佔用率"
-          value={`${data.totals.occupancyRate}%`}
+          primary={`${data.totals.occupancyRate}%`}
+          secondary={data.totals.occupancyRate < 75 ? `業界健康 75%+` : "🟢 達標"}
           prevValue={data.previousTotals.occupancyRate}
           curValue={data.totals.occupancyRate}
           previousLabel={data.previousLabel}
@@ -299,16 +317,24 @@ function ReportsContent({ data }: { data: ReportsResponse }) {
 
 // ─── Widgets ─────────────────────────────────────────────────────────────
 
+/** Compact revenue formatter. NT$1,348,900 → "NT$135萬"; smaller falls back. */
+function formatRevenuePrimary(rev: number): string {
+  if (rev >= 10000) return `NT$${Math.round(rev / 10000).toLocaleString()}萬`;
+  return `NT$${rev.toLocaleString()}`;
+}
+
 function KpiCard({
   label,
-  value,
+  primary,
+  secondary,
   prevValue,
   curValue,
   previousLabel,
   tone = "default",
 }: {
   label: string;
-  value: string;
+  primary: string;
+  secondary?: string;
   prevValue: number;
   curValue: number;
   previousLabel: string;
@@ -336,8 +362,13 @@ function KpiCard({
         {label}
       </p>
       <p className={`text-2xl font-bold mt-1 truncate tabular-nums ${valueClass}`}>
-        {value}
+        {primary}
       </p>
+      {secondary && (
+        <p className="text-[11px] text-[var(--color-text-muted)] tabular-nums truncate mt-0.5">
+          {secondary}
+        </p>
+      )}
       {delta != null && (
         <p className={`text-[11px] mt-0.5 tabular-nums ${deltaClass}`}>
           {delta > 0 ? "↑" : delta < 0 ? "↓" : "—"} {Math.abs(delta).toFixed(1)}% vs {previousLabel}
