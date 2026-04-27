@@ -301,7 +301,7 @@ describe("paymentGuideMessage", () => {
     const bodyStr = JSON.stringify(msg.contents);
     expect(bodyStr).toContain("完成步驟");
     expect(bodyStr).toContain("轉帳");
-    expect(bodyStr).toContain("5 碼");
+    expect(bodyStr).toContain("末五碼");
   });
 
   it("renders 匯款資訊 header (not 付款資訊)", () => {
@@ -314,16 +314,21 @@ describe("paymentGuideMessage", () => {
     const msg = paymentGuideMessage(params);
     const bodyStr = JSON.stringify(msg.contents);
     expect(bodyStr).not.toContain("本次金額");
-    expect(bodyStr).not.toContain("複製金額");
   });
 
-  it("shows amount + 複製金額 button when amount is provided", () => {
+  it("shows amount block with service name when amount is provided", () => {
     const msg = paymentGuideMessage({ ...params, amount: 800, serviceName: "男性剪髮" });
     const bodyStr = JSON.stringify(msg.contents);
     expect(bodyStr).toContain("本次金額");
     expect(bodyStr).toContain("NT$ 800");
     expect(bodyStr).toContain("男性剪髮");
-    expect(bodyStr).toContain("複製金額");
+  });
+
+  it("never includes 複製金額 button (removed 2026-04-27 — redundant)", () => {
+    const noAmount = paymentGuideMessage(params);
+    const withAmount = paymentGuideMessage({ ...params, amount: 800 });
+    expect(JSON.stringify(noAmount.contents)).not.toContain("複製金額");
+    expect(JSON.stringify(withAmount.contents)).not.toContain("複製金額");
   });
 
   it("footer no longer routes to my-bookings (simplified flow — type 5 digits in chat)", () => {
@@ -342,10 +347,12 @@ describe("paymentGuideMessage", () => {
     expect(bodyStr).toContain('"clipboardText":"123456789012"');
   });
 
-  it("clipboardAction for amount uses raw integer string", () => {
-    const msg = paymentGuideMessage({ ...params, amount: 800 });
+  it("includes a 確定完成匯款 button that triggers the 5-digit prompt", () => {
+    const msg = paymentGuideMessage(params);
     const bodyStr = JSON.stringify(msg.contents);
-    expect(bodyStr).toContain('"clipboardText":"800"');
+    expect(bodyStr).toContain("確定完成匯款");
+    // Must be a message action (not clipboard) so webhook can intercept
+    expect(bodyStr).toContain('"text":"確定完成匯款"');
   });
 
 });

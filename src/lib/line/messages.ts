@@ -1367,13 +1367,17 @@ export function rescheduleConfirmationMessage(params: {
 /**
  * Payment guide Flex Message — used for keyword "匯款".
  *
- * - `amount` 為該客「最近一筆 CONFIRMED booking」的服務金額（webhook 端帶入）。
- *   若該客查無預約則 omit，Flex 會自動隱藏金額區塊。
- * - 「複製帳號 / 複製金額」按鈕 action 用 `message`：bot 會把純數字當訊息回送，
- *   客人長按該訊息即可複製（LINE Flex 沒有 clipboard API，這是業界 workaround）。
- * - 完成轉帳後客人輸入 5 碼數字會被 webhook 的 `payment-last5` intent 接住，
- *   直接寫入 Payment.transferLastFive、status=VERIFYING、並推播給老闆對帳。
- *   流程不再需要去「我的預約」頁上傳截圖（簡化版，2026-04-27）。
+ * Flow (2026-04-27 v2):
+ *   1. paymentGuideMessage Flex 顯示銀行/戶名/帳號 + 該客最近一筆 booking 的金額
+ *      + 兩顆按鈕：「📋 點此複製帳號」(clipboardAction) + 「✓ 確定完成匯款」(message)
+ *   2. 客人點複製帳號 → 帳號直接寫進剪貼簿（LINE 2024 clipboardAction，不用長按）
+ *   3. 客人點「✓ 確定完成匯款」→ bot 引導輸入末五碼（webhook 的 payment-confirm-done intent）
+ *   4. 客人輸入 5 碼數字 → webhook payment-last5 intent → 寫 DB + 推播老闆 + Flex 確認
+ *
+ * Notes:
+ *   - `amount` 由 webhook 從該客「最近一筆 CONFIRMED booking」帶入；查無預約則 omit。
+ *   - clipboardAction 在 @line/bot-sdk v10.6 還沒入型別，用 cast 繞過；runtime API 認得。
+ *   - 整套流程不再經過 LIFF /payment 頁（已於 2026-04-27 移除）。
  */
 export function paymentGuideMessage(params: {
   bankName: string;
@@ -1475,9 +1479,9 @@ export function paymentGuideMessage(params: {
     {
       type: "text",
       text:
-        "1. 點下方「📋 點此複製帳號」一鍵複製\n" +
-        "2. 開啟銀行 App 完成轉帳\n" +
-        "3. 回 LINE 直接打 5 碼數字回傳\n     例：12345",
+        "1. 點「📋 點此複製帳號」一鍵複製\n" +
+        "2. 開銀行 App 完成轉帳\n" +
+        "3. 回來點「✓ 確定完成匯款」，輸入末五碼",
       size: "sm",
       margin: "sm",
       wrap: true,
@@ -1513,16 +1517,20 @@ export function paymentGuideMessage(params: {
       color: "#003D2B",
       height: "sm",
     },
-  ];
-
-  if (hasAmount) {
-    footerButtons.push({
+    {
+      // 2026-04-27: 客人按下這顆 → bot 引導輸入末五碼。
+      // 用 message action 故意讓 chat 留下「確定完成匯款」氣泡 — 提供「我做完了」
+      // 的明確 timestamp，老闆翻訊息歷史時也看得到客人按下的時間點。
       type: "button",
-      action: clipboardAction("💰 點此複製金額", String(amount)) as unknown as FlexButton["action"],
+      action: {
+        type: "message",
+        label: "✓ 確定完成匯款",
+        text: "確定完成匯款",
+      },
       style: "secondary",
       height: "sm",
-    });
-  }
+    },
+  ];
 
   const bubble: FlexBubble = {
     type: "bubble",

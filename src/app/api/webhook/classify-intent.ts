@@ -17,6 +17,8 @@ export type KeywordIntent =
   | "payment"
   | "payment-copy-account"
   | "payment-copy-amount"
+  | "payment-confirm-done"
+  | "payment-cancel"
   | "payment-last5"
   | "business-info"
   | "phone"
@@ -45,7 +47,10 @@ export function classifyIntent(text: string): KeywordIntent {
   const t = text.toLowerCase();
   const trimmed = text.trim();
 
-  // Payment Flex Message footer buttons (must check before generic 匯款 keyword)
+  // Payment Flex footer buttons — must check BEFORE generic 匯款 keyword
+  // (按鈕送出的 message text 跟下面的 keywords 重疊，優先級要高)
+  if (trimmed === "確定完成匯款" || trimmed === "完成匯款") return "payment-confirm-done";
+  if (trimmed === "取消匯款" || trimmed === "取消輸入末五碼") return "payment-cancel";
   if (trimmed === "複製帳號") return "payment-copy-account";
   if (trimmed === "複製金額") return "payment-copy-amount";
 

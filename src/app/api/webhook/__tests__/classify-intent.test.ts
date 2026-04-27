@@ -69,6 +69,19 @@ describe("classifyIntent — table-driven keyword routing", () => {
     { input: "匯款", expected: "payment" },
     { input: "帳號", expected: "payment" },
 
+    // payment sub-intents (Flex button → keyword routing)
+    { input: "確定完成匯款", expected: "payment-confirm-done" },
+    { input: "完成匯款", expected: "payment-confirm-done" },
+    { input: "取消輸入末五碼", expected: "payment-cancel" },
+    { input: "取消匯款", expected: "payment-cancel" },
+    { input: "複製帳號", expected: "payment-copy-account" },
+    { input: "複製金額", expected: "payment-copy-amount" },
+    { input: "12345", expected: "payment-last5", note: "5 碼數字 → 末五碼回報" },
+    { input: "00000", expected: "payment-last5" },
+    { input: "1234", expected: "none", note: "4 碼不算" },
+    { input: "123456", expected: "none", note: "6 碼不算" },
+    { input: "12 345", expected: "none", note: "中間有空白不算" },
+
     // business-info
     { input: "營業時間", expected: "business-info" },
     { input: "幾點開", expected: "business-info" },
