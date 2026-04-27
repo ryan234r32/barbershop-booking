@@ -1,10 +1,36 @@
 import { TIMEZONE } from "./constants";
 
-/** Get current time in Asia/Taipei */
+/**
+ * Get current time as a Date whose local components reflect Taipei wall-clock.
+ *
+ * ⚠️ KNOWN BUG (2026-04-27): when the SERVER's local TZ is not Asia/Taipei
+ * (e.g. Vercel = UTC), the returned Date's underlying instant is shifted
+ * +8h from the real moment. Calling `.toLocaleDateString({ timeZone: "Asia/Taipei" })`
+ * on the result then DOUBLE-converts and returns the wrong day during
+ * Taipei afternoon/evening (real Taipei 16:00 → buggy result formats as next day).
+ *
+ * For "what's today's date in Taipei?", use {@link todayInTaipei} instead.
+ * This function is preserved for callers that depend on `.getHours()` etc.
+ * returning Taipei wall-clock values (which works by accident on UTC servers).
+ *
+ * Tracking: TODO migrate Category 2 callers to taipeiHour()/taipeiYmd() helpers,
+ * then make this function return real `new Date()`.
+ */
 export function nowTaipei(): Date {
   return new Date(
     new Date().toLocaleString("en-US", { timeZone: TIMEZONE })
   );
+}
+
+/**
+ * Returns YYYY-MM-DD for today in Asia/Taipei, robust on any server TZ.
+ *
+ * Use this in past-date guards, default date pickers, and anywhere you'd
+ * have called `nowTaipei().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" })`.
+ * The latter is buggy on UTC servers — see `nowTaipei` JSDoc.
+ */
+export function todayInTaipei(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: TIMEZONE });
 }
 
 /** Format a Date to "HH:mm" string */

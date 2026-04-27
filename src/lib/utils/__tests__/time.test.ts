@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import {
   formatTime,
   parseTimeToHour,
@@ -8,6 +8,7 @@ import {
   isWithinBusinessHours,
   formatDateToISO,
   getDayOfWeek,
+  todayInTaipei,
 } from "@/lib/utils/time";
 
 describe("formatTime", () => {
@@ -138,6 +139,53 @@ describe("formatDateToISO", () => {
     const date = new Date(2026, 0, 5); // January 5
     const result = formatDateToISO(date);
     expect(result).toContain("-01-");
+  });
+});
+
+/**
+ * Regression: TZ-AFTERNOON-DAYSHIFT (2026-04-27)
+ * On Vercel (UTC server) during Taipei afternoon (16:00–24:00 Taipei,
+ * 08:00–16:00 UTC), the legacy nowTaipei().toLocaleDateString({ timeZone })
+ * returned tomorrow's date instead of today, falsely rejecting same-day
+ * bookings with "預約日期不可為過去".
+ *
+ * Root cause: nowTaipei() builds a Date from a Taipei-zoned string, which
+ * on a UTC server is parsed as UTC, double-shifting the moment by +8h.
+ *
+ * todayInTaipei() formats `new Date()` directly with the timeZone option —
+ * no intermediate string-then-parse, so it's robust on any server TZ.
+ */
+describe("todayInTaipei() — TZ-safe today computation", () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+  });
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns today during Taipei afternoon (UTC 08:00 = Taipei 16:00) — buggy nowTaipei() returned next day", () => {
+    vi.setSystemTime(new Date("2026-04-27T08:00:00.000Z"));
+    expect(todayInTaipei()).toBe("2026-04-27");
+  });
+
+  it("returns today during Taipei evening (UTC 14:00 = Taipei 22:00)", () => {
+    vi.setSystemTime(new Date("2026-04-27T14:00:00.000Z"));
+    expect(todayInTaipei()).toBe("2026-04-27");
+  });
+
+  it("returns next-day after crossing Taipei midnight (UTC 16:30 = Taipei 00:30 next day)", () => {
+    vi.setSystemTime(new Date("2026-04-27T16:30:00.000Z"));
+    expect(todayInTaipei()).toBe("2026-04-28");
+  });
+
+  it("returns today during Taipei morning (UTC 02:00 = Taipei 10:00)", () => {
+    vi.setSystemTime(new Date("2026-04-27T02:00:00.000Z"));
+    expect(todayInTaipei()).toBe("2026-04-27");
+  });
+
+  it("handles UTC pre-08:00 boundary (UTC 26 20:00 = Taipei 27 04:00)", () => {
+    vi.setSystemTime(new Date("2026-04-26T20:00:00.000Z"));
+    expect(todayInTaipei()).toBe("2026-04-27");
   });
 });
 

@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
 import { errorResponse, UnauthorizedError } from "@/lib/utils/errors";
-import { nowTaipei, formatDateToISO } from "@/lib/utils/time";
+import { todayInTaipei } from "@/lib/utils/time";
 
 /**
  * GET /api/bookings/unacknowledged — bookings the admin still needs to confirm.
@@ -24,7 +24,8 @@ export async function GET(request: NextRequest) {
     const admin = await getAdminFromCookie(request);
     if (!admin) throw new UnauthorizedError();
 
-    const todayStr = formatDateToISO(nowTaipei());
+    // todayInTaipei() — TZ-safe (formatDateToISO(nowTaipei()) double-shifts on UTC servers).
+    const todayStr = todayInTaipei();
     const todayStart = new Date(todayStr + "T00:00:00.000Z");
 
     const bookings = await prisma.booking.findMany({

@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
 import { errorResponse, UnauthorizedError } from "@/lib/utils/errors";
-import { nowTaipei } from "@/lib/utils/time";
+import { todayInTaipei } from "@/lib/utils/time";
 
 // Keep in sync with PaymentMethod enum in prisma/schema.prisma.
 // Phase 2 will add CREDIT_CARD / LINE_PAY / JKO / OTHER.
@@ -33,9 +33,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl;
     const dateParam = searchParams.get("date");
 
-    // Default: today (Taipei).
-    const targetDateStr =
-      dateParam || nowTaipei().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+    // Default: today (Taipei). Uses todayInTaipei() — nowTaipei() has a UTC-server
+    // day-shift bug that defaults this to tomorrow during Taipei afternoon.
+    const targetDateStr = dateParam || todayInTaipei();
 
     // Validate YYYY-MM-DD format
     if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDateStr)) {

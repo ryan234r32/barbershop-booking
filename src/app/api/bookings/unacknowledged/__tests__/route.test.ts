@@ -11,13 +11,12 @@ vi.mock("@/lib/auth/jwt", () => ({
   getAdminFromCookie: (...a: unknown[]) => getAdminFromCookie(...a),
 }));
 
-// Pin "now" to a known Taipei date so we can assert the gte filter.
+// Pin "today" so we can assert the gte filter.
 vi.mock("@/lib/utils/time", async (orig) => {
   const actual = await orig<typeof import("@/lib/utils/time")>();
   return {
     ...actual,
-    nowTaipei: () => new Date("2026-05-15T12:00:00+08:00"),
-    formatDateToISO: () => "2026-05-15",
+    todayInTaipei: () => "2026-05-15",
   };
 });
 
