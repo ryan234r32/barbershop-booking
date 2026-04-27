@@ -1,4 +1,4 @@
-import { FlexMessage, FlexBubble, FlexCarousel } from "@line/bot-sdk";
+import { FlexMessage, FlexBubble, FlexCarousel, FlexComponent, FlexButton } from "@line/bot-sdk";
 
 /** Build Google Calendar URL for a booking */
 function buildGoogleCalendarUrl(
@@ -36,25 +36,14 @@ export function bookingConfirmationMessage(params: {
 
   const calendarUrl = buildGoogleCalendarUrl(serviceName, date, startTime, endTime);
 
+  // 2026-04-27: 「前往付款」按鈕已移除 — 客人於到店後用 Rich Menu「匯款資訊」
+  // 一鍵複製帳號 + 直接傳末五碼即可，不需 LIFF /payment 頁。
+  void bookingId; // (參數保留向後相容；目前未使用)
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const footerButtons: any[] = [];
 
-  // Primary CTA: payment (if bookingId + liffBaseUrl available)
-  if (bookingId && liffBaseUrl) {
-    footerButtons.push({
-      type: "button" as const,
-      action: {
-        type: "uri" as const,
-        label: "前往付款",
-        uri: `${liffBaseUrl}/payment/${bookingId}`,
-      },
-      style: "primary" as const,
-      color: "#003D2B",
-      height: "sm" as const,
-    });
-  }
-
-  // Secondary: Google Calendar
+  // Primary: Google Calendar
   footerButtons.push({
     type: "button" as const,
     action: {
@@ -62,11 +51,12 @@ export function bookingConfirmationMessage(params: {
       label: "加入 Google 行事曆",
       uri: calendarUrl,
     },
-    style: "secondary" as const,
+    style: "primary" as const,
+    color: "#003D2B",
     height: "sm" as const,
   });
 
-  // Tertiary: My Bookings
+  // Secondary: My Bookings
   if (liffBaseUrl) {
     footerButtons.push({
       type: "button" as const,
@@ -1023,19 +1013,8 @@ export function myBookingsFlexMessage(params: {
       });
     }
 
-    // Payment button (always show if not paid)
-    if (!isPaid) {
-      buttons.push({
-        type: "button" as const,
-        action: {
-          type: "uri" as const,
-          label: "前往付款",
-          uri: `${liffBaseUrl}/payment/${b.id}`,
-        },
-        style: "secondary" as const,
-        height: "sm" as const,
-      });
-    }
+    // 2026-04-27: 「前往付款」按鈕已移除 — 用 Rich Menu「匯款資訊」直接付款。
+    // (`isPaid` 仍在 body 顯示「待付款 / 已付款 ✓」狀態列。)
 
     return {
       type: "bubble" as const,
@@ -1385,14 +1364,165 @@ export function rescheduleConfirmationMessage(params: {
   };
 }
 
-/** Payment guide Flex Message — used for keyword "付款" */
+/**
+ * Payment guide Flex Message — used for keyword "匯款".
+ *
+ * - `amount` 為該客「最近一筆 CONFIRMED booking」的服務金額（webhook 端帶入）。
+ *   若該客查無預約則 omit，Flex 會自動隱藏金額區塊。
+ * - 「複製帳號 / 複製金額」按鈕 action 用 `message`：bot 會把純數字當訊息回送，
+ *   客人長按該訊息即可複製（LINE Flex 沒有 clipboard API，這是業界 workaround）。
+ * - 完成轉帳後客人輸入 5 碼數字會被 webhook 的 `payment-last5` intent 接住，
+ *   直接寫入 Payment.transferLastFive、status=VERIFYING、並推播給老闆對帳。
+ *   流程不再需要去「我的預約」頁上傳截圖（簡化版，2026-04-27）。
+ */
 export function paymentGuideMessage(params: {
   bankName: string;
   bankAccountName: string;
   bankAccountNumber: string;
-  liffBaseUrl: string;
+  amount?: number;
+  serviceName?: string;
 }): FlexMessage {
-  const { bankName, bankAccountName, bankAccountNumber, liffBaseUrl } = params;
+  const {
+    bankName,
+    bankAccountName,
+    bankAccountNumber,
+    amount,
+    serviceName,
+  } = params;
+
+  const hasAmount = typeof amount === "number" && amount > 0;
+
+  const bodyContents: FlexComponent[] = [
+    {
+      type: "text",
+      text: "銀行轉帳資訊",
+      weight: "bold",
+      size: "md",
+    },
+    {
+      type: "separator",
+      margin: "md",
+    },
+    {
+      type: "box",
+      layout: "vertical",
+      margin: "lg",
+      spacing: "sm",
+      contents: [
+        infoRow("銀行", bankName),
+        infoRow("戶名", bankAccountName),
+        infoRow("帳號", bankAccountNumber),
+      ],
+    },
+  ];
+
+  if (hasAmount) {
+    const amountBlockContents: FlexComponent[] = [
+      {
+        type: "box",
+        layout: "horizontal",
+        contents: [
+          {
+            type: "text",
+            text: "💰 本次金額",
+            size: "sm",
+            color: "#809A8E",
+            flex: 3,
+          },
+          {
+            type: "text",
+            text: `NT$ ${amount!.toLocaleString("en-US")}`,
+            size: "lg",
+            weight: "bold",
+            color: "#003D2B",
+            flex: 4,
+            align: "end",
+          },
+        ],
+      },
+    ];
+    if (serviceName) {
+      amountBlockContents.push({
+        type: "text",
+        text: serviceName,
+        size: "xs",
+        color: "#9CB1A4",
+        align: "end",
+      });
+    }
+
+    bodyContents.push(
+      { type: "separator", margin: "lg" },
+      {
+        type: "box",
+        layout: "vertical",
+        margin: "lg",
+        spacing: "sm",
+        contents: amountBlockContents,
+      }
+    );
+  }
+
+  bodyContents.push(
+    { type: "separator", margin: "lg" },
+    {
+      type: "text",
+      text: "📋 完成步驟",
+      weight: "bold",
+      size: "sm",
+      margin: "lg",
+    },
+    {
+      type: "text",
+      text:
+        "1. 點下方「📋 點此複製帳號」一鍵複製\n" +
+        "2. 開啟銀行 App 完成轉帳\n" +
+        "3. 回 LINE 直接打 5 碼數字回傳\n     例：12345",
+      size: "sm",
+      margin: "sm",
+      wrap: true,
+      color: "#809A8E",
+    },
+    {
+      type: "text",
+      text: "＊ 也可至現場以現金付款",
+      size: "xs",
+      margin: "md",
+      color: "#9CB1A4",
+    }
+  );
+
+  // 2024-09 LINE 推出 clipboardAction — 點按鈕直接把 clipboardText 寫進客人剪貼簿
+  // (一鍵複製，不用長按)。@line/bot-sdk v10.6 的 type 還沒跟上，這裡用 cast 繞過；
+  // runtime LINE API 認得這個 action type。
+  // 參考：https://developers.line.biz/en/reference/messaging-api/#clipboard-action
+  // 帳號去掉空白 / 連字符，方便客人貼到網銀
+  const cleanAccount = bankAccountNumber.replace(/[\s-]/g, "");
+  type ClipboardAction = { type: "clipboard"; label: string; clipboardText: string };
+  const clipboardAction = (label: string, clipboardText: string): ClipboardAction => ({
+    type: "clipboard",
+    label,
+    clipboardText,
+  });
+
+  const footerButtons: FlexButton[] = [
+    {
+      type: "button",
+      action: clipboardAction("📋 點此複製帳號", cleanAccount) as unknown as FlexButton["action"],
+      style: "primary",
+      color: "#003D2B",
+      height: "sm",
+    },
+  ];
+
+  if (hasAmount) {
+    footerButtons.push({
+      type: "button",
+      action: clipboardAction("💰 點此複製金額", String(amount)) as unknown as FlexButton["action"],
+      style: "secondary",
+      height: "sm",
+    });
+  }
 
   const bubble: FlexBubble = {
     type: "bubble",
@@ -1402,88 +1532,33 @@ export function paymentGuideMessage(params: {
       contents: [
         {
           type: "text",
-          text: "💳 付款資訊",
+          text: "💳 匯款資訊",
           weight: "bold",
           size: "lg",
           color: "#003D2B",
         },
       ],
-      backgroundColor: "#FFF8F1",
+      backgroundColor: "#FAF1E0",
     },
     body: {
       type: "box",
       layout: "vertical",
-      contents: [
-        {
-          type: "text",
-          text: "銀行轉帳資訊",
-          weight: "bold",
-          size: "md",
-        },
-        {
-          type: "separator",
-          margin: "md",
-        },
-        {
-          type: "box",
-          layout: "vertical",
-          margin: "lg",
-          spacing: "sm",
-          contents: [
-            infoRow("銀行", bankName),
-            infoRow("戶名", bankAccountName),
-            infoRow("帳號", bankAccountNumber),
-          ],
-        },
-        {
-          type: "separator",
-          margin: "lg",
-        },
-        {
-          type: "text",
-          text: "📋 付款步驟",
-          weight: "bold",
-          size: "sm",
-          margin: "lg",
-        },
-        {
-          type: "text",
-          text: "1. 完成轉帳後截圖\n2. 至「我的預約」上傳截圖\n3. 店家確認後即完成付款",
-          size: "sm",
-          margin: "sm",
-          wrap: true,
-          color: "#809A8E",
-        },
-        {
-          type: "text",
-          text: "＊也可至現場以現金付款",
-          size: "xs",
-          margin: "md",
-          color: "#809A8E",
-        },
-      ],
+      contents: bodyContents,
     },
     footer: {
       type: "box",
       layout: "vertical",
-      contents: [
-        {
-          type: "button",
-          action: {
-            type: "uri",
-            label: "前往我的預約",
-            uri: `${liffBaseUrl}/my-bookings`,
-          },
-          style: "primary",
-          color: "#003D2B",
-        },
-      ],
+      spacing: "sm",
+      contents: footerButtons,
     },
   };
 
   return {
     type: "flex",
-    altText: "付款資訊 — 銀行轉帳",
+    altText:
+      hasAmount
+        ? `匯款資訊 — NT$ ${amount!.toLocaleString("en-US")}`
+        : "匯款資訊 — 銀行轉帳",
     contents: bubble,
   };
 }

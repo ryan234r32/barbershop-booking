@@ -1,13 +1,12 @@
 /**
  * Rich Menu Setup Script for LINE Barbershop Booking Bot
  *
- * Creates a 3×2 Rich Menu with 6 buttons (PRD-v3 §11 #1, 碩展訪談 1.2):
+ * Creates a 2×2 Rich Menu with 4 buttons (post-訪談 1.2 redesign — 匯款資訊
+ * replaces 門市資訊 in BR; 門市地圖改放歡迎訊息 + Flex 卡片 footer):
  *   Top-Left     — "立即預約"   → opens LIFF booking page
- *   Top-Mid      — "我的預約"   → sends "我的預約" (dynamic Flex via webhook)
- *   Top-Right    — "服務項目"   → sends "服務價目" → pricing carousel
- *   Bottom-Left  — "💰 匯款"    → sends "匯款" → payment guide Flex
- *   Bottom-Mid   — "↻ 改/取消"  → sends "改時間" → my-bookings Flex with reschedule/cancel buttons
- *   Bottom-Right — "門市資訊"   → opens Google Maps to store location
+ *   Top-Right    — "我的預約"   → sends "我的預約" (dynamic Flex via webhook)
+ *   Bottom-Left  — "服務項目"   → sends "服務價目" → pricing carousel
+ *   Bottom-Right — "匯款資訊"   → sends "匯款" → payment guide Flex (amount = 該客最近一筆 booking)
  *
  * Usage:
  *   npx tsx scripts/setup-rich-menu.ts
@@ -17,7 +16,7 @@
  *   - .env with LINE_CHANNEL_ACCESS_TOKEN and NEXT_PUBLIC_LIFF_ID
  *   - A 2500x1686 PNG image saved at scripts/rich-menu.png (or pass --image)
  *
- * Layout: 2500x1686, 3 cols × 2 rows, ~833 wide × 843 high per cell
+ * Layout: 2500x1686, 2 cols × 2 rows, 1250 wide × 843 high per cell
  */
 
 import "dotenv/config";
@@ -42,23 +41,18 @@ if (!LIFF_ID) {
 
 const LIFF_BASE = `https://liff.line.me/${LIFF_ID}`;
 
-// Google Maps link for 門市資訊. Replace with your actual shop's share link
-// (open Google Maps → search your shop → Share → Copy Link).
-const STORE_MAP_URL = "https://maps.google.com/?q=1008+Hair+Studio";
+// (門市地圖連結原本給 Rich Menu BR 用，4-cell 改版後改放歡迎訊息 + Flex 卡片
+// footer 由 src/lib/line/messages.ts 內部處理；此檔不再需要。)
 
 // ---------------------------------------------------------------------------
-// Rich Menu Definition (3×2 grid: 2500x1686, 3 cols × 2 rows)
-// PRD-v3 §11 #1: 4→6 格重構，加 💰 匯款 + ↻ 改/取消
+// Rich Menu Definition (2×2 grid: 2500x1686, 2 cols × 2 rows)
+// 4-cell layout, BR = 匯款資訊 (post-訪談 1.2 redesign)
 // ---------------------------------------------------------------------------
 
-// Cell width: 2500 / 3 = 833.33 — split as 833 / 834 / 833 to absorb the rounding
-const C1_W = 833;
-const C2_W = 834;
-const C3_W = 833;
-const C1_X = 0;
-const C2_X = C1_W; // 833
-const C3_X = C1_W + C2_W; // 1667
-const ROW_H = 843; // 1686 / 2
+const COL_W = 1250; // 2500 / 2
+const ROW_H = 843;  // 1686 / 2
+const COL_L_X = 0;
+const COL_R_X = COL_W; // 1250
 
 const richMenuBody = {
   size: {
@@ -66,13 +60,13 @@ const richMenuBody = {
     height: 1686,
   },
   selected: true,
-  name: "barbershop-main-menu-v2",
+  name: "barbershop-main-menu-v3",
   chatBarText: "選單",
   areas: [
     // ─── Row 1 ───
     {
-      // Top-Left — 立即預約
-      bounds: { x: C1_X, y: 0, width: C1_W, height: ROW_H },
+      // Top-Left — 立即預約 (深綠底)
+      bounds: { x: COL_L_X, y: 0, width: COL_W, height: ROW_H },
       action: {
         type: "uri" as const,
         label: "立即預約",
@@ -80,49 +74,31 @@ const richMenuBody = {
       },
     },
     {
-      // Top-Mid — 我的預約 (message action → dynamic Flex via webhook)
-      bounds: { x: C2_X, y: 0, width: C2_W, height: ROW_H },
+      // Top-Right — 我的預約 (米色底)
+      bounds: { x: COL_R_X, y: 0, width: COL_W, height: ROW_H },
       action: {
         type: "message" as const,
         label: "我的預約",
         text: "我的預約",
       },
     },
+    // ─── Row 2 ───
     {
-      // Top-Right — 服務項目
-      bounds: { x: C3_X, y: 0, width: C3_W, height: ROW_H },
+      // Bottom-Left — 服務項目 (米色底)
+      bounds: { x: COL_L_X, y: ROW_H, width: COL_W, height: ROW_H },
       action: {
         type: "message" as const,
         label: "服務項目",
         text: "服務價目",
       },
     },
-    // ─── Row 2 ───
     {
-      // Bottom-Left — 💰 匯款 (NEW, 碩展 1.2)
-      bounds: { x: C1_X, y: ROW_H, width: C1_W, height: ROW_H },
+      // Bottom-Right — 匯款資訊 (深棕底)
+      bounds: { x: COL_R_X, y: ROW_H, width: COL_W, height: ROW_H },
       action: {
         type: "message" as const,
-        label: "匯款",
+        label: "匯款資訊",
         text: "匯款", // hits classifyIntent "payment" → paymentGuideMessage Flex
-      },
-    },
-    {
-      // Bottom-Mid — ↻ 改/取消 (NEW, 碩展 1.2)
-      bounds: { x: C2_X, y: ROW_H, width: C2_W, height: ROW_H },
-      action: {
-        type: "message" as const,
-        label: "改 / 取消",
-        text: "改時間", // hits classifyIntent "cancel-reschedule" → my-bookings Flex
-      },
-    },
-    {
-      // Bottom-Right — 門市資訊
-      bounds: { x: C3_X, y: ROW_H, width: C3_W, height: ROW_H },
-      action: {
-        type: "uri" as const,
-        label: "門市資訊",
-        uri: STORE_MAP_URL,
       },
     },
   ],
@@ -244,31 +220,29 @@ async function setDefaultRichMenu(richMenuId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * Generate a 3×2 (6-cell) SVG rich menu image as fallback.
+ * Generate a 2×2 (4-cell) SVG rich menu image as fallback.
  * LINE accepts PNG/JPEG; this SVG is a placeholder for design preview.
- * For production, convert to PNG via the HTML generator at docs/rich-menu/.
+ * Production artwork lives at scripts/rich-menu.png.
  */
 function generateFallbackSvg(): string {
   const W = 2500;
   const H = 1686;
   const ROW_H_SVG = H / 2;
-  const COL_W_SVG = W / 3;
-  const PRIMARY = "#003D2B";
-  const SURFACE = "#FFF8F1";
-  const SURFACE_ALT = "#FBF3E6";
+  const COL_W_SVG = W / 2;
+  const PRIMARY = "#003D2B";   // Forest Green
+  const SURFACE = "#FAF1E0";   // Cream Beige
+  const CHARCOAL = "#3D3733";  // Warm Charcoal Brown
 
   const cells = [
     // Row 1
-    { row: 0, col: 0, bg: PRIMARY, fg: SURFACE, title: "立即預約", subtitle: "BOOK NOW", emoji: "📅" },
-    { row: 0, col: 1, bg: SURFACE_ALT, fg: PRIMARY, title: "我的預約", subtitle: "MY BOOKINGS", emoji: "📋" },
-    { row: 0, col: 2, bg: SURFACE_ALT, fg: PRIMARY, title: "服務項目", subtitle: "SERVICES", emoji: "✂️" },
+    { row: 0, col: 0, bg: PRIMARY,  fg: SURFACE, title: "立即預約", subtitle: "BOOK NOW" },
+    { row: 0, col: 1, bg: SURFACE,  fg: PRIMARY, title: "我的預約", subtitle: "MY BOOKINGS" },
     // Row 2
-    { row: 1, col: 0, bg: SURFACE_ALT, fg: PRIMARY, title: "💰 匯款", subtitle: "PAYMENT", emoji: "" },
-    { row: 1, col: 1, bg: SURFACE_ALT, fg: PRIMARY, title: "↻ 改 / 取消", subtitle: "RESCHEDULE", emoji: "" },
-    { row: 1, col: 2, bg: PRIMARY, fg: SURFACE, title: "門市資訊", subtitle: "LOCATION", emoji: "📍" },
+    { row: 1, col: 0, bg: SURFACE,  fg: PRIMARY, title: "服務項目", subtitle: "SERVICES" },
+    { row: 1, col: 1, bg: CHARCOAL, fg: SURFACE, title: "匯款資訊", subtitle: "PAYMENT" },
   ];
 
-  const cellSvg = cells.map(({ row, col, bg, fg, title, subtitle, emoji }) => {
+  const cellSvg = cells.map(({ row, col, bg, fg, title, subtitle }) => {
     const x = col * COL_W_SVG;
     const y = row * ROW_H_SVG;
     const cx = x + COL_W_SVG / 2;
@@ -276,28 +250,19 @@ function generateFallbackSvg(): string {
     return `
   <g>
     <rect x="${x}" y="${y}" width="${COL_W_SVG}" height="${ROW_H_SVG}" fill="${bg}"/>
-    ${emoji ? `<text x="${cx}" y="${cy - 80}" text-anchor="middle" font-size="120" fill="${fg}">${emoji}</text>` : ""}
     <text x="${cx}" y="${cy + 20}" text-anchor="middle"
           font-family="'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif"
-          font-size="64" font-weight="700" fill="${fg}">${title}</text>
-    <text x="${cx}" y="${cy + 80}" text-anchor="middle"
+          font-size="120" font-weight="700" fill="${fg}">${title}</text>
+    <text x="${cx}" y="${cy + 110}" text-anchor="middle"
           font-family="'Manrope', sans-serif"
-          font-size="32" letter-spacing="6" fill="${fg}" opacity="0.6">${subtitle}</text>
+          font-size="48" letter-spacing="8" fill="${fg}" opacity="0.6">${subtitle}</text>
   </g>`;
   }).join("");
 
-  // Subtle dividers between cells
-  const dividers = `
-  <line x1="${COL_W_SVG}" y1="0" x2="${COL_W_SVG}" y2="${H}" stroke="rgba(0,0,0,0.06)" stroke-width="2"/>
-  <line x1="${COL_W_SVG * 2}" y1="0" x2="${COL_W_SVG * 2}" y2="${H}" stroke="rgba(0,0,0,0.06)" stroke-width="2"/>
-  <line x1="0" y1="${ROW_H_SVG}" x2="${W}" y2="${ROW_H_SVG}" stroke="rgba(0,0,0,0.06)" stroke-width="2"/>
-  `;
-
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <!-- 3×2 grid placeholder — swap with branded artwork before production deploy -->
+  <!-- 2×2 grid placeholder — production artwork at scripts/rich-menu.png -->
   ${cellSvg}
-  ${dividers}
 </svg>`;
 }
 
@@ -316,7 +281,11 @@ async function main() {
   // Step 1: Clean up old rich menus with the same name
   console.log("1. Checking for existing rich menus...");
   const existing = await listRichMenus();
-  const old = existing.filter((m) => m.name === "barbershop-main-menu");
+  const old = existing.filter((m) =>
+    m.name === "barbershop-main-menu" ||
+    m.name === "barbershop-main-menu-v2" ||
+    m.name === "barbershop-main-menu-v3"
+  );
   if (old.length > 0) {
     console.log(`   Found ${old.length} existing menu(s) to replace.`);
     for (const menu of old) {
@@ -408,16 +377,14 @@ async function main() {
   // Summary
   console.log("\n=== Setup Complete ===");
   console.log(`Rich Menu ID: ${richMenuId}`);
-  console.log("Layout: 2500x1686 (3 cols × 2 rows, 6 cells)");
-  console.log(`  Row 1: [立即預約] [我的預約] [服務項目]`);
-  console.log(`  Row 2: [💰 匯款]  [↻ 改/取消] [門市資訊]`);
+  console.log("Layout: 2500x1686 (2 cols × 2 rows, 4 cells)");
+  console.log(`  Row 1: [立即預約]   [我的預約]`);
+  console.log(`  Row 2: [服務項目]   [匯款資訊]`);
   console.log("");
-  console.log(`  立即預約    → ${LIFF_BASE}/booking`);
-  console.log(`  我的預約    → keyword "我的預約" → dynamic Flex`);
-  console.log(`  服務項目    → keyword "服務價目" → pricing carousel`);
-  console.log(`  💰 匯款     → keyword "匯款" → payment guide Flex`);
-  console.log(`  ↻ 改/取消   → keyword "改時間" → my-bookings Flex with reschedule/cancel`);
-  console.log(`  門市資訊    → ${STORE_MAP_URL}`);
+  console.log(`  立即預約  → ${LIFF_BASE}/booking`);
+  console.log(`  我的預約  → keyword "我的預約" → dynamic Flex`);
+  console.log(`  服務項目  → keyword "服務價目" → pricing carousel`);
+  console.log(`  匯款資訊  → keyword "匯款" → payment guide Flex (帶該客最近一筆 booking 金額)`);
   console.log("");
 }
 

@@ -1,65 +1,70 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="2500" height="843" viewBox="0 0 2500 843">
-  <!-- Background -->
-  <rect width="2500" height="843" fill="#1DB446"/>
-
-  <!-- Column dividers (subtle) -->
-  <line x1="833.3333333333334" y1="60" x2="833.3333333333334" y2="783"
-        stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
-  <line x1="1666.6666666666667" y1="60" x2="1666.6666666666667" y2="783"
-        stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
-
-  <!-- Icons -->
+<svg xmlns="http://www.w3.org/2000/svg" width="2500" height="1686" viewBox="0 0 2500 1686">
+  <!-- 3×2 grid placeholder — swap with branded artwork before production deploy -->
   
-    <rect x="376.6666666666667" y="200" width="80" height="70" rx="8"
-          fill="none" stroke="white" stroke-width="5"/>
-    <line x1="376.6666666666667" y1="220" x2="456.6666666666667" y2="220"
-          stroke="white" stroke-width="5"/>
-    <line x1="396.6666666666667" y1="185" x2="396.6666666666667" y2="208"
-          stroke="white" stroke-width="5" stroke-linecap="round"/>
-    <line x1="436.6666666666667" y1="185" x2="436.6666666666667" y2="208"
-          stroke="white" stroke-width="5" stroke-linecap="round"/>
+  <g>
+    <rect x="0" y="0" width="833.3333333333334" height="843" fill="#003D2B"/>
+    <text x="416.6666666666667" y="341.5" text-anchor="middle" font-size="120" fill="#FFF8F1">📅</text>
+    <text x="416.6666666666667" y="441.5" text-anchor="middle"
+          font-family="'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif"
+          font-size="64" font-weight="700" fill="#FFF8F1">立即預約</text>
+    <text x="416.6666666666667" y="501.5" text-anchor="middle"
+          font-family="'Manrope', sans-serif"
+          font-size="32" letter-spacing="6" fill="#FFF8F1" opacity="0.6">BOOK NOW</text>
+  </g>
+  <g>
+    <rect x="833.3333333333334" y="0" width="833.3333333333334" height="843" fill="#FBF3E6"/>
+    <text x="1250" y="341.5" text-anchor="middle" font-size="120" fill="#003D2B">📋</text>
+    <text x="1250" y="441.5" text-anchor="middle"
+          font-family="'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif"
+          font-size="64" font-weight="700" fill="#003D2B">我的預約</text>
+    <text x="1250" y="501.5" text-anchor="middle"
+          font-family="'Manrope', sans-serif"
+          font-size="32" letter-spacing="6" fill="#003D2B" opacity="0.6">MY BOOKINGS</text>
+  </g>
+  <g>
+    <rect x="1666.6666666666667" y="0" width="833.3333333333334" height="843" fill="#FBF3E6"/>
+    <text x="2083.3333333333335" y="341.5" text-anchor="middle" font-size="120" fill="#003D2B">✂️</text>
+    <text x="2083.3333333333335" y="441.5" text-anchor="middle"
+          font-family="'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif"
+          font-size="64" font-weight="700" fill="#003D2B">服務項目</text>
+    <text x="2083.3333333333335" y="501.5" text-anchor="middle"
+          font-family="'Manrope', sans-serif"
+          font-size="32" letter-spacing="6" fill="#003D2B" opacity="0.6">SERVICES</text>
+  </g>
+  <g>
+    <rect x="0" y="843" width="833.3333333333334" height="843" fill="#FBF3E6"/>
+    
+    <text x="416.6666666666667" y="1284.5" text-anchor="middle"
+          font-family="'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif"
+          font-size="64" font-weight="700" fill="#003D2B">💰 匯款</text>
+    <text x="416.6666666666667" y="1344.5" text-anchor="middle"
+          font-family="'Manrope', sans-serif"
+          font-size="32" letter-spacing="6" fill="#003D2B" opacity="0.6">PAYMENT</text>
+  </g>
+  <g>
+    <rect x="833.3333333333334" y="843" width="833.3333333333334" height="843" fill="#FBF3E6"/>
+    
+    <text x="1250" y="1284.5" text-anchor="middle"
+          font-family="'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif"
+          font-size="64" font-weight="700" fill="#003D2B">↻ 改 / 取消</text>
+    <text x="1250" y="1344.5" text-anchor="middle"
+          font-family="'Manrope', sans-serif"
+          font-size="32" letter-spacing="6" fill="#003D2B" opacity="0.6">RESCHEDULE</text>
+  </g>
+  <g>
+    <rect x="1666.6666666666667" y="843" width="833.3333333333334" height="843" fill="#003D2B"/>
+    <text x="2083.3333333333335" y="1184.5" text-anchor="middle" font-size="120" fill="#FFF8F1">📍</text>
+    <text x="2083.3333333333335" y="1284.5" text-anchor="middle"
+          font-family="'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif"
+          font-size="64" font-weight="700" fill="#FFF8F1">門市資訊</text>
+    <text x="2083.3333333333335" y="1344.5" text-anchor="middle"
+          font-family="'Manrope', sans-serif"
+          font-size="32" letter-spacing="6" fill="#FFF8F1" opacity="0.6">LOCATION</text>
+  </g>
   
+  <line x1="833.3333333333334" y1="0" x2="833.3333333333334" y2="1686" stroke="rgba(0,0,0,0.06)" stroke-width="2"/>
+  <line x1="1666.6666666666667" y1="0" x2="1666.6666666666667" y2="1686" stroke="rgba(0,0,0,0.06)" stroke-width="2"/>
+  <line x1="0" y1="843" x2="2500" y2="843" stroke="rgba(0,0,0,0.06)" stroke-width="2"/>
   
-    <rect x="1215" y="195" width="70" height="80" rx="8"
-          fill="none" stroke="white" stroke-width="5"/>
-    <rect x="1230" y="185" width="40" height="20" rx="4"
-          fill="none" stroke="white" stroke-width="5"/>
-    <line x1="1232" y1="235" x2="1268" y2="235"
-          stroke="white" stroke-width="4"/>
-    <line x1="1232" y1="255" x2="1268" y2="255"
-          stroke="white" stroke-width="4"/>
-  
-  
-    <circle cx="2083.3333333333335" cy="220" r="35"
-            fill="none" stroke="white" stroke-width="5"/>
-    <text x="2083.3333333333335" y="230" text-anchor="middle"
-          font-size="36" font-weight="bold" fill="white">$</text>
-  
-
-  <!-- Labels -->
-  <text x="416.6666666666667" y="370" text-anchor="middle"
-        font-family="'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif"
-        font-size="56" font-weight="700" fill="white">立即預約</text>
-
-  <text x="1250" y="370" text-anchor="middle"
-        font-family="'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif"
-        font-size="56" font-weight="700" fill="white">我的預約</text>
-
-  <text x="2083.3333333333335" y="370" text-anchor="middle"
-        font-family="'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif"
-        font-size="56" font-weight="700" fill="white">聯絡店家</text>
-
-  <!-- Sub-labels -->
-  <text x="416.6666666666667" y="420" text-anchor="middle"
-        font-family="'Noto Sans TC', sans-serif"
-        font-size="32" fill="rgba(255,255,255,0.8)">Book Now</text>
-
-  <text x="1250" y="420" text-anchor="middle"
-        font-family="'Noto Sans TC', sans-serif"
-        font-size="32" fill="rgba(255,255,255,0.8)">My Bookings</text>
-
-  <text x="2083.3333333333335" y="420" text-anchor="middle"
-        font-family="'Noto Sans TC', sans-serif"
-        font-size="32" fill="rgba(255,255,255,0.8)">Services</text>
 </svg>

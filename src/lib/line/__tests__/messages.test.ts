@@ -279,7 +279,6 @@ describe("paymentGuideMessage", () => {
     bankName: "台北富邦銀行",
     bankAccountName: "張美麗",
     bankAccountNumber: "1234-5678-9012",
-    liffBaseUrl: "https://liff.line.me/1234567890-abcdefgh",
   };
 
   it("returns a valid Flex Message", () => {
@@ -300,14 +299,53 @@ describe("paymentGuideMessage", () => {
   it("includes payment steps", () => {
     const msg = paymentGuideMessage(params);
     const bodyStr = JSON.stringify(msg.contents);
-    expect(bodyStr).toContain("付款步驟");
+    expect(bodyStr).toContain("完成步驟");
     expect(bodyStr).toContain("轉帳");
+    expect(bodyStr).toContain("5 碼");
   });
 
-  it("includes my-bookings link in footer button", () => {
+  it("renders 匯款資訊 header (not 付款資訊)", () => {
     const msg = paymentGuideMessage(params);
     const bodyStr = JSON.stringify(msg.contents);
-    expect(bodyStr).toContain("/my-bookings");
+    expect(bodyStr).toContain("匯款資訊");
+  });
+
+  it("hides amount block when amount is omitted", () => {
+    const msg = paymentGuideMessage(params);
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).not.toContain("本次金額");
+    expect(bodyStr).not.toContain("複製金額");
+  });
+
+  it("shows amount + 複製金額 button when amount is provided", () => {
+    const msg = paymentGuideMessage({ ...params, amount: 800, serviceName: "男性剪髮" });
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("本次金額");
+    expect(bodyStr).toContain("NT$ 800");
+    expect(bodyStr).toContain("男性剪髮");
+    expect(bodyStr).toContain("複製金額");
+  });
+
+  it("footer no longer routes to my-bookings (simplified flow — type 5 digits in chat)", () => {
+    const msg = paymentGuideMessage(params);
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).not.toContain("/my-bookings");
+    expect(bodyStr).not.toContain("前往我的預約");
+    expect(bodyStr).toContain("點此複製帳號");
+  });
+
+  it("uses clipboardAction with cleaned account number (strips dashes/spaces)", () => {
+    const msg = paymentGuideMessage(params);
+    const bodyStr = JSON.stringify(msg.contents);
+    // Original account "1234-5678-9012" should be cleaned to "123456789012" for clipboard
+    expect(bodyStr).toContain('"type":"clipboard"');
+    expect(bodyStr).toContain('"clipboardText":"123456789012"');
+  });
+
+  it("clipboardAction for amount uses raw integer string", () => {
+    const msg = paymentGuideMessage({ ...params, amount: 800 });
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain('"clipboardText":"800"');
   });
 
 });

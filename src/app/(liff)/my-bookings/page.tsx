@@ -238,8 +238,8 @@ export default function MyBookingsPage() {
               const paymentBadge = booking.payment?.status
                 ? PAYMENT_BADGE[booking.payment.status]
                 : null;
-              const paymentReceived = booking.payment?.status === "RECEIVED";
-              const paymentPicked = booking.payment?.method === "CASH" || paymentReceived || booking.payment?.status === "VERIFYING";
+              // 2026-04-27: paymentPicked / paymentReceived 已移除 — 「前往付款」流程裁掉，
+              // 客人改用 Rich Menu「匯款資訊」處理。
 
               return (
                 <article
@@ -325,14 +325,7 @@ export default function MyBookingsPage() {
                           取消
                         </a>
                       </div>
-                      {!paymentPicked && (
-                        <a
-                          href={`/payment/${booking.id}`}
-                          className="block w-full py-4 bg-[#003D2B] text-[#FFF8F1] text-[0.8rem] font-bold tracking-[0.15em] text-center rounded transition-colors hover:bg-[#003D2B]/90"
-                        >
-                          前往付款
-                        </a>
-                      )}
+                      {/* 2026-04-27: 「前往付款」按鈕已移除 — 客人於到店後用 Rich Menu「匯款資訊」一鍵複製帳號 + 傳末五碼即可。 */}
                     </div>
                   )}
                 </article>

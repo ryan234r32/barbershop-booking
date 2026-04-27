@@ -16,10 +16,12 @@ import {
   myBookingsFlexMessage,
   myBookingsEmptyMessage,
   paymentGuideMessage,
+  transferReportedMessage,
   busyNoticeMessage,
   serviceInquiryFlexMessage,
   bleachConsultationFlexMessage,
 } from "@/lib/line/messages";
+import { notifyAdminTransferReported } from "@/lib/notifications/admin-notify";
 import { MessageKind } from "@prisma/client";
 import { classifyIntent } from "./classify-intent";
 
@@ -311,12 +313,238 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
 
   // Priority 4: Payment / transfer
   if (intent === "payment") {
+    // 帶該客「最近一筆 CONFIRMED booking」金額。優先順序：
+    // (1) 今天 endTime 已過的 (剛剪完) → (2) 今天即將開始的 → (3) 最近 3 天 endTime 已過的 → (4) 未來最近的
+    let amount: number | undefined;
+    let serviceName: string | undefined;
+
+    if (lineUserId) {
+      const user = await prisma.user.findUnique({
+        where: { tenantId_lineUserId: { tenantId, lineUserId } },
+        select: { id: true },
+      });
+      if (user) {
+        const now = nowTaipei();
+        const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+        const sevenDaysAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const candidates = await prisma.booking.findMany({
+          where: {
+            userId: user.id,
+            tenantId,
+            status: "CONFIRMED",
+            date: { gte: threeDaysAgo, lte: sevenDaysAhead },
+          },
+          include: { service: { select: { name: true, price: true } } },
+          orderBy: [{ date: "asc" }, { startTime: "asc" }],
+          take: 20,
+        });
+
+        if (candidates.length > 0) {
+          // Score each booking by abs distance (ms) from now (using endTime in Taipei)
+          const scored = candidates.map((b) => {
+            const bDateStr = b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+            const [y, m, d] = bDateStr.split("-").map(Number);
+            const [eH] = b.endTime.split(":").map(Number);
+            const endUtc = new Date(Date.UTC(y, m - 1, d, eH - 8, 0, 0));
+            return { booking: b, distance: Math.abs(endUtc.getTime() - now.getTime()) };
+          });
+          scored.sort((a, b) => a.distance - b.distance);
+          const closest = scored[0].booking;
+          amount = closest.service.price;
+          serviceName = closest.service.name;
+        }
+      }
+    }
+
     return reply(paymentGuideMessage({
       bankName: tenant?.bankInfo || "請洽店家",
       bankAccountName: tenant?.bankAccountName || "請洽店家",
       bankAccountNumber: tenant?.bankAccountNumber || "請洽店家",
-      liffBaseUrl: liffUrl,
+      amount,
+      serviceName,
     }));
+  }
+
+  // Priority 4a: 「複製帳號」純文字訊息 → 舊版 LINE app fallback
+  // (新版按鈕用 clipboardAction，點下去直接複製不會送這條訊息；
+  //  只有客人手動打「複製帳號」、或舊版 LINE 不認得 clipboardAction 才會走這裡)
+  if (intent === "payment-copy-account") {
+    const cleanAccount = (tenant?.bankAccountNumber || "").replace(/[\s-]/g, "");
+    if (!cleanAccount) {
+      return reply({ type: "text", text: "目前尚未設定銀行帳號，請洽店家。" });
+    }
+    return reply({
+      type: "text",
+      text:
+        `${cleanAccount}\n` +
+        `\n👆 長按上方帳號即可複製\n` +
+        `\n完成轉帳後，請直接傳「末五碼」5 位數字給我，例：12345`,
+    });
+  }
+
+  // Priority 4b: 「複製金額」純文字訊息 → 同上的 fallback
+  if (intent === "payment-copy-amount") {
+    if (!lineUserId) {
+      return reply({ type: "text", text: "請從「匯款資訊」按鈕開始操作 🙏" });
+    }
+    const user = await prisma.user.findUnique({
+      where: { tenantId_lineUserId: { tenantId, lineUserId } },
+      select: { id: true },
+    });
+    if (!user) {
+      return reply({ type: "text", text: "查無您的預約資料 🙏" });
+    }
+    const now = nowTaipei();
+    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+    const sevenDaysAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const candidates = await prisma.booking.findMany({
+      where: {
+        userId: user.id,
+        tenantId,
+        status: "CONFIRMED",
+        date: { gte: threeDaysAgo, lte: sevenDaysAhead },
+      },
+      include: { service: { select: { price: true } } },
+      orderBy: [{ date: "asc" }, { startTime: "asc" }],
+      take: 20,
+    });
+    if (candidates.length === 0) {
+      return reply({
+        type: "text",
+        text: "查無您近期的預約金額，若有疑問請洽店家 🙏",
+      });
+    }
+    const scored = candidates.map((b) => {
+      const bDateStr = b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+      const [y, m, d] = bDateStr.split("-").map(Number);
+      const [eH] = b.endTime.split(":").map(Number);
+      const endUtc = new Date(Date.UTC(y, m - 1, d, eH - 8, 0, 0));
+      return { booking: b, distance: Math.abs(endUtc.getTime() - now.getTime()) };
+    });
+    scored.sort((a, b) => a.distance - b.distance);
+    const amt = scored[0].booking.service.price;
+    return reply({
+      type: "text",
+      text:
+        `${amt}\n` +
+        `\n👆 長按上方金額即可複製\n` +
+        `\n完成轉帳後，請直接傳「末五碼」5 位數字給我，例：12345`,
+    });
+  }
+
+  // Priority 4c: 5 碼數字訊息 → 寫進 Payment.transferLastFive、status=VERIFYING、
+  // 推播給老闆對帳。客人傳 5 碼後 bot 回 transferReportedMessage Flex 確認。
+  //
+  // 整套流程不再經過 LIFF /payment 頁（已於 2026-04-27 移除）。
+  if (intent === "payment-last5") {
+    const transferLastFive = text.trim();
+
+    if (!lineUserId) {
+      return reply({ type: "text", text: "請從 LINE 帳號內傳送，謝謝 🙏" });
+    }
+    const user = await prisma.user.findUnique({
+      where: { tenantId_lineUserId: { tenantId, lineUserId } },
+      select: { id: true, displayName: true },
+    });
+    if (!user) {
+      return reply({ type: "text", text: "查無您的預約資料，若有疑問請洽店家 🙏" });
+    }
+
+    // 找該客「最近一筆 CONFIRMED 且 Payment 還沒終結」的 booking。
+    // 範圍 = 前 3 天 ~ 後 7 天，挑 endTime 距離 now 最近、且 payment 還沒
+    // VERIFYING/RECEIVED/WAIVED 的那筆。
+    const now = nowTaipei();
+    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+    const sevenDaysAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const candidates = await prisma.booking.findMany({
+      where: {
+        userId: user.id,
+        tenantId,
+        status: "CONFIRMED",
+        date: { gte: threeDaysAgo, lte: sevenDaysAhead },
+      },
+      include: {
+        service: { select: { name: true, price: true } },
+        payment: true,
+      },
+      orderBy: [{ date: "asc" }, { startTime: "asc" }],
+      take: 20,
+    });
+
+    const eligible = candidates.filter(
+      (b) =>
+        !b.payment ||
+        b.payment.status === "PENDING" ||
+        b.payment.status === "AWAITING_BANK",
+    );
+
+    if (eligible.length === 0) {
+      const hasAnyBooking = candidates.length > 0;
+      return reply({
+        type: "text",
+        text: hasAnyBooking
+          ? `查無待回報的預約 — 你最近的預約付款已在處理中或已完成。若有疑問請洽店家 🙏`
+          : `查無您近期的預約，請先預約後再回報匯款 🙏`,
+      });
+    }
+
+    const scored = eligible.map((b) => {
+      const bDateStr = b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+      const [y, m, d] = bDateStr.split("-").map(Number);
+      const [eH] = b.endTime.split(":").map(Number);
+      const endUtc = new Date(Date.UTC(y, m - 1, d, eH - 8, 0, 0));
+      return { booking: b, distance: Math.abs(endUtc.getTime() - now.getTime()) };
+    });
+    scored.sort((a, b) => a.distance - b.distance);
+    const target = scored[0].booking;
+
+    // Atomic transition — create or upgrade PENDING/AWAITING_BANK → VERIFYING
+    const payment = target.payment
+      ? await prisma.payment.update({
+          where: { bookingId: target.id },
+          data: {
+            method: "BANK_TRANSFER",
+            status: "VERIFYING",
+            transferLastFive,
+            verifiedAt: new Date(),
+          },
+        })
+      : await prisma.payment.create({
+          data: {
+            bookingId: target.id,
+            amount: target.service.price,
+            method: "BANK_TRANSFER",
+            status: "VERIFYING",
+            transferLastFive,
+            verifiedAt: new Date(),
+          },
+        });
+
+    // Fire-and-forget: notify admin (web push + LINE)
+    void notifyAdminTransferReported({
+      tenantId: target.tenantId,
+      bookingId: target.id,
+      displayName: user.displayName ?? "客戶",
+      serviceName: target.service.name,
+      date: target.date.toISOString().slice(0, 10),
+      startTime: target.startTime,
+      amount: payment.amount,
+      transferLastFive,
+    }).catch((err) => logger.error("notifyAdminTransferReported failed", err, "webhook"));
+
+    const dateStr = target.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+    return reply(
+      transferReportedMessage({
+        serviceName: target.service.name,
+        date: dateStr,
+        startTime: target.startTime,
+        endTime: target.endTime,
+        price: payment.amount,
+        transferLastFive,
+        liffBaseUrl: liffUrl,
+      }),
+      true, // usePush — DB write delayed reply, avoid 1s webhook timeout
+    );
   }
 
   // Priority 5: Business hours / location

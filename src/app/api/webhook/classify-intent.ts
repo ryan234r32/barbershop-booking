@@ -15,6 +15,9 @@ export type KeywordIntent =
   | "booking"
   | "pricing"
   | "payment"
+  | "payment-copy-account"
+  | "payment-copy-amount"
+  | "payment-last5"
   | "business-info"
   | "phone"
   | "thanks"
@@ -40,6 +43,15 @@ function isNonServiceUsage(text: string): boolean {
 
 export function classifyIntent(text: string): KeywordIntent {
   const t = text.toLowerCase();
+  const trimmed = text.trim();
+
+  // Payment Flex Message footer buttons (must check before generic 匯款 keyword)
+  if (trimmed === "複製帳號") return "payment-copy-account";
+  if (trimmed === "複製金額") return "payment-copy-amount";
+
+  // Bare 5-digit message → assume it's the bank receipt last-5 ack (post-轉帳 回報)
+  if (/^\d{5}$/.test(trimmed)) return "payment-last5";
+
   if (matchKeywords(t, ["我的預約", "我預約", "我約了", "預約了什麼", "查詢", "紀錄", "記錄"])) return "my-bookings";
   if (matchKeywords(t, ["取消", "不約了", "不來了", "改時間", "更改", "改期", "換時間", "改一下", "cancel"])) return "cancel-reschedule";
 

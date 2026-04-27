@@ -23,7 +23,10 @@ const INTENT_LABELS: Record<KeywordIntent, string> = {
   "service-inquiry-bleach": "漂髮諮詢 → ConsultationRequest (P2.6)",
   "booking": "新預約 (P3)",
   "pricing": "服務價格 (P4)",
-  "payment": "付款 / 轉帳 (P5)",
+  "payment": "匯款 / 轉帳 (P5) — 帶最近一筆 booking 金額",
+  "payment-copy-account": "複製帳號 (P5a — Flex 按鈕)",
+  "payment-copy-amount": "複製金額 (P5b — Flex 按鈕)",
+  "payment-last5": "後五碼回報 (P5c — 純 5 碼數字)",
   "business-info": "營業時間 / 地址 (P6)",
   "phone": "電話 / 聯絡 (P6)",
   "thanks": "感謝 (P7)",
@@ -90,7 +93,6 @@ export async function POST(request: NextRequest) {
         bankName: tenant?.bankInfo || "請洽店家",
         bankAccountName: tenant?.bankAccountName || "請洽店家",
         bankAccountNumber: tenant?.bankAccountNumber || "請洽店家",
-        liffBaseUrl: liffUrl,
       });
       break;
     case "business-info":

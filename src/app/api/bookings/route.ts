@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
         include: {
           service: { select: { name: true, duration: true, price: true, slotsNeeded: true } },
           user: { select: { id: true, displayName: true, lineUserId: true, phone: true, segment: true, totalVisits: true, notes: true, lastVisitAt: true } },
-          payment: { select: { status: true, method: true } },
+          payment: { select: { status: true, method: true, transferLastFive: true } },
         },
         orderBy: [{ date: "asc" }, { startTime: "asc" }],
         skip: (page - 1) * limit,

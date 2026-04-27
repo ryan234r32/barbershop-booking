@@ -49,13 +49,8 @@ export const adminLoginSchema = z.object({
   password: z.string().min(6),
 });
 
-export const transferLastFiveSchema = z
-  .string()
-  .regex(/^\d{5}$/, "末五碼必須為 5 位數字");
-
-export const reportTransferSchema = z.object({
-  transferLastFive: transferLastFiveSchema,
-});
+// 2026-04-27: reportTransferSchema 已移除 — LIFF /payment 頁刪除後，5 碼回報
+// 改在 LINE webhook 用 regex /^\d{5}$/ 直接 inline classify。
 
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type CancelBookingInput = z.infer<typeof cancelBookingSchema>;
