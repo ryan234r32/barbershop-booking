@@ -21,7 +21,7 @@
  * sheet so the diff stays focused on the new three-state model.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Drawer } from "vaul";
 import { useToast } from "@/components/ui/toast";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
@@ -98,30 +98,62 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleTime, setRescheduleTime] = useState("");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  // Optimistic local state: parent passes the booking it had at click time
+  // and refreshes its list in the background, but the prop reference does
+  // not change — so we maintain a local copy that we mutate after each
+  // successful API call to keep segment + checkout button in sync without
+  // requiring a sheet close/reopen.
+  const [liveBooking, setLiveBooking] = useState<BookingDetail | null>(booking);
   const { toast } = useToast();
 
-  if (!booking) return null;
+  // Re-seed live state whenever the parent points at a different booking
+  // (e.g. closing this sheet and clicking another one).
+  useEffect(() => {
+    setLiveBooking(booking);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+  }, [booking?.id]);
 
-  const currentSegment = segmentForBooking(booking);
-  const isFinal = booking.status === "COMPLETED" || booking.status === "CANCELLED" || booking.status === "CANCELLED_BY_ADMIN";
+  const view = liveBooking ?? booking;
+  if (!view) return null;
+
+  const currentSegment = segmentForBooking(view);
+  const isFinal = view.status === "COMPLETED" || view.status === "CANCELLED" || view.status === "CANCELLED_BY_ADMIN";
 
   /** Toggle 已報到 (per plan §C2: no confirm dialog — reversible). */
   const handleCheckin = async (desired: "checked_in" | "not_yet") => {
     if (loading) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/bookings/${booking.id}/checkin`, {
+      const res = await fetch(`/api/bookings/${view.id}/checkin`, {
         method: "PATCH",
         headers: adminHeaders(),
         body: JSON.stringify({
           desired,
-          ...(booking.updatedAt ? { expectedUpdatedAt: booking.updatedAt } : {}),
+          ...(view.updatedAt ? { expectedUpdatedAt: view.updatedAt } : {}),
         }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.message || "報到失敗");
       }
+      const data = await res.json();
+      // Optimistic merge so segment + checkout button reflect the new state
+      // immediately, without waiting for SWR list refetch + sheet reopen.
+      setLiveBooking((prev) =>
+        prev
+          ? {
+              ...prev,
+              checkedInAt:
+                typeof data.checkedInAt === "string"
+                  ? data.checkedInAt
+                  : data.checkedInAt === null
+                    ? null
+                    : prev.checkedInAt,
+              updatedAt:
+                typeof data.updatedAt === "string" ? data.updatedAt : prev.updatedAt,
+            }
+          : prev,
+      );
       toast({ type: "success", message: desired === "checked_in" ? "已報到" : "改回尚未到來" });
       onAction();
     } catch (err) {
@@ -137,11 +169,11 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
     if (!confirm("確定標記為爽約？這會記一次違規，無法復原。")) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/bookings/${booking.id}/no-show`, {
+      const res = await fetch(`/api/bookings/${view.id}/no-show`, {
         method: "PATCH",
         headers: adminHeaders(),
         body: JSON.stringify(
-          booking.updatedAt ? { expectedUpdatedAt: booking.updatedAt } : {},
+          view.updatedAt ? { expectedUpdatedAt: view.updatedAt } : {},
         ),
       });
       if (!res.ok) {
@@ -161,13 +193,25 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
   /** Called by CheckoutFullPage after a successful POST /checkout. */
   const handleCheckoutComplete = () => {
     setCheckoutOpen(false);
+    // Optimistically reflect the COMPLETED state so the user sees the
+    // post-checkout note prompt instead of the segment briefly flipping.
+    setLiveBooking((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: "COMPLETED",
+            checkedInAt: prev.checkedInAt ?? new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }
+        : prev,
+    );
     setSubState("notes");
     onAction();
   };
 
   const handleOpenReschedule = () => {
-    setRescheduleDate(booking.date.slice(0, 10));
-    setRescheduleTime(booking.startTime);
+    setRescheduleDate(view.date.slice(0, 10));
+    setRescheduleTime(view.startTime);
     setSubState("reschedule");
   };
 
@@ -178,7 +222,7 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
     }
     setLoading(true);
     try {
-      const res = await fetch(`/api/bookings/${booking.id}/reschedule`, {
+      const res = await fetch(`/api/bookings/${view.id}/reschedule`, {
         method: "POST",
         headers: adminHeaders(),
         body: JSON.stringify({ date: rescheduleDate, startTime: rescheduleTime }),
@@ -201,7 +245,7 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
     if (!confirm("確定要取消此預約？")) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/bookings/${booking.id}`, {
+      const res = await fetch(`/api/bookings/${view.id}`, {
         method: "PATCH",
         headers: adminHeaders(),
         body: JSON.stringify({ action: "admin_cancel" }),
@@ -220,12 +264,12 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
   const handleSaveNote = async () => {
     if (noteText.trim()) {
       try {
-        await fetch(`/api/customers/${booking.user.id}`, {
+        await fetch(`/api/customers/${view.user.id}`, {
           method: "PATCH",
           headers: adminHeaders(),
           body: JSON.stringify({
-            notes: booking.user.notes
-              ? `${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" })} ${noteText.trim()}\n${booking.user.notes}`
+            notes: view.user.notes
+              ? `${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" })} ${noteText.trim()}\n${view.user.notes}`
               : `${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" })} ${noteText.trim()}`,
           }),
         });
@@ -286,7 +330,7 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
             <div className="flex-1 overflow-y-auto px-5 pb-8">
               {subState === "detail" && (
                 <DetailView
-                  booking={booking}
+                  booking={view}
                   currentSegment={currentSegment}
                   isFinal={isFinal}
                   loading={loading}
@@ -300,7 +344,7 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
 
               {subState === "notes" && (
                 <NotesView
-                  booking={booking}
+                  booking={view}
                   noteText={noteText}
                   onChange={setNoteText}
                   onSave={handleSaveNote}
@@ -310,7 +354,7 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
 
               {subState === "reschedule" && (
                 <RescheduleView
-                  booking={booking}
+                  booking={view}
                   date={rescheduleDate}
                   time={rescheduleTime}
                   loading={loading}
@@ -327,7 +371,7 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
 
       {/* Checkout flow — opens as a nested full-page sheet on top of detail. */}
       <CheckoutFullPage
-        booking={booking}
+        booking={view}
         open={checkoutOpen}
         onOpenChange={setCheckoutOpen}
         onCompleted={handleCheckoutComplete}
