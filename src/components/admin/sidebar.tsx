@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAdmin } from "@/lib/admin/auth-context";
 import { useState, useEffect } from "react";
 import useSWR from "swr";
@@ -20,6 +20,7 @@ import {
   Ticket,
   FileBarChart,
   Settings,
+  X,
 } from "lucide-react";
 
 interface NavItem {
@@ -30,8 +31,9 @@ interface NavItem {
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
-  { href: "/dashboard", label: "儀表板", Icon: LayoutDashboard },
+  // V3.5 Phase 4: 行事曆是 app 的根 — 排第一，其他頁面從這裡發散出去。
   { href: "/calendar", label: "行事曆", Icon: Calendar },
+  { href: "/dashboard", label: "儀表板", Icon: LayoutDashboard },
   { href: "/bookings/new", label: "新增預約", Icon: Plus },
   { href: "/customers", label: "顧客管理", Icon: Users },
   { href: "/services", label: "服務項目", Icon: Scissors },
@@ -50,8 +52,17 @@ const sidebarFetcher = (url: string) =>
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { admin, logout } = useAdmin();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // V3.5 Phase 4: 日曆是 app 的根 — 其他頁面在行動版 top bar 顯示「X 回日曆」
+  // 而不是漢堡選單。漢堡只在 /calendar 上才出現。Tab bar 仍然永遠顯示。
+  const isOnCalendar = pathname === "/calendar" || pathname.startsWith("/calendar/");
+  const currentPageLabel =
+    NAV_ITEMS.find(
+      (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
+    )?.label ?? "理髮廳";
 
   // Live consultation pending count — drives the sidebar red dot.
   // Refresh every 60s, plus when admin navigates back from /consultations.
@@ -134,24 +145,42 @@ export function AdminSidebar() {
 
   return (
     <>
-      {/* Mobile top bar */}
+      {/* Mobile top bar — calendar shows hamburger; other pages show X→日曆.
+          The drawer-style sidebar is still reachable from /calendar via the
+          hamburger; non-calendar pages emphasize "you're a step away from
+          the root, tap X to return". */}
       <div className="fixed top-0 left-0 right-0 h-14 bg-card border-b border-border flex items-center px-4 z-40 lg:hidden">
-        <button
-          onClick={() => setMobileOpen(!mobileOpen)}
-          className="p-2 -ml-2 text-muted-foreground hover:text-foreground"
-          aria-label="Toggle menu"
-        >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            {mobileOpen ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            )}
-          </svg>
-        </button>
-        <span className="ml-3 font-semibold text-foreground">
-          {admin?.tenant.businessName || "理髮廳"}
-        </span>
+        {isOnCalendar ? (
+          <>
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="p-2 -ml-2 text-muted-foreground hover:text-foreground"
+              aria-label="Toggle menu"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                {mobileOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
+            </button>
+            <span className="ml-3 font-semibold text-foreground">
+              {admin?.tenant.businessName || "理髮廳"}
+            </span>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => router.push("/calendar")}
+              className="p-2 -ml-2 text-muted-foreground hover:text-foreground"
+              aria-label="返回日曆"
+            >
+              <X className="w-6 h-6" strokeWidth={2.2} />
+            </button>
+            <span className="ml-3 font-semibold text-foreground">{currentPageLabel}</span>
+          </>
+        )}
       </div>
 
       {/* Mobile overlay */}
