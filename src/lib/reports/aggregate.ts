@@ -380,6 +380,140 @@ export async function computeServicePie(tenantId: string, r: TimeRange): Promise
     .map(([category, v]) => ({ category, count: v.count, revenue: v.revenue }));
 }
 
+interface ServiceMixByCustomerEntry {
+  category: string;
+  newCount: number;       // bookings by first-time customers (firstVisitAt within range)
+  returningCount: number; // bookings by customers who visited before this range
+}
+
+/**
+ * Same categorisation as computeServicePie, but splits each category into
+ * "新" (this customer's firstVisitAt is inside the range — first-time visitor
+ * of the period) vs "熟" (returning customer). Powers the V3.5 "服務組合 split
+ * 新熟" widget — e.g. tells the owner染髮 is mostly熟客，剪髮新客比例最高.
+ */
+export async function computeServiceMixByCustomer(
+  tenantId: string,
+  r: TimeRange,
+): Promise<ServiceMixByCustomerEntry[]> {
+  const bookings = await prisma.booking.findMany({
+    where: {
+      tenantId,
+      date: { gte: r.from, lte: r.to },
+      status: { in: [...ACTIVE_STATUSES] },
+    },
+    select: {
+      service: { select: { name: true } },
+      user: { select: { firstVisitAt: true } },
+    },
+  });
+
+  const map = new Map<string, { newCount: number; returningCount: number }>();
+  for (const b of bookings) {
+    const cat = categorize(b.service.name);
+    const acc = map.get(cat) ?? { newCount: 0, returningCount: 0 };
+    const isNew =
+      b.user?.firstVisitAt != null &&
+      b.user.firstVisitAt.getTime() >= r.from.getTime() &&
+      b.user.firstVisitAt.getTime() <= r.to.getTime();
+    if (isNew) acc.newCount++;
+    else acc.returningCount++;
+    map.set(cat, acc);
+  }
+
+  return Array.from(map.entries())
+    .sort(
+      (a, b) =>
+        b[1].newCount + b[1].returningCount - (a[1].newCount + a[1].returningCount),
+    )
+    .map(([category, v]) => ({
+      category,
+      newCount: v.newCount,
+      returningCount: v.returningCount,
+    }));
+}
+
+interface ShopSourceQuarterEntry {
+  label: string;          // "2025 Q1"
+  fromIso: string;
+  toIso: string;
+  shopNew: number;        // first-time-at-this-shop customers (新 prefix or post-launch)
+  shopOld: number;        // moved over from old shop (Excel without 新 prefix)
+}
+
+/**
+ * For the V3.5 客戶來源 widget. Returns the last `n` quarters relative to the
+ * given range (anchored to range.to year+quarter), each with shopNew /
+ * shopOld counts. Same first-booking-notes inspection as computeTotals — just
+ * extended across quarters so the owner sees the trend (老闆 explicitly asked
+ * for 季度成長 in the second interview).
+ */
+export async function computeShopSourceByQuarter(
+  tenantId: string,
+  anchor: TimeRange,
+  quarters = 4,
+): Promise<ShopSourceQuarterEntry[]> {
+  const result: ShopSourceQuarterEntry[] = [];
+  const isoOfDate = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+
+  // Anchor: derive (year, quarter) of anchor.to in Taipei
+  const anchorIso = isoOfDate(anchor.to);
+  const [aY, aM] = anchorIso.split("-").map(Number);
+  const aQ = Math.floor((aM - 1) / 3); // 0..3
+
+  for (let i = quarters - 1; i >= 0; i--) {
+    const idx = aY * 4 + aQ - i;
+    const y = Math.floor(idx / 4);
+    const q = ((idx % 4) + 4) % 4;
+    const startMonth = q * 3 + 1;
+    const endMonth = startMonth + 2;
+    const lastDay = new Date(y, endMonth, 0).getDate();
+    const from = new Date(Date.UTC(y, startMonth - 1, 1, -8, 0, 0));
+    const to = new Date(Date.UTC(y, endMonth - 1, lastDay, 15, 59, 59, 999));
+
+    const newInQuarter = await prisma.user.findMany({
+      where: { tenantId, firstVisitAt: { gte: from, lte: to } },
+      select: { id: true },
+    });
+    if (newInQuarter.length === 0) {
+      result.push({
+        label: `${y} Q${q + 1}`,
+        fromIso: isoOfDate(from),
+        toIso: isoOfDate(to),
+        shopNew: 0,
+        shopOld: 0,
+      });
+      continue;
+    }
+    const ids = newInQuarter.map((u) => u.id);
+    const firstBookings = await prisma.booking.findMany({
+      where: { tenantId, userId: { in: ids } },
+      select: { userId: true, date: true, notes: true },
+      orderBy: [{ date: "asc" }, { startTime: "asc" }],
+    });
+    const seen = new Set<string>();
+    let shopNew = 0;
+    let shopOld = 0;
+    for (const b of firstBookings) {
+      if (seen.has(b.userId)) continue;
+      seen.add(b.userId);
+      const notes = b.notes ?? "";
+      const isExcel = notes.startsWith("原始 Excel:");
+      const isFreshAtShop = !isExcel || notes.startsWith("原始 Excel: 新");
+      if (isFreshAtShop) shopNew++;
+      else shopOld++;
+    }
+    result.push({
+      label: `${y} Q${q + 1}`,
+      fromIso: isoOfDate(from),
+      toIso: isoOfDate(to),
+      shopNew,
+      shopOld,
+    });
+  }
+  return result;
+}
+
 interface HeatmapResult {
   weekdays: string[];
   hours: string[];

@@ -4,6 +4,17 @@ import { useState } from "react";
 import useSWR from "swr";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
+import { WidgetSection } from "@/components/admin/reports/widget-section";
+import {
+  DiagnosisBanner,
+  diagnoseOneTimerRate,
+  diagnoseOccupancyRate,
+  diagnoseRetention90,
+  diagnoseGapDays,
+} from "@/components/admin/reports/diagnosis-banner";
+import { HeroEstimate } from "@/components/admin/reports/hero-estimate";
+import { ShopSourceBar } from "@/components/admin/reports/shop-source-bar";
+import { ServiceMixByCustomerWidget } from "@/components/admin/reports/service-mix-by-customer";
 
 // ─── Types (match GET /api/reports response) ─────────────────────────────
 
@@ -74,6 +85,20 @@ interface PaymentMixEntry {
   amount: number;
 }
 
+interface ServiceMixByCustomerEntry {
+  category: string;
+  newCount: number;
+  returningCount: number;
+}
+
+interface ShopSourceQuarterEntry {
+  label: string;
+  fromIso: string;
+  toIso: string;
+  shopNew: number;
+  shopOld: number;
+}
+
 interface ReportsResponse {
   range: { type: RangeType; offset: number; label: string; fromIso: string; toIso: string };
   previousLabel: string;
@@ -81,6 +106,8 @@ interface ReportsResponse {
   previousTotals: Totals;
   trend: TrendPoint[];
   servicePie: ServicePieEntry[];
+  serviceMixByCustomer: ServiceMixByCustomerEntry[];
+  shopSourceQuarters: ShopSourceQuarterEntry[];
   heatmap: { weekdays: string[]; hours: string[]; data: number[][] };
   topServices: TopServiceEntry[];
   topCustomers: TopCustomerEntry[];
@@ -94,16 +121,6 @@ const fetcher = (url: string) =>
     if (!r.ok) throw new Error(`${r.status}`);
     return r.json();
   });
-
-const SERVICE_COLORS: Record<string, string> = {
-  剪: "bg-[var(--color-brand)]",
-  燙: "bg-[var(--color-service-perm)]",
-  染: "bg-[var(--color-service-color)]",
-  漂: "bg-[var(--color-warning)]",
-  護: "bg-[var(--color-success)]",
-  洗: "bg-[var(--color-success)]/60",
-  其他: "bg-[var(--color-text-muted)]",
-};
 
 const RANGE_LABELS: Record<RangeType, string> = {
   week: "週",
@@ -245,10 +262,18 @@ function ReportsContent({ data }: { data: ReportsResponse }) {
   }
 
   return (
-    <>
-      {/* KPI cards with ±% comparison. `primary` = the big readable headline
-          (e.g. "NT$135萬"), `secondary` = full-precision context underneath
-          ("1,348,900 元"). Stops 7-figure revenue from getting clipped. */}
+    <div className="space-y-6">
+      {/* Hero estimate — V3.5 wow moment, sits above everything else */}
+      <HeroEstimate
+        revenue={data.totals.revenue}
+        oneTimerRate={data.totals.oneTimerRate}
+        occupancyRate={data.totals.occupancyRate}
+        rangeLabel={data.range.label}
+      />
+
+      {/* KPI strip — primary big-number + secondary context. `primary` =
+          "NT$135萬" headline, `secondary` = "1,348,900 元" full precision.
+          Stops 7-figure revenue clip + adds inline benchmark hint to 佔用率. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard
           label="營收"
@@ -260,15 +285,17 @@ function ReportsContent({ data }: { data: ReportsResponse }) {
           tone="brand"
         />
         <KpiCard
-          label="預約數"
-          primary={data.totals.bookings.toLocaleString()}
-          prevValue={data.previousTotals.bookings}
-          curValue={data.totals.bookings}
+          label="客戶"
+          primary={data.totals.uniqueCustomers.toLocaleString()}
+          secondary={`新客 ${data.totals.newCustomers}`}
+          prevValue={data.previousTotals.uniqueCustomers}
+          curValue={data.totals.uniqueCustomers}
           previousLabel={data.previousLabel}
         />
         <KpiCard
           label="客單價"
           primary={`NT$${data.totals.arpu.toLocaleString()}`}
+          secondary={`年訪 ${data.totals.visitFrequency} 次/人`}
           prevValue={data.previousTotals.arpu}
           curValue={data.totals.arpu}
           previousLabel={data.previousLabel}
@@ -276,7 +303,7 @@ function ReportsContent({ data }: { data: ReportsResponse }) {
         <KpiCard
           label="佔用率"
           primary={`${data.totals.occupancyRate}%`}
-          secondary={data.totals.occupancyRate < 75 ? `業界健康 75%+` : "🟢 達標"}
+          secondary={data.totals.occupancyRate < 75 ? "業界健康 75%+" : "🟢 達標"}
           prevValue={data.previousTotals.occupancyRate}
           curValue={data.totals.occupancyRate}
           previousLabel={data.previousLabel}
@@ -284,34 +311,59 @@ function ReportsContent({ data }: { data: ReportsResponse }) {
         />
       </div>
 
-      {/* Secondary stats */}
+      {/* Secondary ratios */}
       <div className="grid grid-cols-3 gap-3 text-xs">
-        <SecondaryStat label="新客" value={data.totals.newCustomers} />
+        <SecondaryStat label="預約數" value={data.totals.bookings.toLocaleString()} />
         <SecondaryStat label="取消率" value={`${data.totals.cancellationRate}%`} />
         <SecondaryStat label="No-show 率" value={`${data.totals.noShowRate}%`} />
       </div>
 
-      {/* Trend chart */}
-      <TrendWidget trend={data.trend} rangeType={data.range.type} />
+      {/* ── 客戶診斷 — V3.5 hero diagnosis section ─────────────────────── */}
+      <WidgetSection
+        title="客戶診斷"
+        subtitle="把客戶結構攤開，找出最大的營收 leverage"
+      >
+        <DiagnosisBanner diagnosis={diagnoseOneTimerRate(data.totals.oneTimerRate)} />
+        <DiagnosisBanner diagnosis={diagnoseRetention90(data.retention.retention90Days)} />
+        <DiagnosisBanner diagnosis={diagnoseGapDays(data.totals.medianGapDays)} />
+        <DiagnosisBanner diagnosis={diagnoseOccupancyRate(data.totals.occupancyRate)} />
+      </WidgetSection>
 
-      {/* Service pie */}
-      <ServicePieWidget servicePie={data.servicePie} />
+      {/* ── 客戶來源 ─ shop-source split per quarter ───────────────────── */}
+      <WidgetSection
+        title="客戶來源"
+        subtitle="近 4 季新進客戶（新店面客 vs 從舊店搬過來）"
+      >
+        <ShopSourceBar quarters={data.shopSourceQuarters} />
+      </WidgetSection>
 
-      {/* Customer segment ring */}
-      <CustomerSegmentWidget segments={data.customerSegments} />
+      {/* ── 客戶活躍度 ─ existing segment donut ────────────────────────── */}
+      <WidgetSection title="客戶活躍度" subtitle="按頻率 + 最近到訪分層">
+        <CustomerSegmentWidget segments={data.customerSegments} />
+      </WidgetSection>
 
-      {/* Heatmap */}
-      <HeatmapWidget heatmap={data.heatmap} />
+      {/* ── 服務組合 ─ split 新熟 + Top services table ─────────────────── */}
+      <WidgetSection title="服務組合" subtitle="同時看「服務在誰身上」+「Top 排行」">
+        <ServiceMixByCustomerWidget mix={data.serviceMixByCustomer} />
+        <TopServicesWidget services={data.topServices} />
+      </WidgetSection>
 
-      {/* Top customers */}
-      <TopCustomersWidget customers={data.topCustomers} />
+      {/* ── 時段 ─ 趨勢 + 熱力圖 ───────────────────────────────────────── */}
+      <WidgetSection title="時段（產能利用）" subtitle="哪些時段空著沒填，哪些天最忙">
+        <TrendWidget trend={data.trend} rangeType={data.range.type} />
+        <HeatmapWidget heatmap={data.heatmap} />
+      </WidgetSection>
 
-      {/* Top services */}
-      <TopServicesWidget services={data.topServices} />
+      {/* ── VIP Top 20 ─────────────────────────────────────────────────── */}
+      <WidgetSection title="VIP 客戶" subtitle="按本期消費總額排序">
+        <TopCustomersWidget customers={data.topCustomers} />
+      </WidgetSection>
 
-      {/* Payment mix */}
-      <PaymentMixWidget mix={data.paymentMix} />
-    </>
+      {/* ── 收款方式 ────────────────────────────────────────────────────── */}
+      <WidgetSection title="收款方式" subtitle="本期已收款分布">
+        <PaymentMixWidget mix={data.paymentMix} />
+      </WidgetSection>
+    </div>
   );
 }
 
@@ -417,41 +469,6 @@ function TrendWidget({ trend, rangeType }: { trend: TrendPoint[]; rangeType: Ran
             </div>
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-function ServicePieWidget({ servicePie }: { servicePie: ServicePieEntry[] }) {
-  if (servicePie.length === 0) return null;
-  const total = servicePie.reduce((s, p) => s + p.count, 0);
-  return (
-    <div className="bg-[var(--color-surface)] rounded-2xl p-5">
-      <h2 className="text-sm font-bold text-[var(--color-text-primary)] mb-1">服務分布</h2>
-      <p className="text-xs text-[var(--color-text-muted)] mb-4">按類別歸類，總計 {total} 筆</p>
-      <div className="space-y-2">
-        {servicePie.map((p) => {
-          const pct = (p.count / total) * 100;
-          return (
-            <div key={p.category} className="flex items-center gap-3">
-              <span className="text-sm font-semibold w-8 shrink-0 text-[var(--color-text-primary)]">
-                {p.category}
-              </span>
-              <div className="flex-1 bg-[var(--color-bg)] rounded h-5 overflow-hidden">
-                <div
-                  className={`h-full rounded ${SERVICE_COLORS[p.category] || SERVICE_COLORS["其他"]}`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <span className="text-xs text-[var(--color-text-body)] w-32 text-right tabular-nums">
-                {p.count} 筆 · NT${p.revenue.toLocaleString()}
-              </span>
-              <span className="text-xs text-[var(--color-text-muted)] w-12 text-right tabular-nums">
-                {pct.toFixed(1)}%
-              </span>
-            </div>
-          );
-        })}
       </div>
     </div>
   );
