@@ -28,8 +28,12 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
+      # Pin to `main` regardless of which ref the workflow_dispatch was triggered
+      # from. Without this, a manual run from a feature branch would later push
+      # that branch's tip to main alongside the report. Codex P1 (2026-04-27).
       - uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
       - name: Set up Node
@@ -146,10 +150,15 @@ jobs:
           REPORT="docs/security-reports/${{ steps.today.outputs.date }}.md"
           git config user.name "security-bot"
           git config user.email "security-bot@users.noreply.github.com"
-          git add "$REPORT"
+          # Pathspec-restricted add — even if other files were modified during
+          # the workflow (e.g. cache writes), only the report can be staged.
+          git add -- "$REPORT"
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
             git commit -m "chore(security): daily report ${{ steps.today.outputs.date }}"
-            git push origin HEAD:main
+            # Explicit `main:main` — never `HEAD:main`. With actions/checkout
+            # pinned to `main` above this is belt-and-braces, but safer in case
+            # someone tweaks the checkout step later.
+            git push origin main:main
           fi

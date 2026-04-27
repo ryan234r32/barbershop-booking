@@ -226,6 +226,40 @@ describe("POST /api/bookings/[id]/checkout", () => {
     );
   });
 
+  it("accepts amount=0 (fully comped visit) — Codex P2 regression pin", async () => {
+    // The form lets admins enter 0 for a 100% comp / friend visit. Schema
+    // was previously z.number().positive() and rejected 0 with 400 even
+    // though the UI passed it through. Now nonnegative().
+    getAdminFromCookie.mockResolvedValue(ADMIN);
+    findFirst.mockResolvedValue(baseBooking);
+
+    const txPaymentUpsert = vi.fn().mockResolvedValue({});
+    $transaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
+      cb({
+        booking: {
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          findFirst: vi.fn().mockResolvedValue({
+            id: "b1",
+            status: "COMPLETED",
+            checkedInAt: baseBooking.checkedInAt,
+            updatedAt: new Date(),
+            payment: null,
+          }),
+        },
+        user: { update: vi.fn().mockResolvedValue({}) },
+        payment: { upsert: txPaymentUpsert },
+      }),
+    );
+
+    const res = await POST(req({ method: "CASH", amount: 0 }), params());
+    expect(res.status).toBe(200);
+    expect(txPaymentUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ amount: 0, method: "CASH" }),
+      }),
+    );
+  });
+
   it("stale write (expectedUpdatedAt mismatch) → 409, no transaction", async () => {
     getAdminFromCookie.mockResolvedValue(ADMIN);
     findFirst.mockResolvedValue(baseBooking);
