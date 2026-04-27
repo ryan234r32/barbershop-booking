@@ -19,10 +19,34 @@
 
 import { useEffect, useState } from "react";
 import { Drawer } from "vaul";
+import { Plus, X } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 
 export type PaymentMethod = "CASH" | "BANK_TRANSFER" | "ECPAY_ATM";
+
+/**
+ * Free-text 加購商品 line item — kept lightweight per V3.5 plan §4 (no
+ * Product table). Owner sells products rarely (~handful per month) so the
+ * value of full SKU tracking doesn't justify a schema migration. Items are
+ * rendered into Payment.notes as human-readable breakdown so it shows up in
+ *付款對帳 + 現金流 history without changing aggregations.
+ */
+interface ProductLine {
+  id: string;
+  name: string;
+  price: number | "";
+}
+
+function newProductLine(): ProductLine {
+  // crypto.randomUUID() exists in modern browsers + Node — used purely as
+  // a stable React key so reordering doesn't cause input remounts.
+  return {
+    id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()),
+    name: "",
+    price: "",
+  };
+}
 
 interface BookingForCheckout {
   id: string;
@@ -53,7 +77,8 @@ const METHODS: Array<{ key: PaymentMethod; label: string; description: string }>
 export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: Props) {
   const [step, setStep] = useState<"review" | "method">("review");
   const [method, setMethod] = useState<PaymentMethod>("CASH");
-  const [amount, setAmount] = useState<number | "">("");
+  const [serviceAmount, setServiceAmount] = useState<number | "">("");
+  const [products, setProducts] = useState<ProductLine[]>([]);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -63,7 +88,8 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
     if (open && booking) {
       setStep("review");
       setMethod("CASH");
-      setAmount("");
+      setServiceAmount("");
+      setProducts([]);
       setNotes("");
       setLoading(false);
     }
@@ -71,21 +97,68 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
 
   if (!booking) return null;
 
-  const finalAmount = typeof amount === "number" ? amount : booking.service.price;
+  // Service total = override (if set) or price from service.
+  const serviceTotal = typeof serviceAmount === "number" ? serviceAmount : booking.service.price;
+  const productsTotal = products.reduce(
+    (sum, p) => sum + (typeof p.price === "number" ? p.price : 0),
+    0,
+  );
+  const finalAmount = serviceTotal + productsTotal;
+
+  const addProduct = () => setProducts((prev) => [...prev, newProductLine()]);
+  const updateProduct = (id: string, patch: Partial<ProductLine>) =>
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  const removeProduct = (id: string) =>
+    setProducts((prev) => prev.filter((p) => p.id !== id));
 
   const handleSubmit = async () => {
     if (loading) return;
+    // Validation: every visible product must have a non-empty name AND a positive price.
+    const validProducts = products.filter((p) => p.name.trim() && typeof p.price === "number" && p.price > 0);
+    const incompleteProducts = products.filter((p) => p.name.trim() || (typeof p.price === "number" && p.price > 0)).length - validProducts.length;
+    if (incompleteProducts > 0) {
+      toast({ type: "error", message: "加購商品的名稱和金額都要填" });
+      return;
+    }
+
     setLoading(true);
     try {
+      // Build a human-readable breakdown for Payment.notes so future bookkeeping
+      // can see the product mix without a separate table. Format:
+      //   服務: 男性剪髮 NT$1,000 (折扣後)
+      //   商品: 造型品 NT$600 / 護髮油 NT$200
+      //   --
+      //   {admin's manual note if any}
+      const lines: string[] = [];
+      if (serviceTotal !== booking.service.price) {
+        lines.push(
+          `服務: ${booking.service.name} NT$${serviceTotal.toLocaleString()}（原價 ${booking.service.price.toLocaleString()}，已調整）`,
+        );
+      } else {
+        lines.push(`服務: ${booking.service.name} NT$${serviceTotal.toLocaleString()}`);
+      }
+      if (validProducts.length > 0) {
+        const breakdown = validProducts
+          .map((p) => `${p.name.trim()} NT$${(p.price as number).toLocaleString()}`)
+          .join(" / ");
+        lines.push(`商品: ${breakdown}`);
+      }
+      if (notes.trim()) {
+        lines.push("--");
+        lines.push(notes.trim());
+      }
+      const composedNotes = lines.join("\n");
+
       const res = await fetch(`/api/bookings/${booking.id}/checkout`, {
         method: "POST",
         headers: adminHeaders(),
         body: JSON.stringify({
           method,
-          // Only send amount when admin overrode it — otherwise let the server
-          // default to service.price (single source of truth).
-          ...(typeof amount === "number" ? { amount } : {}),
-          ...(notes.trim() ? { notes: notes.trim() } : {}),
+          // Always send the computed grand total — server defaults to
+          // service.price if amount is omitted, but we now have products on
+          // top of (or in place of) the service price, so be explicit.
+          amount: finalAmount,
+          notes: composedNotes,
           ...(booking.updatedAt ? { expectedUpdatedAt: booking.updatedAt } : {}),
         }),
       });
@@ -168,21 +241,21 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
                 <p className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider mb-2">
                   服務項目
                 </p>
-                <div className="rounded-lg border border-[var(--color-surface)] mb-4">
+                <div className="rounded-lg border border-[var(--color-surface)] mb-3">
                   <div className="flex items-center justify-between px-4 py-3">
                     <span className="text-sm text-[var(--color-text-primary)]">
                       {booking.service.name}
                     </span>
-                    <span className="text-sm font-medium text-[var(--color-text-primary)]">
-                      NT${booking.service.price.toLocaleString()}
+                    <span className="text-sm font-medium text-[var(--color-text-primary)] tabular-nums">
+                      NT${serviceTotal.toLocaleString()}
                     </span>
                   </div>
                 </div>
 
-                {/* Override amount */}
-                <details className="mb-4">
+                {/* Service amount override */}
+                <details className="mb-5">
                   <summary className="text-xs text-[var(--color-text-muted)] cursor-pointer select-none">
-                    調整總額（折扣 / 加價）
+                    調整服務金額（折扣 / 加價）
                   </summary>
                   <div className="mt-2 flex items-center gap-2">
                     <span className="text-xs text-[var(--color-text-muted)]">NT$</span>
@@ -190,19 +263,81 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
                       type="number"
                       inputMode="numeric"
                       placeholder={String(booking.service.price)}
-                      value={amount === "" ? "" : amount}
+                      value={serviceAmount === "" ? "" : serviceAmount}
                       onChange={(e) => {
                         const v = e.target.value;
-                        if (v === "") setAmount("");
+                        if (v === "") setServiceAmount("");
                         else {
                           const n = Number(v);
-                          if (Number.isFinite(n) && n >= 0) setAmount(Math.floor(n));
+                          if (Number.isFinite(n) && n >= 0) setServiceAmount(Math.floor(n));
                         }
                       }}
                       className="flex-1 border-b border-[var(--color-brand)] bg-transparent py-1.5 text-sm text-[var(--color-text-body)] outline-none"
                     />
                   </div>
                 </details>
+
+                {/* Products (free text — see ProductLine docstring at top) */}
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider">
+                    加購商品
+                  </p>
+                  <button
+                    type="button"
+                    onClick={addProduct}
+                    className="flex items-center gap-1 text-xs text-[var(--color-brand)] hover:opacity-80 transition-opacity"
+                  >
+                    <Plus size={14} />
+                    新增商品
+                  </button>
+                </div>
+                {products.length === 0 ? (
+                  <p className="text-[11px] text-[var(--color-text-muted)] mb-5">
+                    若客人有加購商品（造型品、護髮油等）請點「新增商品」加入。
+                  </p>
+                ) : (
+                  <div className="space-y-2 mb-5">
+                    {products.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center gap-2 rounded-lg border border-[var(--color-surface)] px-3 py-2"
+                      >
+                        <input
+                          value={p.name}
+                          onChange={(e) => updateProduct(p.id, { name: e.target.value })}
+                          placeholder="商品名稱"
+                          className="flex-1 min-w-0 bg-transparent text-sm text-[var(--color-text-body)] outline-none placeholder:text-[var(--color-text-disabled)]"
+                          aria-label="商品名稱"
+                        />
+                        <span className="text-xs text-[var(--color-text-muted)] shrink-0">NT$</span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={p.price === "" ? "" : p.price}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v === "") updateProduct(p.id, { price: "" });
+                            else {
+                              const n = Number(v);
+                              if (Number.isFinite(n) && n >= 0) updateProduct(p.id, { price: Math.floor(n) });
+                            }
+                          }}
+                          placeholder="0"
+                          className="w-20 bg-transparent text-sm text-[var(--color-text-body)] outline-none text-right placeholder:text-[var(--color-text-disabled)] tabular-nums"
+                          aria-label="商品金額"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeProduct(p.id)}
+                          aria-label="移除商品"
+                          className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Notes */}
                 <div className="mb-6">

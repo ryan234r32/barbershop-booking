@@ -19,7 +19,7 @@ import { logger } from "@/lib/utils/logger";
 import {
   ECPAY_API_TIMEOUT_MS,
 } from "@/lib/utils/constants";
-import { nowTaipei, formatDateToISO } from "@/lib/utils/time";
+import { formatDateToISO, todayInTaipei } from "@/lib/utils/time";
 import { loadECPayConfig } from "./config";
 import { createEcpaySdk } from "./client";
 import {
@@ -124,9 +124,10 @@ export async function createEcpayAtmOrder(
       throw new AppError("此預約無法建立付款", 409, "BOOKING_NOT_CONFIRMED");
     }
 
-    // 2. Reject past bookings (Taipei tz)
-    const now = nowTaipei();
-    const todayISO = formatDateToISO(now);
+    // 2. Reject past bookings (Taipei tz). Uses todayInTaipei() — nowTaipei()
+    // has a UTC-server day-shift bug that makes today look like tomorrow
+    // during Taipei afternoon, falsely rejecting same-day bookings.
+    const todayISO = todayInTaipei();
     const bookingDateISO = formatDateToISO(booking.date);
     if (bookingDateISO < todayISO) {
       throw new AppError("此預約已過期，無法建立付款", 409, "BOOKING_IN_PAST");
@@ -168,7 +169,7 @@ export async function createEcpayAtmOrder(
     const merchantTradeDateSource = new Date();
     const merchantTradeNo = generateMerchantTradeNo({ bookingId });
     const merchantTradeDate = formatMerchantTradeDate(merchantTradeDateSource);
-    const expireDays = computeExpireDays(booking.date, now);
+    const expireDays = computeExpireDays(booking.date, nowDate);
 
     // 7. Tx: upsert Payment (AWAITING_BANK) + insert ECPayOrder (PENDING).
     //    COMMIT BEFORE calling ECPay so webhook can always locate the row.

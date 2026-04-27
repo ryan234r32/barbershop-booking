@@ -10,7 +10,7 @@ import { createBookingSchema } from "@/lib/utils/validation";
 import { errorResponse, AppError, SlotUnavailableError, BookingRestrictedError } from "@/lib/utils/errors";
 import { requireBookingAuth } from "@/lib/auth/booking-auth";
 import { randomUUID } from "node:crypto";
-import { addHours, parseTimeToHour, nowTaipei } from "@/lib/utils/time";
+import { addHours, parseTimeToHour, todayInTaipei } from "@/lib/utils/time";
 import { DEFAULT_BUSINESS_HOURS } from "@/lib/utils/constants";
 import { logger } from "@/lib/utils/logger";
 
@@ -112,8 +112,11 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Service not found" }, { status: 404 });
     }
 
-    // 1b. Validate date is not in the past (Taipei timezone)
-    const today = nowTaipei().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+    // 1b. Validate date is not in the past (Taipei timezone).
+    // Uses todayInTaipei() — direct Date → toLocaleDateString — instead of
+    // routing through nowTaipei(), which has a known TZ bug on UTC servers
+    // (Vercel) that shifts the day to "tomorrow" between Taipei 16:00–24:00.
+    const today = todayInTaipei();
     if (input.date < today) {
       throw new AppError("預約日期不可為過去", 400, "PAST_DATE");
     }

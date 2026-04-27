@@ -3,8 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getLineClient } from "@/lib/line/client";
 import { dailySettlementMessage } from "@/lib/line/messages";
 import { verifyCronSecret } from "@/lib/utils/cron-auth";
-import { nowTaipei } from "@/lib/utils/time";
-import { TIMEZONE } from "@/lib/utils/constants";
+import { todayInTaipei } from "@/lib/utils/time";
 import { logger } from "@/lib/utils/logger";
 
 /** GET /api/cron/daily-settlement — push daily settlement to admin at 20:30 Taipei */
@@ -19,8 +18,8 @@ export async function GET(request: NextRequest) {
       return Response.json({ success: true, skipped: true, reason: "ADMIN_LINE_USER_ID not set" });
     }
 
-    const now = nowTaipei();
-    const todayStr = now.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+    // todayInTaipei() avoids the nowTaipei() UTC-server day-shift bug.
+    const todayStr = todayInTaipei();
     const todayDate = new Date(todayStr + "T00:00:00.000Z");
 
     // Get all tenants (for multi-tenant support)

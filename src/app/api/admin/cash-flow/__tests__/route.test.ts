@@ -16,7 +16,7 @@ vi.mock("@/lib/auth/jwt", () => ({
 }));
 
 vi.mock("@/lib/utils/time", () => ({
-  nowTaipei: () => new Date("2026-04-27T12:00:00+08:00"),
+  todayInTaipei: () => "2026-04-27",
 }));
 
 import { GET } from "@/app/api/admin/cash-flow/route";

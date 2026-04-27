@@ -2,8 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
 import { errorResponse } from "@/lib/utils/errors";
-import { nowTaipei, formatTime } from "@/lib/utils/time";
-import { TIMEZONE } from "@/lib/utils/constants";
+import { nowTaipei, formatTime, todayInTaipei } from "@/lib/utils/time";
 
 /** GET /api/bookings/past-due — list CONFIRMED bookings whose time has passed */
 export async function GET(request: NextRequest) {
@@ -13,9 +12,11 @@ export async function GET(request: NextRequest) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const now = nowTaipei();
-    const todayStr = now.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
-    const currentTime = formatTime(now);
+    // Date uses todayInTaipei() (TZ-safe). Time keeps nowTaipei() because
+    // formatTime → .getHours() coincidentally returns Taipei wall-clock on
+    // UTC servers thanks to the buggy nowTaipei() shift.
+    const todayStr = todayInTaipei();
+    const currentTime = formatTime(nowTaipei());
 
     const pastDue = await prisma.booking.findMany({
       where: {

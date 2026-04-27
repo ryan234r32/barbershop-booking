@@ -5,7 +5,7 @@ import { requireBookingAuth, requireAdmin } from "@/lib/auth/booking-auth";
 import { errorResponse, AppError, SlotUnavailableError } from "@/lib/utils/errors";
 import { isSlotAvailable } from "@/lib/booking/availability";
 import { acquireBookingLock, releaseBookingLock } from "@/lib/booking/lock";
-import { addHours, parseTimeToHour, nowTaipei } from "@/lib/utils/time";
+import { addHours, parseTimeToHour, todayInTaipei } from "@/lib/utils/time";
 import { DEFAULT_BUSINESS_HOURS } from "@/lib/utils/constants";
 import { getLineClient } from "@/lib/line/client";
 import { bookingConfirmationMessage } from "@/lib/line/messages";
@@ -57,7 +57,8 @@ export async function POST(
     });
     if (!service) throw new AppError("找不到服務", 404, "SERVICE_NOT_FOUND");
 
-    const today = nowTaipei().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+    // todayInTaipei() avoids the nowTaipei() UTC-server day-shift bug.
+    const today = todayInTaipei();
     if (data.date < today) throw new AppError("預約日期不可為過去", 400, "PAST_DATE");
 
     const startHour = parseTimeToHour(data.startTime);
