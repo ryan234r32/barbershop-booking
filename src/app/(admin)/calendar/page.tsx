@@ -19,7 +19,9 @@ import { useCalendarPolling } from "@/lib/hooks/use-calendar-polling";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { useToast } from "@/components/ui/toast";
 import { BookingDetailSheet } from "@/components/admin/booking-detail-sheet";
+import { BookingDetailFullPage } from "@/components/admin/booking-detail-full-page";
 import { NewBookingSheet } from "@/components/admin/new-booking-sheet";
+import { useFullPageBookingDetailFlag } from "@/lib/hooks/use-feature-flags";
 import { UnacknowledgedModal } from "@/components/admin/unacknowledged-modal";
 import { DayView } from "@/components/admin/calendar/day-view";
 import { WeekView } from "@/components/admin/calendar/week-view";
@@ -406,13 +408,24 @@ export default function CalendarPage() {
         hidden={detailSheetOpen || newSheetOpen || unackBookings.length > 0}
       />
 
-      {/* Bottom Sheets */}
-      <BookingDetailSheet
-        booking={selectedBooking}
-        open={detailSheetOpen}
-        onOpenChange={setDetailSheetOpen}
-        onAction={() => mutateBookings()}
-      />
+      {/* Bottom Sheets — V3.5 夯客 full-page detail behind a flag.
+          Default ON (env var unset → true). Set NEXT_PUBLIC_FULL_PAGE_BOOKING_DETAIL=false
+          to fall back to the legacy bottom-sheet during incident rollback. */}
+      {useFullPageBookingDetailFlag() ? (
+        <BookingDetailFullPage
+          booking={selectedBooking}
+          open={detailSheetOpen}
+          onOpenChange={setDetailSheetOpen}
+          onAction={() => mutateBookings()}
+        />
+      ) : (
+        <BookingDetailSheet
+          booking={selectedBooking}
+          open={detailSheetOpen}
+          onOpenChange={setDetailSheetOpen}
+          onAction={() => mutateBookings()}
+        />
+      )}
       <NewBookingSheet
         date={newBookingDate}
         time={newBookingTime}

@@ -262,6 +262,13 @@ model Booking {
   /// /api/bookings/unacknowledged.
   adminAcknowledgedAt DateTime? @map("admin_acknowledged_at")
 
+  /// V3.5 夯客流程：admin 手動點「已報到」的時間戳。
+  /// NULL = 尚未到來；NOT NULL = 已報到。
+  /// 「爽約」走 status = NO_SHOW 路徑，不寫此欄。
+  /// COMPLETED booking 一定有此值（結帳前若仍 NULL 自動補 now()）。
+  /// 既有 COMPLETED 資料無 checkedInAt — 視為「已報到 + 已結帳」grandfather。
+  checkedInAt DateTime? @map("checked_in_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

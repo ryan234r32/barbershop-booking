@@ -26,6 +26,10 @@ export interface Booking {
   createdAt?: string;
   /// PRD-v3 §2 + 1.6b: NULL = admin hasn't seen this booking yet → 紅點 indicator
   adminAcknowledgedAt?: string | null;
+  /// V3.5 夯客 §1.2: NULL = 尚未到來；NOT NULL = 已報到。
+  /// (status=NO_SHOW for 爽約; status=COMPLETED for 已結帳.)
+  checkedInAt?: string | null;
+  updatedAt?: string;
 }
 
 export interface MonthlySummary {
