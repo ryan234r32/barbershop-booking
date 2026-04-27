@@ -1,0 +1,110 @@
+import { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getAdminFromCookie } from "@/lib/auth/jwt";
+import { errorResponse, UnauthorizedError } from "@/lib/utils/errors";
+import { nowTaipei } from "@/lib/utils/time";
+
+// Keep in sync with PaymentMethod enum in prisma/schema.prisma.
+// Phase 2 will add CREDIT_CARD / LINE_PAY / JKO / OTHER.
+type MethodKey = "CASH" | "BANK_TRANSFER" | "ECPAY_ATM";
+
+/**
+ * GET /api/admin/cash-flow?date=YYYY-MM-DD
+ *
+ * V3.5 §1.1.5 每日現金流頁面 — answers 「今天收了多少 + 怎麼來的」.
+ *
+ * Returns receipts (status = RECEIVED) bucketed by:
+ *   - source: fromCheckout (booking status = COMPLETED) vs fromDeposit (any
+ *     other status, e.g. CONFIRMED with ECPay pre-pay or future bookings)
+ *   - method: CASH / BANK_TRANSFER / ECPAY_ATM (enum-driven; Phase 2 will
+ *     add CREDIT_CARD / LINE_PAY / etc.)
+ *
+ * Date semantics: filters on Payment.receivedAt converted to Asia/Taipei
+ * day boundaries. A booking received at 23:30 UTC on 4/26 = 7:30 Taipei on
+ * 4/27 → counts under 4/27.
+ *
+ * Admin-only. Tenant-scoped via booking.tenantId.
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const admin = await getAdminFromCookie(request);
+    if (!admin) throw new UnauthorizedError();
+
+    const { searchParams } = request.nextUrl;
+    const dateParam = searchParams.get("date");
+
+    // Default: today (Taipei).
+    const targetDateStr =
+      dateParam || nowTaipei().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+
+    // Validate YYYY-MM-DD format
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDateStr)) {
+      return Response.json(
+        { error: "invalid_date", message: "date must be YYYY-MM-DD" },
+        { status: 400 },
+      );
+    }
+
+    // Build [start, end) window in UTC corresponding to the Taipei calendar day.
+    // Taipei is UTC+8 with no DST → simple offset.
+    const [y, m, d] = targetDateStr.split("-").map(Number);
+    const start = new Date(Date.UTC(y, m - 1, d, -8, 0, 0)); // 00:00 Taipei
+    const end = new Date(Date.UTC(y, m - 1, d + 1, -8, 0, 0)); // 24:00 Taipei
+
+    // Pull all RECEIVED payments in the window for this tenant, with the
+    // booking status so we can split checkout vs deposit. Tenant scope is
+    // enforced via the nested booking relation.
+    const payments = await prisma.payment.findMany({
+      where: {
+        status: "RECEIVED",
+        receivedAt: { gte: start, lt: end },
+        booking: { tenantId: admin.tenantId },
+      },
+      select: {
+        amount: true,
+        method: true,
+        receivedAt: true,
+        booking: { select: { status: true } },
+      },
+    });
+
+    // Initialize per-method buckets so the response shape is stable even
+    // when no rows exist for a given method.
+    type MethodBucket = { fromCheckout: number; fromDeposit: number; total: number };
+    const byMethod: Record<MethodKey, MethodBucket> = {
+      CASH: { fromCheckout: 0, fromDeposit: 0, total: 0 },
+      BANK_TRANSFER: { fromCheckout: 0, fromDeposit: 0, total: 0 },
+      ECPAY_ATM: { fromCheckout: 0, fromDeposit: 0, total: 0 },
+    };
+
+    let totalReceived = 0;
+    let fromCheckout = 0;
+    let fromDeposit = 0;
+
+    for (const p of payments) {
+      const isCheckout = p.booking?.status === "COMPLETED";
+      const bucket = byMethod[p.method as MethodKey];
+      if (!bucket) continue; // unknown enum value (forward compat) — skip
+      if (isCheckout) {
+        bucket.fromCheckout += p.amount;
+        fromCheckout += p.amount;
+      } else {
+        bucket.fromDeposit += p.amount;
+        fromDeposit += p.amount;
+      }
+      bucket.total += p.amount;
+      totalReceived += p.amount;
+    }
+
+    return Response.json({
+      date: targetDateStr,
+      totalReceived,
+      fromCheckout,
+      fromDeposit,
+      byMethod,
+      count: payments.length,
+    });
+  } catch (err) {
+    return errorResponse(err);
+  }
+}

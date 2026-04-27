@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { PastDueModal } from "@/components/admin/past-due-modal";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
@@ -237,6 +238,13 @@ export default function DashboardPage() {
               {todaySettlement.total} 筆 · 已收 {todaySettlement.receivedCount}
               {todaySettlement.pendingCount > 0 && ` · 待對 ${todaySettlement.pendingCount}`}
             </p>
+            {/* V3.5 §1.1.5 entry to per-method cash-flow breakdown. */}
+            <Link
+              href="/cash-flow"
+              className="inline-flex items-center gap-1 text-[11px] text-[var(--color-brand)] mt-1 hover:underline"
+            >
+              查看每日現金流（按支付方式）→
+            </Link>
           </div>
           <div className="text-right shrink-0">
             <p className="text-xs text-muted-foreground">今日已收</p>
