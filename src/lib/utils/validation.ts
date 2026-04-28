@@ -21,6 +21,23 @@ export const cancelBookingSchema = z.object({
   reason: z.string().optional(),
 });
 
+export const updateProfileSchema = z.object({
+  phone: z
+    .string()
+    .trim()
+    .regex(/^09\d{8}$|^0\d{1,2}-?\d{6,8}$/, "電話格式不正確（例：0912345678）")
+    .optional()
+    .or(z.literal("")),
+  birthday: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "生日格式須為 YYYY-MM-DD")
+    .optional()
+    .or(z.literal("")),
+  gender: z.enum(["MALE", "FEMALE", "OTHER", "PREFER_NOT_TO_SAY"]).optional(),
+  realName: z.string().trim().max(40).optional().or(z.literal("")),
+  legacyName: z.string().trim().max(40).optional().or(z.literal("")),
+});
+
 export const rescheduleBookingSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   startTime: z.string().regex(/^\d{2}:00$/),
