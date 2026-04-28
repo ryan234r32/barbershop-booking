@@ -54,6 +54,19 @@ model Tenant {
   /// Add new keys via PR with this comment block updated.
   featureFlags Json? @default("{}") @map("feature_flags")
 
+  /// V3.6 §4.2 — monthly revenue targets. Key = "YYYY-MM", value = revenue (TWD).
+  /// e.g. {"2026-01": 140000, "2026-02": 130000}.
+  /// Set via /api/admin/year-target (annual radio scenarios) or /reports monthly footer.
+  monthlyTargets Json? @map("monthly_targets")
+
+  /// V3.6 §7.3 — year target metadata: {year, scenario, targetAnnualRevenue, monthlyTargets}.
+  /// scenario ∈ "conservative" | "flat" | "aggressive" | "custom".
+  yearTargets Json? @map("year_targets")
+
+  /// V3.6 §5.2 — daily settlement lock. Key = ISO yyyy-mm-dd, value = closing time ISO string.
+  /// Once a date is keyed here the daily view UI marks it "已結班" + read-only.
+  dayClosedAt Json? @map("day_closed_at")
+
   @@map("tenants")
 }
 
@@ -130,6 +143,7 @@ model User {
   phone    String?
   realName String? @map("real_name")
   email    String?
+  gender   Gender?
 
   segment CustomerSegment @default(NEW)
   isVip   Boolean         @default(false) @map("is_vip")
@@ -143,12 +157,22 @@ model User {
   lastVisitAt  DateTime? @map("last_visit_at")
   firstVisitAt DateTime? @map("first_visit_at")
 
+  /// Set the first time the customer self-fills their phone via LIFF /profile.
+  /// Drives the launch lottery eligibility (only entries within window qualify).
+  /// Never set by admin manual edits — only by /api/profile/me.
+  profileCompletedAt DateTime? @map("profile_completed_at")
+
   birthday      DateTime? @map("birthday") @db.Date
   birthdayMonth Int?      @map("birthday_month")
   birthdayDay   Int?      @map("birthday_day")
 
-  notes     String?
-  tags      String[] @default([])
+  notes String?
+  tags  String[] @default([])
+
+  /// V3.6 §14.5 — 客戶可在 LIFF 設定頁關閉行銷推播，cron retention-push 會跳過此客戶。
+  /// 此旗標**不影響**預約確認 / 提醒等交易性 LINE 推播。
+  marketingOptOut Boolean @default(false) @map("marketing_opt_out")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -173,6 +197,13 @@ enum CustomerSegment {
   AT_RISK
   LAPSED
   BLACKLISTED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
 }
 
 // ============================================
@@ -268,6 +299,16 @@ model Booking {
   /// COMPLETED booking 一定有此值（結帳前若仍 NULL 自動補 now()）。
   /// 既有 COMPLETED 資料無 checkedInAt — 視為「已報到 + 已結帳」grandfather。
   checkedInAt DateTime? @map("checked_in_at")
+
+  /// V3.6 §5.2 — 老闆對帳時間戳：daily view 「確認」按鈕觸發。
+  /// NULL = 待對帳；NOT NULL = 已對帳。
+  /// 結班按鈕需要當日所有 COMPLETED booking 都有此值才解鎖。
+  settledAt DateTime? @map("settled_at")
+
+  /// V3.6 §4.1 — 離店再預約標記：客戶結帳當下若 admin 在 0-2 小時內為其建立未來 Booking → true.
+  /// 用於計算 prebookRate（業界第一武器留客指標）。
+  /// 預設 false；admin /api/bookings POST + ?prebookSource=true 時設為 true。
+  prebookSource Boolean @default(false) @map("prebook_source")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -630,4 +671,66 @@ enum CouponReason {
   BOOKING_COMPLETED
   MANUAL
   CAMPAIGN
+  RETENTION_DISCOUNT // V3.6 Phase H：服務分群 49 天到期券
+  RETENTION_WINBACK // V3.6 Phase H：服務分群 70+ 天召回券
+}
+
+// ============================================
+// V3.6 PHASE H — RETENTION PUSH SCHEDULE (服務分群自動推播)
+// ============================================
+//
+// Each row = one customer × one service-stage push that's scheduled / sent.
+// Cron job /api/cron/retention-push (10:00 Taipei) iterates RETENTION_RULES,
+// picks customers, and writes one PushSchedule row per (customer, service, stage).
+//
+// stage encodes BOTH the trigger day AND the message tone:
+//   - SOFT_REMINDER (剪 35 / 染 31 / 燙 90 days since last service)
+//   - DISCOUNT_10 (剪 49 / 染 56 / 燙 120 days)
+//   - WINBACK (剪 70 / 染 90 / 燙 150 days)
+//
+// Anti-spam: cooldown checked via PushSchedule rows in the past 7 days for
+// the same userId. couponId set when stage emits a coupon.
+//
+// See V3.6 plan §14.4 for cron logic, §14.5 for anti-spam rules.
+model PushSchedule {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  userId   String @map("user_id")
+
+  serviceCategory String     @map("service_category") // "剪髮" | "染髮" | "燙髮"
+  stage           PushStage
+  scheduledFor    DateTime   @map("scheduled_for")
+  status          PushStatus @default(QUEUED)
+
+  // Coupon emitted with this push (DISCOUNT_10 + WINBACK stages only)
+  couponId String? @unique @map("coupon_id")
+
+  // For tracking effectiveness — when was the customer's *next* booking after
+  // receiving this push (filled by post-booking observer if within 30 days)
+  convertedBookingId String?   @map("converted_booking_id")
+  convertedAt        DateTime? @map("converted_at")
+
+  sentAt       DateTime? @map("sent_at")
+  errorMessage String?   @map("error_message")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId, userId, createdAt])
+  @@index([tenantId, status, scheduledFor])
+  @@index([tenantId, stage, sentAt])
+  @@map("push_schedules")
+}
+
+enum PushStage {
+  SOFT_REMINDER
+  DISCOUNT_10
+  WINBACK
+}
+
+enum PushStatus {
+  QUEUED // 已建立尚未送達
+  SENT // 已送出
+  SKIPPED // 因死忠客排除 / cooldown / 全店上限被跳過
+  FAILED // LINE push API 失敗
 }

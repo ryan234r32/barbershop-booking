@@ -83,12 +83,34 @@ npm run db:migrate       # Create migration
 
 Body-supplied `lineUserId` is **ignored** — caller identity always comes from verified auth. LIFF clients send `X-LIFF-ID-Token: <idToken>` header; admin clients send admin JWT cookie or `Authorization: Bearer <token>`.
 
+### V3.6 Reports Redesign (2026-04-28)
+- **取代 V3.5 散裝指標頁** → 三視角報表系統（每日/每月/每年）。Plan 詳見 `docs/v3.6-reports-redesign-plan.md`
+- `src/lib/reports/v3.6/aggregates.ts` — 新指標：prebookRate、RFM、YoY、monthlyTarget、alerts、NL summary、annual highlights、scenarios
+- `src/components/admin/reports/v3.6/` — 12 個共用元件（MCard / MTag / MToggle / KpiCard / AlertBanner / ThreeWayDecomposition / Sparkline / ProgressBar / RfmCard / YoYBars / CohortStackedBar / SectionDivider）
+- `src/app/(admin)/reports/views/{daily,monthly,annual}.tsx` — 三視角分頁；page.tsx 為 tab 容器（URL state via `?view=daily|monthly|annual&period=...`）
+- `src/app/api/reports/v3.6/route.ts` — 新 API endpoint，依 view 回傳不同 shape
+- 新 admin API：`PATCH /api/bookings/[id]/settle`、`POST /api/admin/day-close`、`POST /api/admin/year-target`、`GET /api/admin/retention-push`
+- Schema 新欄位：`Tenant.{monthlyTargets,yearTargets,dayClosedAt}`、`Booking.{settledAt,prebookSource}`、`User.marketingOptOut`、新 model `PushSchedule`（`prisma db push` 由使用者自行執行）
+- 移除：`hero-estimate.tsx` / `shop-source-bar.tsx` / `service-mix-by-customer.tsx` / `widget-section.tsx`
+- V3.5 兼容：舊 URL `?range=year&offset=-1` 自動轉為 `?view=annual&period=YYYY`
+
+### V3.6 Phase H — 服務分群自動推播系統
+- `src/lib/notifications/retention-push.ts` — `RETENTION_RULES` + 死忠客判定 + 候選查詢 + LINE push 邏輯
+- `src/app/api/cron/retention-push/route.ts` — 每日 02:00 UTC（10:00 Taipei）三段推播 cron
+- `src/components/admin/retention-push-widget.tsx` — admin 監控頁元件（今日預定 + 7 日趨勢）
+- `src/app/api/profile/marketing-opt-out/route.ts` — 客戶 LIFF 端關閉行銷推播
+- 規則：剪 35/49/70 天、染 31/56/90、燙 90/120/150（軟提醒/9 折/8 折召回）
+- 防騷擾：cooldown 7d / 全店每日 50 則上限 / 09-21 時間窗 / 死忠客排除（軟提醒+折扣，召回券例外） / 客戶 opt-out 開關
+- ⚠️ Demo 前 6 題 B1-B6 須老闆確認（plan §14.8），尤其折扣金額 + 燙髮樣本太少（n=8）要不要啟用
+
 ### Cron Jobs (vercel.json, times in UTC → +8 for Taipei)
 - `/api/cron/reminders` — hourly, sends pending notification records via LINE
 - `/api/cron/cleanup` — 19:00 UTC (3AM Taipei), maintenance tasks
 - `/api/cron/at-risk` — Sunday 20:00 UTC (Monday 4AM Taipei), CRM segmentation
 - `/api/cron/weekly-report` — Sunday 22:00 UTC (Monday 6AM Taipei), push weekly report to admin
 - `/api/cron/daily-settlement` — 12:30 UTC (20:30 Taipei), push daily settlement summary to admin
+- `/api/cron/coupon-expiry-reminder` — 02:00 UTC (10AM Taipei), coupon expiry pings
+- `/api/cron/retention-push` — V3.6 §14.4: 02:00 UTC (10AM Taipei), 三段服務分群推播
 
 ## Key Conventions
 - **犯錯當下**：小坑/一次性事件 → `/lesson {內容}` 丟進 `tasks/lessons-inbox.md`；明顯通則（「永遠要 X」「X 時必須 Y」）→ 直接加一行到本段 `Key Conventions`。Inbox 每週日 `/triage` 審核升格。
