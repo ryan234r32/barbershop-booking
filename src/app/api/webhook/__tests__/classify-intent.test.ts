@@ -76,7 +76,11 @@ describe("classifyIntent — table-driven keyword routing", () => {
     { input: "複製金額", expected: "payment-copy-amount" },
     { input: "12345", expected: "payment-last5", note: "5 碼數字 → 末五碼回報" },
     { input: "00000", expected: "payment-last5" },
-    { input: "123456", expected: "none", note: "6 碼不算" },
+    { input: "1234", expected: "payment-malformed-digits", note: "4 碼數字 → 友善 retry" },
+    { input: "123", expected: "payment-malformed-digits", note: "3 碼" },
+    { input: "123456", expected: "payment-malformed-digits", note: "6 碼" },
+    { input: "1234567", expected: "payment-malformed-digits", note: "7 碼" },
+    { input: "12345678", expected: "none", note: "8+ 碼可能是電話/帳號其他用途，不誤判" },
     { input: "12 345", expected: "none", note: "中間有空白不算" },
 
     // business-info

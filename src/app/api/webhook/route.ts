@@ -368,11 +368,33 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
   // Priority 4a-pre: 「✓ 確定完成匯款」按鈕 → 引導客人輸入末五碼
   // 客人匯款是服務完成後才會做，沒有「取消」場景，所以拿掉 Quick Reply
   if (intent === "payment-confirm-done") {
+    // Personalize with displayName if available
+    let displayName: string | undefined;
+    if (lineUserId) {
+      const u = await prisma.user.findUnique({
+        where: { tenantId_lineUserId: { tenantId, lineUserId } },
+        select: { displayName: true },
+      });
+      displayName = u?.displayName ?? undefined;
+    }
+    const greeting = displayName ? `${displayName} 您好，` : "";
     return reply({
       type: "text",
       text:
-        "📝 請輸入您匯款的後 5 碼數字\n\n" +
-        "例：12345",
+        `${greeting}請輸入您匯款的後 5 碼數字 ✏️\n\n` +
+        `例：12345`,
+    });
+  }
+
+  // Priority 4a-pre2: 3/4/6/7 碼純數字 → 客人很可能想回報末五碼但打錯位數
+  // 給友善的 retry 提示，避免 fall through 到 busy-notice 造成混亂
+  if (intent === "payment-malformed-digits") {
+    return reply({
+      type: "text",
+      text:
+        `「${text.trim()}」似乎不是 5 位數字 🤔\n\n` +
+        `若您要回報匯款後五碼，請改打「正好 5 位數字」\n` +
+        `例：12345`,
     });
   }
 
@@ -455,7 +477,7 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
     }
     const user = await prisma.user.findUnique({
       where: { tenantId_lineUserId: { tenantId, lineUserId } },
-      select: { id: true, displayName: true },
+      select: { id: true, displayName: true, segment: true },
     });
     if (!user) {
       return reply({ type: "text", text: "查無您的預約資料，若有疑問請洽店家 🙏" });
@@ -560,6 +582,8 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
         price: payment.amount,
         transferLastFive,
         googleReviewUrl,
+        displayName: user.displayName ?? undefined,
+        isVip: user.segment === "VIP",
       }),
       true, // usePush — DB write delayed reply, avoid 1s webhook timeout
     );

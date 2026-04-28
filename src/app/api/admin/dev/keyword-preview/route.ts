@@ -28,6 +28,7 @@ const INTENT_LABELS: Record<KeywordIntent, string> = {
   "payment-copy-account": "複製帳號 (P5b — fallback for old LINE)",
   "payment-copy-amount": "複製金額 (P5b — fallback for old LINE)",
   "payment-last5": "後五碼回報 (P5c — 純 5 碼數字 → 寫 DB)",
+  "payment-malformed-digits": "末五碼長度錯誤 fallback (3/4/6/7 碼)",
   "business-info": "營業時間 / 地址 (P6)",
   "phone": "電話 / 聯絡 (P6)",
   "thanks": "感謝 (P7)",

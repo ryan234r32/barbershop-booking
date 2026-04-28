@@ -151,10 +151,19 @@ export async function notifyAdminTransferReported(params: {
   if (webPushSent === 0 && adminLineUserId) {
     try {
       const lineClient = getLineClient();
-      await lineClient.pushMessage(adminLineUserId, {
-        type: "text",
-        text: `💳 待對帳\n${displayName} · ${serviceName}\n${date} ${startTime}\n金額：NT$${amount.toLocaleString()}\n末五碼：${transferLastFive}`,
-      });
+      // 老闆視覺辨識度：text + 官方 sticker（package 11537 / sticker 52002735 = "OK 兔兔"）
+      // 合併成一個 multi-message push，一次到達避免 LINE 1 sec 限流
+      await lineClient.pushMessage(adminLineUserId, [
+        {
+          type: "text",
+          text: `💳 待對帳\n${displayName} · ${serviceName}\n${date} ${startTime}\n金額：NT$${amount.toLocaleString()}\n末五碼：${transferLastFive}`,
+        },
+        {
+          type: "sticker",
+          packageId: "11537",
+          stickerId: "52002735",
+        },
+      ]);
     } catch (err) {
       logger.error("LINE push transfer-reported failed", err, "admin-notify");
     }

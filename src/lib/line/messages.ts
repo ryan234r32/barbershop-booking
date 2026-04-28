@@ -1,4 +1,5 @@
 import { FlexMessage, FlexBubble, FlexCarousel, FlexComponent, FlexButton } from "@line/bot-sdk";
+import { formatHumanDate } from "@/lib/utils/time";
 
 /** Build Google Calendar URL for a booking */
 function buildGoogleCalendarUrl(
@@ -142,8 +143,14 @@ export function bookingConfirmationMessage(params: {
 /**
  * Transfer reported Flex Message — sent after customer submits last-5 digits.
  *
- * 2026-04-27 v2: 客人匯款都是「服務完成後」，這張卡片是整段服務的最後一棒
- * → 拿掉「查看我的預約」(沒意義)，改成 Google 五星評論 CTA (最佳評價時機)。
+ * 2026-04-28 v3: receipt-style polish。客人匯款都是服務完成後做的事，
+ * 這張卡是整段體驗的最後一棒 — 慶祝感 + 邀評論。
+ *
+ * - displayName 個人化 header
+ * - 日期改用人性化「今天」「明天」「4 月 27 日 (週日)」格式
+ * - VIP 客人加額外感謝文案（segment-aware）
+ * - 不承諾對帳 ETA（老闆可能晚上才對帳，30 分鐘是不切實際的承諾）
+ * - 上下用 ........ 模擬 receipt 虛線分隔線，提升儀式感
  */
 export function transferReportedMessage(params: {
   serviceName: string;
@@ -153,8 +160,23 @@ export function transferReportedMessage(params: {
   price: number;
   transferLastFive: string;
   googleReviewUrl?: string;
+  displayName?: string;
+  isVip?: boolean;
 }): FlexMessage {
-  const { serviceName, date, startTime, endTime, price, transferLastFive, googleReviewUrl } = params;
+  const {
+    serviceName,
+    date,
+    startTime,
+    endTime,
+    price,
+    transferLastFive,
+    googleReviewUrl,
+    displayName,
+    isVip,
+  } = params;
+
+  const humanDate = formatHumanDate(date);
+  const dashedLine = ".".repeat(28);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const footerButtons: any[] = [];
@@ -167,10 +189,14 @@ export function transferReportedMessage(params: {
         uri: googleReviewUrl,
       },
       style: "primary" as const,
-      color: "#C88B3B", // 金黃色 — 慶祝/感謝感
+      color: "#C88B3B",
       height: "md" as const,
     });
   }
+
+  const greeting = displayName
+    ? `${displayName}，已收到您的匯款 ✓`
+    : "已收到轉帳資訊 ✓";
 
   const bubble: FlexBubble = {
     type: "bubble",
@@ -178,7 +204,7 @@ export function transferReportedMessage(params: {
       type: "box",
       layout: "vertical",
       contents: [
-        { type: "text", text: "已收到轉帳資訊 ✓", weight: "bold", size: "lg", color: "#003D2B" },
+        { type: "text", text: greeting, weight: "bold", size: "lg", color: "#003D2B", wrap: true },
       ],
       backgroundColor: "#FAF1E0",
     },
@@ -186,38 +212,67 @@ export function transferReportedMessage(params: {
       type: "box",
       layout: "vertical",
       contents: [
+        // Top dashed separator (receipt vibe)
+        {
+          type: "text",
+          text: dashedLine,
+          size: "xxs",
+          color: "#9CB1A4",
+          align: "center",
+        },
         {
           type: "box",
           layout: "vertical",
           spacing: "sm",
+          margin: "md",
           contents: [
             infoRow("服務", serviceName),
-            infoRow("日期", date),
+            infoRow("日期", humanDate),
             infoRow("時間", `${startTime} - ${endTime}`),
-            infoRow("金額", `NT$${price.toLocaleString()}`),
+            infoRow("金額", `NT$ ${price.toLocaleString()}`),
             infoRow("末五碼", transferLastFive),
           ],
         },
+        // Bottom dashed separator
         {
-          type: "separator",
-          margin: "lg",
+          type: "text",
+          text: dashedLine,
+          size: "xxs",
+          color: "#9CB1A4",
+          align: "center",
+          margin: "md",
         },
         {
           type: "text",
-          text: "老闆對帳完成後會再通知您 🙏",
+          text: "老闆對帳完成後會推播通知您 🙏",
           size: "xs",
           color: "#809A8E",
-          margin: "lg",
+          margin: "md",
+          align: "center",
           wrap: true,
         },
+        ...(isVip
+          ? [
+              {
+                type: "text" as const,
+                text: "💚 感謝 VIP 顧客的長期支持",
+                size: "xs" as const,
+                color: "#C88B3B" as const,
+                margin: "md" as const,
+                align: "center" as const,
+                weight: "bold" as const,
+              },
+            ]
+          : []),
         ...(googleReviewUrl
           ? [
               {
                 type: "text" as const,
-                text: "若服務滿意，懇請花 30 秒給我們評價，是對我們最大的支持 💚",
+                text: "若滿意今日服務，懇請花 30 秒給我們五星好評，是對小店最大的支持 💚",
                 size: "xs" as const,
                 color: "#809A8E" as const,
-                margin: "md" as const,
+                margin: "lg" as const,
+                align: "center" as const,
                 wrap: true,
               },
             ]
@@ -1417,28 +1472,46 @@ export function paymentGuideMessage(params: {
   } = params;
 
   const hasAmount = typeof amount === "number" && amount > 0;
+  const cleanAccountForDisplay = bankAccountNumber.replace(/[\s-]/g, "");
+  // 把帳號每 4 碼空一格，方便人眼掃讀（例：1234 5678 9012 3456）
+  const formattedAccount = cleanAccountForDisplay.replace(/(.{4})(?=.)/g, "$1 ");
 
   const bodyContents: FlexComponent[] = [
+    // 銀行 + 戶名（小字、置中）
     {
       type: "text",
-      text: "銀行轉帳資訊",
+      text: bankName,
+      align: "center",
+      size: "sm",
+      color: "#003D2B",
       weight: "bold",
-      size: "md",
     },
     {
-      type: "separator",
-      margin: "md",
+      type: "text",
+      text: bankAccountName,
+      align: "center",
+      size: "xs",
+      color: "#809A8E",
+      margin: "xs",
     },
+    { type: "separator", margin: "lg" },
+    // ⭐ 帳號 — 客人唯一要記憶的資訊，用最大字級置中粗體
     {
-      type: "box",
-      layout: "vertical",
+      type: "text",
+      text: formattedAccount,
+      align: "center",
+      size: "xl",
+      weight: "bold",
+      color: "#003D2B",
       margin: "lg",
-      spacing: "sm",
-      contents: [
-        infoRow("銀行", bankName),
-        infoRow("戶名", bankAccountName),
-        infoRow("帳號", bankAccountNumber),
-      ],
+    },
+    {
+      type: "text",
+      text: "帳號",
+      align: "center",
+      size: "xs",
+      color: "#9CB1A4",
+      margin: "xs",
     },
   ];
 
@@ -1489,41 +1562,26 @@ export function paymentGuideMessage(params: {
     );
   }
 
+  // 簡化文案：拿掉「完成步驟」標題、不再出現「現金付款」干擾文字
+  // 動線靠 footer 兩顆按鈕引導即可（複製帳號 → 確定完成匯款）
   bodyContents.push(
     { type: "separator", margin: "lg" },
     {
       type: "text",
-      text: "📋 完成步驟",
-      weight: "bold",
-      size: "sm",
-      margin: "lg",
-    },
-    {
-      type: "text",
-      text:
-        "1. 點「📋 點此複製帳號」一鍵複製\n" +
-        "2. 開銀行 App 完成轉帳\n" +
-        "3. 回來點「✓ 確定完成匯款」，輸入末五碼",
-      size: "sm",
-      margin: "sm",
-      wrap: true,
-      color: "#809A8E",
-    },
-    {
-      type: "text",
-      text: "＊ 也可至現場以現金付款",
+      text: "完成轉帳後，請點下方按鈕回報",
       size: "xs",
-      margin: "md",
+      margin: "lg",
       color: "#9CB1A4",
-    }
+      align: "center",
+      wrap: true,
+    },
   );
 
   // 2024-09 LINE 推出 clipboardAction — 點按鈕直接把 clipboardText 寫進客人剪貼簿
   // (一鍵複製，不用長按)。@line/bot-sdk v10.6 的 type 還沒跟上，這裡用 cast 繞過；
   // runtime LINE API 認得這個 action type。
   // 參考：https://developers.line.biz/en/reference/messaging-api/#clipboard-action
-  // 帳號去掉空白 / 連字符，方便客人貼到網銀
-  const cleanAccount = bankAccountNumber.replace(/[\s-]/g, "");
+  // 帳號去掉空白 / 連字符（已在上方 cleanAccountForDisplay 算過），複製按鈕用同一個值
   type ClipboardAction = { type: "clipboard"; label: string; clipboardText: string };
   const clipboardAction = (label: string, clipboardText: string): ClipboardAction => ({
     type: "clipboard",
@@ -1539,7 +1597,7 @@ export function paymentGuideMessage(params: {
   const footerContents: (FlexButton | FlexComponent)[] = [
     {
       type: "button",
-      action: clipboardAction("📋 點此複製帳號", cleanAccount) as unknown as FlexButton["action"],
+      action: clipboardAction("📋 點此複製帳號", cleanAccountForDisplay) as unknown as FlexButton["action"],
       style: "primary",
       color: "#003D2B",
       height: "sm",

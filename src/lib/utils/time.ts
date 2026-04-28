@@ -80,6 +80,35 @@ export function formatDateToISO(date: Date): string {
   return date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
 }
 
+/**
+ * Humanize a date string for customer-facing messages.
+ *
+ * Input:  "YYYY-MM-DD" (Taipei timezone interpretation)
+ * Output: "今天 (週X)" | "明天 (週X)" | "M 月 D 日 (週X)"
+ *
+ * Examples (assuming today = 2026-04-28):
+ *   "2026-04-28" → "今天 (週二)"
+ *   "2026-04-29" → "明天 (週三)"
+ *   "2026-05-04" → "5 月 4 日 (週一)"
+ */
+export function formatHumanDate(dateStr: string): string {
+  const today = todayInTaipei();
+  const [y, m, d] = dateStr.split("-").map(Number);
+  // Compute weekday by treating dateStr as Taipei midnight, converted to UTC
+  const utc = new Date(Date.UTC(y, m - 1, d, -8, 0, 0));
+  const weekdayChar = ["日", "一", "二", "三", "四", "五", "六"][utc.getUTCDay()];
+  const weekday = `(週${weekdayChar})`;
+
+  if (dateStr === today) return `今天 ${weekday}`;
+
+  const [ty, tm, td] = today.split("-").map(Number);
+  const tomorrowDate = new Date(Date.UTC(ty, tm - 1, td + 1, -8, 0, 0));
+  const tomorrow = tomorrowDate.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+  if (dateStr === tomorrow) return `明天 ${weekday}`;
+
+  return `${m} 月 ${d} 日 ${weekday}`;
+}
+
 /** Get day of week (0=Sun) in Taipei timezone */
 export function getDayOfWeek(date: Date): number {
   const taipeiDate = new Date(

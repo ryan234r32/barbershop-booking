@@ -19,6 +19,7 @@ export type KeywordIntent =
   | "payment-copy-amount"
   | "payment-confirm-done"
   | "payment-last5"
+  | "payment-malformed-digits"
   | "business-info"
   | "phone"
   | "thanks"
@@ -54,6 +55,9 @@ export function classifyIntent(text: string): KeywordIntent {
 
   // Bare 5-digit message → assume it's the bank receipt last-5 ack (post-轉帳 回報)
   if (/^\d{5}$/.test(trimmed)) return "payment-last5";
+  // Adjacent digits (3, 4, 6, 7) → likely meant 末五碼 but typed wrong length
+  // 8+ 碼故意排除（可能是電話、地址門牌）
+  if (/^\d{3,4}$/.test(trimmed) || /^\d{6,7}$/.test(trimmed)) return "payment-malformed-digits";
 
   if (matchKeywords(t, ["我的預約", "我預約", "我約了", "預約了什麼", "查詢", "紀錄", "記錄"])) return "my-bookings";
   if (matchKeywords(t, ["取消", "不約了", "不來了", "改時間", "更改", "改期", "換時間", "改一下", "cancel"])) return "cancel-reschedule";

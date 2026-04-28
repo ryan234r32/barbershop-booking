@@ -7,6 +7,7 @@ import {
   campaignMessage,
   weeklyReportMessage,
   paymentGuideMessage,
+  transferReportedMessage,
   adminNewBookingMessage,
   adminCancellationMessage,
   serviceInquiryFlexMessage,
@@ -293,15 +294,23 @@ describe("paymentGuideMessage", () => {
     const bodyStr = JSON.stringify(msg.contents);
     expect(bodyStr).toContain("台北富邦銀行");
     expect(bodyStr).toContain("張美麗");
-    expect(bodyStr).toContain("1234-5678-9012");
+    // Account number is now formatted with spaces every 4 digits (1234 5678 9012)
+    expect(bodyStr).toContain("1234 5678 9012");
   });
 
-  it("includes payment steps", () => {
+  it("emphasizes account number visually (xl size, bold, centered)", () => {
     const msg = paymentGuideMessage(params);
     const bodyStr = JSON.stringify(msg.contents);
-    expect(bodyStr).toContain("完成步驟");
-    expect(bodyStr).toContain("轉帳");
-    expect(bodyStr).toContain("末五碼");
+    // The account-number text element should carry size:xl and weight:bold
+    expect(bodyStr).toMatch(/"text":"1234 5678 9012"[^}]*"size":"xl"/);
+    expect(bodyStr).toMatch(/"text":"1234 5678 9012"[^}]*"weight":"bold"/);
+  });
+
+  it("guides customer to confirm-after-transfer", () => {
+    const msg = paymentGuideMessage(params);
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("完成轉帳後");
+    expect(bodyStr).toContain("確定完成匯款");
   });
 
   it("renders 匯款資訊 header (not 付款資訊)", () => {
@@ -355,6 +364,56 @@ describe("paymentGuideMessage", () => {
     expect(bodyStr).toContain('"text":"確定完成匯款"');
   });
 
+});
+
+describe("transferReportedMessage", () => {
+  const baseParams = {
+    serviceName: "男性剪髮",
+    date: "2026-04-28",
+    startTime: "14:00",
+    endTime: "15:00",
+    price: 800,
+    transferLastFive: "12345",
+  };
+
+  it("includes booking details + last-5", () => {
+    const msg = transferReportedMessage(baseParams);
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("男性剪髮");
+    expect(bodyStr).toContain("NT$ 800");
+    expect(bodyStr).toContain("12345");
+  });
+
+  it("personalizes header with displayName", () => {
+    const msg = transferReportedMessage({ ...baseParams, displayName: "王小明" });
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("王小明");
+  });
+
+  it("includes Google review CTA when googleReviewUrl provided", () => {
+    const msg = transferReportedMessage({
+      ...baseParams,
+      googleReviewUrl: "https://g.page/r/abc/review",
+    });
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("五星好評");
+    expect(bodyStr).toContain("g.page");
+  });
+
+  it("shows VIP tagline only when isVip=true", () => {
+    const noVip = transferReportedMessage(baseParams);
+    expect(JSON.stringify(noVip.contents)).not.toContain("VIP");
+
+    const vip = transferReportedMessage({ ...baseParams, isVip: true });
+    expect(JSON.stringify(vip.contents)).toContain("VIP");
+  });
+
+  it("does NOT promise a reconciliation ETA (老闆 may settle in evening)", () => {
+    const msg = transferReportedMessage(baseParams);
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).not.toMatch(/\d+\s*分鐘/);
+    expect(bodyStr).toContain("會推播通知");
+  });
 });
 
 describe("adminNewBookingMessage", () => {
