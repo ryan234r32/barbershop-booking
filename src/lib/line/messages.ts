@@ -2017,6 +2017,189 @@ export function campaignMessage(text: string, liffUrl: string): FlexMessage {
   };
 }
 
+/** Launch lottery — congratulates a winner and explains how to redeem. */
+export function lotteryWinnerMessage(params: { shopName: string }): FlexMessage {
+  const { shopName } = params;
+  const bubble: FlexBubble = {
+    type: "bubble",
+    header: {
+      type: "box",
+      layout: "vertical",
+      backgroundColor: "#003D2B",
+      paddingAll: "lg",
+      contents: [
+        {
+          type: "text",
+          text: "🎉 恭喜中獎！",
+          weight: "bold",
+          size: "xl",
+          color: "#FFF8F1",
+        },
+      ],
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      spacing: "md",
+      contents: [
+        {
+          type: "text",
+          text: `${shopName} 上線抽獎活動`,
+          size: "sm",
+          color: "#666666",
+        },
+        {
+          type: "text",
+          text: "您獲得免費剪髮一次！",
+          weight: "bold",
+          size: "lg",
+          color: "#003D2B",
+          wrap: true,
+        },
+        {
+          type: "separator",
+          margin: "md",
+        },
+        {
+          type: "text",
+          text: "兌換方式",
+          weight: "bold",
+          size: "sm",
+          color: "#003D2B",
+          margin: "md",
+        },
+        {
+          type: "text",
+          text: "下次到店剪髮時，跟老闆說「我中獎了」即可免費。",
+          size: "sm",
+          color: "#666666",
+          wrap: true,
+        },
+        {
+          type: "text",
+          text: "感謝您的支持！",
+          size: "xs",
+          color: "#999999",
+          margin: "md",
+        },
+      ],
+    },
+  };
+  return {
+    type: "flex",
+    altText: `🎉 恭喜！您獲得 ${shopName} 免費剪髮一次`,
+    contents: bubble,
+  };
+}
+
+/** Launch announcement Flex — broadcast to all users with deadline + form link. */
+export function launchAnnouncementMessage(params: {
+  shopName: string;
+  profileUrl: string;
+  deadlineLabel: string;
+  prizeLabel: string;
+}): FlexMessage {
+  const { shopName, profileUrl, deadlineLabel, prizeLabel } = params;
+  const bubble: FlexBubble = {
+    type: "bubble",
+    header: {
+      type: "box",
+      layout: "vertical",
+      backgroundColor: "#003D2B",
+      paddingAll: "lg",
+      contents: [
+        {
+          type: "text",
+          text: "📣 新系統上線",
+          weight: "bold",
+          size: "lg",
+          color: "#FFF8F1",
+        },
+        {
+          type: "text",
+          text: shopName,
+          size: "sm",
+          color: "#FFF8F1",
+        },
+      ],
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      spacing: "md",
+      contents: [
+        {
+          type: "text",
+          text: "為慶祝 LINE 預約系統上線，30 秒填寫會員資料即可參加抽獎！",
+          size: "sm",
+          color: "#003D2B",
+          wrap: true,
+        },
+        {
+          type: "box",
+          layout: "vertical",
+          backgroundColor: "#003D2B0A",
+          paddingAll: "md",
+          cornerRadius: "md",
+          spacing: "xs",
+          contents: [
+            {
+              type: "text",
+              text: "🎁 抽獎獎項",
+              weight: "bold",
+              size: "sm",
+              color: "#003D2B",
+            },
+            {
+              type: "text",
+              text: prizeLabel,
+              size: "sm",
+              color: "#003D2B",
+              wrap: true,
+            },
+            {
+              type: "text",
+              text: `⏰ 截止：${deadlineLabel}`,
+              size: "xs",
+              color: "#A84A3B",
+              margin: "sm",
+            },
+          ],
+        },
+        {
+          type: "text",
+          text: "🔒 我們不會發行銷簡訊，手機只用於預約提醒。",
+          size: "xs",
+          color: "#999999",
+          wrap: true,
+          margin: "md",
+        },
+      ],
+    },
+    footer: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "button",
+          style: "primary",
+          color: "#003D2B",
+          action: {
+            type: "uri",
+            label: "立即填寫（30 秒）",
+            uri: profileUrl,
+          },
+        },
+      ],
+    },
+  };
+  return {
+    type: "flex",
+    altText: `📣 ${shopName} 上線抽獎，填會員資料抽免費剪髮，截止 ${deadlineLabel}`,
+    contents: bubble,
+  };
+}
+
 /** Weekly report Flex Message for admin LINE push */
 export function weeklyReportMessage(report: {
   period: { from: string; to: string };

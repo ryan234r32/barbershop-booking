@@ -12,12 +12,14 @@ interface CustomerDetail {
   displayName: string | null;
   realName: string | null;
   phone: string | null;
+  gender: "MALE" | "FEMALE" | "OTHER" | "PREFER_NOT_TO_SAY" | null;
   segment: string;
   isVip: boolean;
   violationCount: number;
   bookingRestricted: boolean;
   totalVisits: number;
   lastVisitAt: string | null;
+  firstVisitAt: string | null;
   birthday: string | null;
   notes: string | null;
   bookings: Array<{
@@ -27,6 +29,32 @@ interface CustomerDetail {
     status: string;
     service: { name: string; price: number };
   }>;
+}
+
+interface Stats {
+  totalBookings: number;
+  statusCounts: Record<string, number>;
+  totalRevenue: number;
+  avgPrice: number | null;
+  avgIntervalDays: number | null;
+}
+
+const GENDER_LABEL: Record<string, string> = {
+  MALE: "男",
+  FEMALE: "女",
+  OTHER: "其他",
+  PREFER_NOT_TO_SAY: "—",
+};
+
+function formatRelativeDate(dateStr: string | null): string {
+  if (!dateStr) return "—";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days === 0) return "今天";
+  if (days === 1) return "昨天";
+  if (days < 30) return `${days} 天前`;
+  if (days < 365) return `${Math.floor(days / 30)} 個月前`;
+  return `${Math.floor(days / 365)} 年前`;
 }
 
 const SEGMENT_STYLE: Record<string, string> = {
@@ -60,6 +88,7 @@ export default function CustomerDetailPage({
 
   const { data, mutate } = useSWR(`/api/customers/${id}`, fetcher);
   const customer: CustomerDetail | null = data?.customer || null;
+  const stats: Stats | null = data?.stats || null;
 
   if (!customer) {
     return (
@@ -70,9 +99,22 @@ export default function CustomerDetailPage({
   }
 
   const name = customer.displayName || customer.realName || "未知";
-  const totalRevenue = customer.bookings
+  const totalRevenue = stats?.totalRevenue ?? customer.bookings
     .filter((b) => b.status === "COMPLETED")
     .reduce((sum, b) => sum + (b.service?.price || 0), 0);
+  const completedCount = stats?.statusCounts?.COMPLETED ?? 0;
+  const noShowCount = stats?.statusCounts?.NO_SHOW ?? 0;
+  const cancelledCount =
+    (stats?.statusCounts?.CANCELLED ?? 0) +
+    (stats?.statusCounts?.CANCELLED_BY_ADMIN ?? 0);
+  const upcomingCount = stats?.statusCounts?.CONFIRMED ?? 0;
+  const totalBookings = stats?.totalBookings ?? 0;
+  const attendanceRate =
+    completedCount + noShowCount > 0
+      ? Math.round((completedCount / (completedCount + noShowCount)) * 100)
+      : null;
+  const avgPrice = stats?.avgPrice ?? null;
+  const avgIntervalDays = stats?.avgIntervalDays ?? null;
 
   // Parse notes into timeline entries
   const noteEntries = (customer.notes || "")
@@ -136,29 +178,93 @@ export default function CustomerDetailPage({
         </span>
       </div>
 
-      {/* Stats Card */}
-      <div className="bg-[var(--color-surface)] rounded-xl p-4 mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-center flex-1">
-            <p className="text-lg font-bold text-[var(--color-text-primary)]">{customer.totalVisits}</p>
-            <p className="text-[10px] text-[var(--color-text-muted)]">來訪</p>
+      {/* Profile Card — 基本資料 */}
+      <div className="bg-[var(--color-surface)] rounded-xl p-4 mb-3">
+        <p className="text-[10px] text-[var(--color-text-muted)] tracking-wider mb-2">基本資料</p>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div>
+            <p className="text-[10px] text-[var(--color-text-muted)]">本名</p>
+            <p className="text-[var(--color-text-body)]">{customer.realName || "—"}</p>
           </div>
-          <div className="w-px h-8 bg-[var(--color-text-disabled)]" />
-          <div className="text-center flex-1">
-            <p className="text-lg font-bold text-[var(--color-text-primary)]">NT${totalRevenue.toLocaleString()}</p>
-            <p className="text-[10px] text-[var(--color-text-muted)]">總消費</p>
+          <div>
+            <p className="text-[10px] text-[var(--color-text-muted)]">性別</p>
+            <p className="text-[var(--color-text-body)]">
+              {customer.gender ? GENDER_LABEL[customer.gender] : "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] text-[var(--color-text-muted)]">手機</p>
+            {customer.phone ? (
+              <a href={`tel:${customer.phone}`} className="flex items-center gap-1 text-[var(--color-brand)]">
+                <Phone size={12} strokeWidth={1.5} />
+                {customer.phone}
+              </a>
+            ) : (
+              <p className="text-[var(--color-text-disabled)]">—</p>
+            )}
+          </div>
+          <div>
+            <p className="text-[10px] text-[var(--color-text-muted)]">生日</p>
+            {customer.birthday ? (
+              <p className="flex items-center gap-1 text-[var(--color-text-body)]">
+                <Cake size={12} strokeWidth={1.5} />
+                {customer.birthday.split("T")[0]}
+              </p>
+            ) : (
+              <p className="text-[var(--color-text-disabled)]">—</p>
+            )}
           </div>
         </div>
-        {customer.phone && (
-          <a href={`tel:${customer.phone}`} className="flex items-center gap-1.5 text-sm text-[var(--color-brand)] mt-2">
-            <Phone size={14} strokeWidth={1.5} />
-            {customer.phone}
-          </a>
-        )}
-        {customer.birthday && (
-          <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] mt-1">
-            <Cake size={14} strokeWidth={1.5} />
-            {customer.birthday.split("T")[0]}
+      </div>
+
+      {/* Stats Card — 消費數據 (6 指標) */}
+      <div className="bg-[var(--color-surface)] rounded-xl p-4 mb-4">
+        <p className="text-[10px] text-[var(--color-text-muted)] tracking-wider mb-3">消費數據</p>
+        <div className="grid grid-cols-3 gap-y-3 gap-x-2">
+          <div>
+            <p className="text-base font-bold text-[var(--color-text-primary)]">{customer.totalVisits}</p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">總來訪次數</p>
+          </div>
+          <div>
+            <p className="text-base font-bold text-[var(--color-text-primary)]">
+              NT${totalRevenue.toLocaleString()}
+            </p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">總消費</p>
+          </div>
+          <div>
+            <p className="text-base font-bold text-[var(--color-text-primary)]">
+              {avgPrice !== null ? `NT$${avgPrice.toLocaleString()}` : "—"}
+            </p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">平均消費</p>
+          </div>
+          <div>
+            <p className="text-base font-bold text-[var(--color-text-primary)]">
+              {formatRelativeDate(customer.lastVisitAt)}
+            </p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">最近回訪</p>
+          </div>
+          <div>
+            <p className="text-base font-bold text-[var(--color-text-primary)]">
+              {avgIntervalDays !== null ? `${avgIntervalDays} 天` : "—"}
+            </p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">平均回訪間隔</p>
+          </div>
+          <div>
+            <p className="text-base font-bold text-[var(--color-text-primary)]">
+              {attendanceRate !== null ? `${attendanceRate}%` : "—"}
+            </p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">出席率</p>
+          </div>
+        </div>
+        {totalBookings > 0 && (
+          <div className="mt-3 pt-3 border-t border-[var(--color-text-disabled)]/30">
+            <p className="text-[10px] text-[var(--color-text-muted)] mb-1">出席狀況（總預約 {totalBookings} 次）</p>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+              <span className="text-[var(--color-text-body)]">✅ 完成 {completedCount}</span>
+              {upcomingCount > 0 && <span className="text-[var(--color-brand)]">🔵 即將 {upcomingCount}</span>}
+              {noShowCount > 0 && <span className="text-[var(--color-warning)]">⚠️ 未到 {noShowCount}</span>}
+              {cancelledCount > 0 && <span className="text-[var(--color-text-muted)]">❌ 取消 {cancelledCount}</span>}
+            </div>
           </div>
         )}
       </div>
