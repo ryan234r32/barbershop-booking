@@ -566,13 +566,13 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
     }).catch((err) => logger.error("notifyAdminTransferReported failed", err, "webhook"));
 
     const dateStr = target.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
-    // Google 評論連結：優先讀環境變數 GOOGLE_REVIEW_URL（老闆貼自家 Place ID 連結），
-    // 沒設則 fallback 到 Google Maps 搜尋 URL（用 tenant.address 或店名）
+    // Google 評論連結：優先讀環境變數 GOOGLE_REVIEW_URL（最佳：老闆從 Google Business
+    // Profile 取得的「直達寫評論」連結，例：https://g.page/r/.../review）。
+    // 沒設則 fallback 到 1008 hair studio 的短連結 — 點擊到該店家 Maps 頁，客人再
+    // 滑下去點「寫評論」按鈕。比搜尋頁少一步，是目前能 hardcode 的最佳體驗。
     const googleReviewUrl =
       process.env.GOOGLE_REVIEW_URL ||
-      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        tenant?.address || shopName,
-      )}`;
+      "https://maps.app.goo.gl/5XNK3uakFphFhSvd8";
     return reply(
       transferReportedMessage({
         serviceName: target.service.name,

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { errorResponse, AppError, UnauthorizedError } from "@/lib/utils/errors";
 import { requireBookingAuth, requireAdmin, requireBookingOwnership } from "@/lib/auth/booking-auth";
 import { getLineClient } from "@/lib/line/client";
+import { paymentReceivedMessage } from "@/lib/line/messages";
 import { logger } from "@/lib/utils/logger";
 
 type RouteParams = { params: Promise<{ bookingId: string }> };
@@ -24,7 +25,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       where: { id: bookingId },
       include: {
         service: { select: { name: true, price: true } },
-        user: { select: { lineUserId: true, displayName: true } },
+        user: { select: { lineUserId: true, displayName: true, segment: true } },
         payment: true,
       },
     });
@@ -68,15 +69,27 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           },
         });
 
-    // Notify customer (best-effort)
+    // Notify customer (best-effort) — 用 Flex Message receipt-style，跟
+    // transferReportedMessage 視覺一致，形成完整體驗閉環。VIP 客戶有專屬感謝文案。
     const lineUserId = booking.user.lineUserId;
     if (lineUserId && !lineUserId.startsWith("manual-")) {
       try {
         const lineClient = getLineClient();
-        await lineClient.pushMessage(lineUserId, {
-          type: "text",
-          text: `✓ 已確認收款\n${booking.service.name}\n金額：NT$${payment.amount.toLocaleString()}\n期待您的光臨！`,
-        });
+        const dateStr = booking.date.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+        const googleReviewUrl =
+          process.env.GOOGLE_REVIEW_URL ||
+          "https://maps.app.goo.gl/5XNK3uakFphFhSvd8";
+        await lineClient.pushMessage(
+          lineUserId,
+          paymentReceivedMessage({
+            serviceName: booking.service.name,
+            date: dateStr,
+            amount: payment.amount,
+            displayName: booking.user.displayName ?? undefined,
+            isVip: booking.user.segment === "VIP",
+            googleReviewUrl,
+          }),
+        );
       } catch (err) {
         logger.error("Failed to push payment-received to customer", err, "payments");
       }

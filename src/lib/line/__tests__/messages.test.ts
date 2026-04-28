@@ -8,6 +8,7 @@ import {
   weeklyReportMessage,
   paymentGuideMessage,
   transferReportedMessage,
+  paymentReceivedMessage,
   adminNewBookingMessage,
   adminCancellationMessage,
   serviceInquiryFlexMessage,
@@ -413,6 +414,47 @@ describe("transferReportedMessage", () => {
     const bodyStr = JSON.stringify(msg.contents);
     expect(bodyStr).not.toMatch(/\d+\s*分鐘/);
     expect(bodyStr).toContain("會推播通知");
+  });
+});
+
+describe("paymentReceivedMessage", () => {
+  const baseParams = {
+    serviceName: "男性剪髮",
+    date: "2026-04-28",
+    amount: 800,
+  };
+
+  it("includes booking detail + receipt-style framing", () => {
+    const msg = paymentReceivedMessage(baseParams);
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("男性剪髮");
+    expect(bodyStr).toContain("NT$ 800");
+    // dashed-line receipt vibes
+    expect(bodyStr).toContain("....");
+  });
+
+  it("personalizes greeting with displayName when provided", () => {
+    const msg = paymentReceivedMessage({ ...baseParams, displayName: "王小明" });
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("王小明");
+    expect(bodyStr).toContain("已收款");
+  });
+
+  it("VIP tagline differs from regular tagline", () => {
+    const regular = paymentReceivedMessage(baseParams);
+    const vip = paymentReceivedMessage({ ...baseParams, isVip: true });
+    expect(JSON.stringify(regular.contents)).not.toContain("VIP");
+    expect(JSON.stringify(vip.contents)).toContain("VIP");
+  });
+
+  it("includes Google review CTA when googleReviewUrl provided", () => {
+    const msg = paymentReceivedMessage({
+      ...baseParams,
+      googleReviewUrl: "https://maps.app.goo.gl/abc",
+    });
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("五星好評");
+    expect(bodyStr).toContain("maps.app.goo.gl/abc");
   });
 });
 

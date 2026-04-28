@@ -297,6 +297,126 @@ export function transferReportedMessage(params: {
   };
 }
 
+/**
+ * Payment received Flex Message — sent when admin clicks「✓ 確認收款」.
+ *
+ * 2026-04-28 新增。取代原本 mark-received 路由送的純文字訊息，視覺一致 receipt-style，
+ * 跟 transferReportedMessage 形成完整體驗閉環（客人收到「款到了」+ 慶祝感）。
+ */
+export function paymentReceivedMessage(params: {
+  serviceName: string;
+  date: string;
+  amount: number;
+  displayName?: string;
+  isVip?: boolean;
+  googleReviewUrl?: string;
+}): FlexMessage {
+  const { serviceName, date, amount, displayName, isVip, googleReviewUrl } = params;
+  const humanDate = formatHumanDate(date);
+  const dashedLine = ".".repeat(28);
+  const greeting = displayName ? `${displayName}，已收款 ✓` : "已確認收款 ✓";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const footerButtons: any[] = [];
+  if (googleReviewUrl) {
+    footerButtons.push({
+      type: "button" as const,
+      action: {
+        type: "uri" as const,
+        label: "⭐ 給我們五星好評",
+        uri: googleReviewUrl,
+      },
+      style: "primary" as const,
+      color: "#C88B3B",
+      height: "md" as const,
+    });
+  }
+
+  const bubble: FlexBubble = {
+    type: "bubble",
+    header: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        { type: "text", text: greeting, weight: "bold", size: "lg", color: "#003D2B", wrap: true },
+      ],
+      backgroundColor: "#FAF1E0",
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "text",
+          text: dashedLine,
+          size: "xxs",
+          color: "#9CB1A4",
+          align: "center",
+        },
+        {
+          type: "box",
+          layout: "vertical",
+          spacing: "sm",
+          margin: "md",
+          contents: [
+            infoRow("服務", serviceName),
+            infoRow("日期", humanDate),
+            infoRow("金額", `NT$ ${amount.toLocaleString()}`),
+          ],
+        },
+        {
+          type: "text",
+          text: dashedLine,
+          size: "xxs",
+          color: "#9CB1A4",
+          align: "center",
+          margin: "md",
+        },
+        {
+          type: "text",
+          text: isVip
+            ? "💚 感謝 VIP 顧客的長期支持，期待下次！"
+            : "💚 感謝您的光臨，期待下次！",
+          size: "sm",
+          color: isVip ? "#C88B3B" : "#003D2B",
+          weight: "bold",
+          align: "center",
+          margin: "lg",
+          wrap: true,
+        },
+        ...(googleReviewUrl
+          ? [
+              {
+                type: "text" as const,
+                text: "若滿意今日服務，懇請花 30 秒給我們五星好評 💚",
+                size: "xs" as const,
+                color: "#809A8E" as const,
+                align: "center" as const,
+                margin: "md" as const,
+                wrap: true,
+              },
+            ]
+          : []),
+      ],
+    },
+    footer: footerButtons.length
+      ? {
+          type: "box",
+          layout: "vertical",
+          spacing: "sm",
+          contents: footerButtons,
+          backgroundColor: "#FAF1E0",
+        }
+      : undefined,
+  };
+
+  return {
+    type: "flex",
+    altText: `已收款確認 — ${serviceName} NT$${amount.toLocaleString()}`,
+    contents: bubble,
+  };
+}
+
 /** Cash selected Flex Message — sent after customer chooses pay-at-store */
 export function cashSelectedMessage(params: {
   serviceName: string;
