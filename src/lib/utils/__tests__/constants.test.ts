@@ -33,12 +33,12 @@ describe("business constants", () => {
     expect(VIOLATION_RESTRICTION_MONTHS).toBe(1);
   });
 
-  it("marks at-risk after 100 days inactive (PRD-v3 §5)", () => {
-    expect(AT_RISK_DAYS).toBe(100);
+  it("marks at-risk after 120 days inactive (Plan A 2026-04-29 — calibrated to 1008 ~3.36 visits/yr)", () => {
+    expect(AT_RISK_DAYS).toBe(120);
   });
 
-  it("marks lapsed after 180 days inactive (PRD-v3 §5)", () => {
-    expect(LAPSED_DAYS).toBe(180);
+  it("marks lapsed after 240 days inactive (Plan A 2026-04-29)", () => {
+    expect(LAPSED_DAYS).toBe(240);
   });
 
   it("at-risk window precedes lapsed (AT_RISK < LAPSED)", () => {
