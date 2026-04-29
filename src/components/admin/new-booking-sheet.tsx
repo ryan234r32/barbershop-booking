@@ -65,8 +65,10 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
 
   // Customer search — skip when name/phone match the currently bound customer
   // (avoids a redundant query right after picking from the suggestions list).
+  // Min 2 chars + 500ms debounce: 1-char queries triggered every keystroke and
+  // ran a full ILIKE '%x%' table scan; mobile keyboard input felt laggy.
   useEffect(() => {
-    if (customerName.length < 1) { setSuggestions([]); return; }
+    if (customerName.trim().length < 2) { setSuggestions([]); return; }
     if (boundCustomer && customerName === boundCustomer.displayName) {
       setSuggestions([]);
       return;
@@ -77,7 +79,7 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
         const data = await res.json();
         setSuggestions(data.customers || []);
       } catch { /* silent */ }
-    }, 300);
+    }, 500);
     return () => clearTimeout(timer);
   }, [customerName, boundCustomer]);
 
@@ -92,7 +94,9 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
     setCustomerName(next);
     // Edited away from the bound name → drop the binding so we don't
     // accidentally link a stranger's booking to that customer record.
+    // Toast tells admin the binding is gone (they may have intended to keep it).
     if (boundCustomer && next !== boundCustomer.displayName) {
+      toast({ type: "info", message: "已解除綁定，這次會建立新客戶" });
       setBoundCustomer(null);
     }
   };
@@ -100,6 +104,7 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
   const handlePhoneChange = (next: string) => {
     setPhone(next);
     if (boundCustomer && next !== (boundCustomer.phone || "")) {
+      toast({ type: "info", message: "已解除綁定，這次會建立新客戶" });
       setBoundCustomer(null);
     }
   };

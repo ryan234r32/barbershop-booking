@@ -15,8 +15,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params;
 
-    const customer = await prisma.user.findUnique({
-      where: { id },
+    // Tenant isolation: scope by both id AND tenantId. Without this, a multi-tenant
+    // admin could fetch any customer record across tenants. findFirst (not findUnique)
+    // because we're matching on a compound (id + tenantId) that isn't a Prisma unique key.
+    const customer = await prisma.user.findFirst({
+      where: { id, tenantId: admin.tenantId },
       include: {
         bookings: {
           include: {
@@ -41,7 +44,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Status counts across ALL bookings (not just the 20 in `bookings`)
     const statusGroups = await prisma.booking.groupBy({
       by: ["status"],
-      where: { userId: id },
+      where: { userId: id, tenantId: admin.tenantId },
       _count: { _all: true },
     });
     const statusCounts: Record<string, number> = {};
@@ -53,7 +56,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Total revenue from all COMPLETED bookings — sum service.price.
     const completedBookings = await prisma.booking.findMany({
-      where: { userId: id, status: "COMPLETED" },
+      where: { userId: id, tenantId: admin.tenantId, status: "COMPLETED" },
       select: { service: { select: { price: true } } },
     });
     const totalRevenue = completedBookings.reduce(
@@ -133,9 +136,20 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       data.restrictedUntil = null;
     }
 
-    const customer = await prisma.user.update({
-      where: { id },
+    // Tenant isolation: updateMany with compound where so a cross-tenant id is
+    // a no-op (count === 0 → 404), not a silent overwrite. Then re-fetch via
+    // findFirst to return the updated record so the response shape stays stable.
+    const result = await prisma.user.updateMany({
+      where: { id, tenantId: admin.tenantId },
       data,
+    });
+
+    if (result.count === 0) {
+      return Response.json({ error: "Customer not found" }, { status: 404 });
+    }
+
+    const customer = await prisma.user.findFirst({
+      where: { id, tenantId: admin.tenantId },
     });
 
     return Response.json({ customer });
