@@ -1,6 +1,12 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { AT_RISK_DAYS, LAPSED_DAYS } from "@/lib/utils/constants";
+import {
+  AT_RISK_DAYS,
+  LAPSED_DAYS,
+  VIP_RECENT_DAYS,
+  VIP_VISITS_180D,
+  REGULAR_VISITS_365D,
+} from "@/lib/utils/constants";
 
 /**
  * Recalculate customer segments.
@@ -23,36 +29,29 @@ export async function recalculateSegments(tenantId?: string) {
 }
 
 /**
- * Single-SQL CRM segmentation (PRD-v3 §5 + E-10).
+ * Single-SQL CRM segmentation (Plan A 2026-04-29 — 依 1008 真實 3.36 次/年訪頻校準).
  *
- * Replaces the prior 4-step `updateMany` chain with one CTE-style UPDATE that:
- *   1. Computes COMPLETED visit count in the last 60 days per user
- *   2. Joins back via LEFT JOIN so users with zero visits still get evaluated
- *   3. Applies the segment CASE in priority order (BLACKLISTED > LAPSED > AT_RISK > VIP > REGULAR > NEW)
+ * Aggregates COMPLETED bookings per user with two windowed counts (180d + 365d)
+ * in one LEFT JOIN, then applies segment CASE in priority order. Postgres planner:
+ * aggregate → hash join → bulk UPDATE. O(N+M).
  *
- * Why a single SQL: prior 4 sequential updateMany would also OK, but the new
- * V3 rules require "visits in last 60 days" — totalVisits column alone can't
- * answer that. A naive impl would be N+1 (per-user query); CTE keeps it O(N+M)
- * with a single hash aggregate + hash join in Postgres.
- *
- * Segment rules (PRD-v3 §5):
+ * Segment rules (constants in lib/utils/constants.ts):
  *   BLACKLISTED → no change (manual lockout)
  *   totalVisits = 0 → NEW
- *   lastVisitAt < (now - LAPSED_DAYS=180) → LAPSED
- *   lastVisitAt < (now - AT_RISK_DAYS=100) → AT_RISK
- *   visits_60d ≥ 12 AND lastVisitAt within 100 days → VIP (also flips is_vip)
- *   visits_60d ≥ 1 AND lastVisitAt within 100 days → REGULAR
+ *   lastVisitAt < (now - LAPSED_DAYS=240) → LAPSED
+ *   lastVisitAt < (now - AT_RISK_DAYS=120) → AT_RISK
+ *   cnt_180d ≥ VIP_VISITS_180D=6 AND lastVisitAt ≥ (now - VIP_RECENT_DAYS=60) → VIP
+ *   cnt_365d ≥ REGULAR_VISITS_365D=3 AND lastVisitAt ≥ (now - AT_RISK_DAYS=120) → REGULAR
  *   else → NEW
  */
 async function recalculateSegmentsForTenant(tenantId: string) {
   const now = new Date();
   const atRiskDate = new Date(now.getTime() - AT_RISK_DAYS * 24 * 60 * 60 * 1000);
   const lapsedDate = new Date(now.getTime() - LAPSED_DAYS * 24 * 60 * 60 * 1000);
-  const window60d = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+  const vipRecentDate = new Date(now.getTime() - VIP_RECENT_DAYS * 24 * 60 * 60 * 1000);
+  const window180d = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+  const window365d = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
 
-  // Single CTE-style UPDATE — replaces 4 sequential updateMany (E-10).
-  // Postgres planner produces: aggregate (COMPLETED bookings in 60d window) →
-  // LEFT JOIN to all tenant users → single bulk UPDATE. ~O(N+M) not N*M.
   await prisma.$executeRaw`
     UPDATE users
     SET
@@ -61,26 +60,30 @@ async function recalculateSegmentsForTenant(tenantId: string) {
         WHEN users.total_visits = 0 THEN 'NEW'
         WHEN users.last_visit_at < ${lapsedDate} THEN 'LAPSED'
         WHEN users.last_visit_at < ${atRiskDate} THEN 'AT_RISK'
-        WHEN COALESCE(sub.cnt_60d, 0) >= 12 THEN 'VIP'
-        WHEN COALESCE(sub.cnt_60d, 0) >= 1 THEN 'REGULAR'
+        WHEN COALESCE(sub.cnt_180d, 0) >= ${VIP_VISITS_180D}
+             AND users.last_visit_at >= ${vipRecentDate} THEN 'VIP'
+        WHEN COALESCE(sub.cnt_365d, 0) >= ${REGULAR_VISITS_365D}
+             AND users.last_visit_at >= ${atRiskDate} THEN 'REGULAR'
         ELSE 'NEW'
       END)::"CustomerSegment",
       is_vip = (CASE
-        WHEN users.segment != 'BLACKLISTED' AND COALESCE(sub.cnt_60d, 0) >= 12 THEN true
+        WHEN users.segment != 'BLACKLISTED'
+             AND COALESCE(sub.cnt_180d, 0) >= ${VIP_VISITS_180D}
+             AND users.last_visit_at >= ${vipRecentDate} THEN true
         ELSE users.is_vip
       END)
     FROM (
-      SELECT u.id, COALESCE(v.cnt, 0) AS cnt_60d
+      SELECT u.id,
+             COALESCE(SUM(CASE WHEN v.date >= ${window180d} THEN 1 ELSE 0 END), 0)::int AS cnt_180d,
+             COALESCE(COUNT(v.id), 0)::int AS cnt_365d
       FROM users u
-      LEFT JOIN (
-        SELECT user_id, COUNT(*)::int AS cnt
-        FROM bookings
-        WHERE tenant_id = ${tenantId}
-          AND status = 'COMPLETED'
-          AND date >= ${window60d}
-        GROUP BY user_id
-      ) v ON v.user_id = u.id
+      LEFT JOIN bookings v
+        ON v.user_id = u.id
+        AND v.tenant_id = ${tenantId}
+        AND v.status = 'COMPLETED'
+        AND v.date >= ${window365d}
       WHERE u.tenant_id = ${tenantId}
+      GROUP BY u.id
     ) sub
     WHERE users.id = sub.id
   `;

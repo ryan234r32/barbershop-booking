@@ -41,19 +41,21 @@ describe("recalculateSegments — CTE single-pass (PRD-v3 §5 + E-10)", () => {
     const call = $executeRaw.mock.calls[0];
     const values = call.slice(1);
 
-    // Order in segmentation.ts SQL: lapsedDate, atRiskDate, tenantId, window60d, tenantId
-    // We verify the tenant id appears (twice — both subquery + outer WHERE)
+    // Plan A SQL parameter count (each `${}` is one param, even on value reuse):
+    //   tenantId × 2 (subquery JOIN + outer WHERE)
+    //   Date params × 7:
+    //     lapsedDate × 1, atRiskDate × 2 (AT_RISK + REGULAR recent),
+    //     vipRecentDate × 2 (VIP segment + is_vip), window180d × 1, window365d × 1
+    //   Numeric thresholds × 3: VIP_VISITS_180D × 2, REGULAR_VISITS_365D × 1
     const tenantIdAppearances = values.filter((v) => v === "tenant-x").length;
     expect(tenantIdAppearances).toBe(2);
 
-    // Verify all dates are recent (computed from `new Date()` at call time)
     const dates = values.filter((v): v is Date => v instanceof Date);
-    expect(dates.length).toBe(3); // lapsedDate, atRiskDate, window60d
+    expect(dates.length).toBe(7);
     for (const d of dates) {
-      // All three offsets are positive (subtract from now), so all dates < now
       expect(d.getTime()).toBeLessThanOrEqual(after);
-      // All within last year (sanity: 180 days max)
-      expect(d.getTime()).toBeGreaterThan(before - 200 * 24 * 60 * 60 * 1000);
+      // All within last 400 days (widest window is 365)
+      expect(d.getTime()).toBeGreaterThan(before - 400 * 24 * 60 * 60 * 1000);
     }
   });
 
@@ -89,20 +91,30 @@ describe("recalculateSegments — CTE single-pass (PRD-v3 §5 + E-10)", () => {
     expect(fullSql).toContain("BLACKLISTED");
   });
 
-  it("SQL must implement VIP threshold of 12+ visits in 60d", async () => {
+  it("SQL must reference VIP threshold (180-day window) + recent-visit gate", async () => {
     await recalculateSegments("t");
     const sqlFragments = $executeRaw.mock.calls[0][0];
     const fullSql = Array.isArray(sqlFragments) ? sqlFragments.join("?") : String(sqlFragments);
-    expect(fullSql).toContain(">= 12");
+    expect(fullSql).toContain("cnt_180d");
     expect(fullSql).toContain("'VIP'");
+    // VIP must check recent activity (last_visit_at >= vipRecentDate)
+    expect(fullSql).toMatch(/last_visit_at\s*>=/);
   });
 
-  it("SQL must implement REGULAR threshold of 1+ visits in 60d", async () => {
+  it("SQL must reference REGULAR threshold (365-day window)", async () => {
     await recalculateSegments("t");
     const sqlFragments = $executeRaw.mock.calls[0][0];
     const fullSql = Array.isArray(sqlFragments) ? sqlFragments.join("?") : String(sqlFragments);
-    expect(fullSql).toContain(">= 1");
+    expect(fullSql).toContain("cnt_365d");
     expect(fullSql).toContain("'REGULAR'");
+  });
+
+  it("SQL pre-filters bookings to 365-day window (perf bound)", async () => {
+    await recalculateSegments("t");
+    const sqlFragments = $executeRaw.mock.calls[0][0];
+    const fullSql = Array.isArray(sqlFragments) ? sqlFragments.join("?") : String(sqlFragments);
+    // The aggregate's date >= ${window365d} ensures we don't scan all bookings
+    expect(fullSql).toMatch(/v\.date\s*>=/);
   });
 });
 

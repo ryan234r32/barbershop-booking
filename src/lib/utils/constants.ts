@@ -21,8 +21,19 @@ export function generateAllSlots(startTime: string, endTime: string): string[] {
 export const MAX_VIOLATIONS = 3;
 export const VIOLATION_RESTRICTION_MONTHS = 1;
 
-export const AT_RISK_DAYS = 100;
-export const LAPSED_DAYS = 180;
+// CRM segment thresholds (Plan A — 2026-04-29，依 1008 真實 3.36 次/年訪頻校準)
+//
+// 規則 (priority: BLACKLISTED > LAPSED > AT_RISK > VIP > REGULAR > NEW):
+//   LAPSED:   最後一次 > 240 天前
+//   AT_RISK:  最後一次 > 120 天前 (≤ 240)
+//   VIP:      180 天內 ≥ 6 次 + 最近 ≤ 60 天前 (月剪一次的死忠)
+//   REGULAR:  365 天內 ≥ 3 次 + 最近 ≤ 120 天前 (建立關係)
+//   else:     NEW
+export const AT_RISK_DAYS = 120;
+export const LAPSED_DAYS = 240;
+export const VIP_RECENT_DAYS = 60;
+export const VIP_VISITS_180D = 6;
+export const REGULAR_VISITS_365D = 3;
 
 export const BOOKING_LOCK_TTL_MS = 10_000;
 
