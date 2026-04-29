@@ -385,35 +385,35 @@ describe("transferReportedMessage", () => {
     expect(bodyStr).toContain("12345");
   });
 
-  it("personalizes header with displayName", () => {
-    const msg = transferReportedMessage({ ...baseParams, displayName: "王小明" });
+  it("clearly says 已收到回報 + 對帳中 (NOT 已收款)", () => {
+    const msg = transferReportedMessage(baseParams);
     const bodyStr = JSON.stringify(msg.contents);
-    expect(bodyStr).toContain("王小明");
+    expect(bodyStr).toContain("已收到回報");
+    expect(bodyStr).toContain("對帳中");
+    // Must NOT use 已收款 wording — that's reserved for paymentReceivedMessage (post-admin-confirm)
+    expect(bodyStr).not.toContain("已收款");
+    expect(bodyStr).not.toContain("已確認收款");
   });
 
-  it("includes Google review CTA when googleReviewUrl provided", () => {
+  it("v4: removes Google review CTA from this step (premature; moved to paymentReceivedMessage)", () => {
     const msg = transferReportedMessage({
       ...baseParams,
       googleReviewUrl: "https://g.page/r/abc/review",
     });
     const bodyStr = JSON.stringify(msg.contents);
-    expect(bodyStr).toContain("五星好評");
-    expect(bodyStr).toContain("g.page");
+    expect(bodyStr).not.toContain("五星好評");
   });
 
-  it("shows VIP tagline only when isVip=true", () => {
-    const noVip = transferReportedMessage(baseParams);
-    expect(JSON.stringify(noVip.contents)).not.toContain("VIP");
-
+  it("v4: removes VIP tagline from this step (moved to paymentReceivedMessage)", () => {
     const vip = transferReportedMessage({ ...baseParams, isVip: true });
-    expect(JSON.stringify(vip.contents)).toContain("VIP");
+    expect(JSON.stringify(vip.contents)).not.toContain("VIP");
   });
 
   it("does NOT promise a reconciliation ETA (老闆 may settle in evening)", () => {
     const msg = transferReportedMessage(baseParams);
     const bodyStr = JSON.stringify(msg.contents);
     expect(bodyStr).not.toMatch(/\d+\s*分鐘/);
-    expect(bodyStr).toContain("會推播通知");
+    expect(bodyStr).toContain("會再通知您");
   });
 });
 
@@ -424,20 +424,18 @@ describe("paymentReceivedMessage", () => {
     amount: 800,
   };
 
-  it("includes booking detail + receipt-style framing", () => {
+  it("includes booking detail (compact: only 服務 + 金額, no 末五碼)", () => {
     const msg = paymentReceivedMessage(baseParams);
     const bodyStr = JSON.stringify(msg.contents);
     expect(bodyStr).toContain("男性剪髮");
     expect(bodyStr).toContain("NT$ 800");
-    // dashed-line receipt vibes
-    expect(bodyStr).toContain("....");
   });
 
-  it("personalizes greeting with displayName when provided", () => {
-    const msg = paymentReceivedMessage({ ...baseParams, displayName: "王小明" });
+  it("clearly says 已確認收款 + 對帳完成 (distinct from transferReportedMessage)", () => {
+    const msg = paymentReceivedMessage(baseParams);
     const bodyStr = JSON.stringify(msg.contents);
-    expect(bodyStr).toContain("王小明");
-    expect(bodyStr).toContain("已收款");
+    expect(bodyStr).toContain("已確認收款");
+    expect(bodyStr).toContain("對帳完成");
   });
 
   it("VIP tagline differs from regular tagline", () => {

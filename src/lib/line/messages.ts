@@ -143,14 +143,11 @@ export function bookingConfirmationMessage(params: {
 /**
  * Transfer reported Flex Message — sent after customer submits last-5 digits.
  *
- * 2026-04-28 v3: receipt-style polish。客人匯款都是服務完成後做的事，
- * 這張卡是整段體驗的最後一棒 — 慶祝感 + 邀評論。
- *
- * - displayName 個人化 header
- * - 日期改用人性化「今天」「明天」「4 月 27 日 (週日)」格式
- * - VIP 客人加額外感謝文案（segment-aware）
- * - 不承諾對帳 ETA（老闆可能晚上才對帳，30 分鐘是不切實際的承諾）
- * - 上下用 ........ 模擬 receipt 虛線分隔線，提升儀式感
+ * 2026-04-29 v4: 緊湊版 + 明確「對帳中」狀態。
+ * - 跟 paymentReceivedMessage 視覺明確區隔（這張說「收到回報、對帳中」，
+ *   那張才說「對帳完成、款項已收」）
+ * - 拿掉 receipt 虛線、邀評 CTA、VIP 文案、displayName 個人化（移到 Step 2）
+ * - body 只 3 行：服務 / 金額 / 末五碼，砍一半版面
  */
 export function transferReportedMessage(params: {
   serviceName: string;
@@ -159,6 +156,7 @@ export function transferReportedMessage(params: {
   endTime: string;
   price: number;
   transferLastFive: string;
+  // googleReviewUrl + displayName + isVip 保留參數位避免 caller break，但 v4 不再使用
   googleReviewUrl?: string;
   displayName?: string;
   isVip?: boolean;
@@ -170,132 +168,82 @@ export function transferReportedMessage(params: {
     endTime,
     price,
     transferLastFive,
-    googleReviewUrl,
-    displayName,
-    isVip,
   } = params;
+  void params.googleReviewUrl;
+  void params.displayName;
+  void params.isVip;
+  void startTime;
+  void endTime; // v4 不再顯示時間範圍
 
   const humanDate = formatHumanDate(date);
-  const dashedLine = ".".repeat(28);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const footerButtons: any[] = [];
-  if (googleReviewUrl) {
-    footerButtons.push({
-      type: "button" as const,
-      action: {
-        type: "uri" as const,
-        label: "⭐ 給我們五星好評",
-        uri: googleReviewUrl,
-      },
-      style: "primary" as const,
-      color: "#C88B3B",
-      height: "md" as const,
-    });
-  }
-
-  const greeting = displayName
-    ? `${displayName}，已收到您的匯款 ✓`
-    : "已收到轉帳資訊 ✓";
 
   const bubble: FlexBubble = {
     type: "bubble",
     header: {
       type: "box",
       layout: "vertical",
+      paddingAll: "md",
       contents: [
-        { type: "text", text: greeting, weight: "bold", size: "lg", color: "#003D2B", wrap: true },
+        {
+          type: "text",
+          text: "💳 已收到回報",
+          weight: "bold",
+          size: "md",
+          color: "#003D2B",
+        },
+        {
+          type: "box",
+          layout: "horizontal",
+          margin: "sm",
+          contents: [
+            {
+              type: "text",
+              text: "🔍 對帳中",
+              size: "xs",
+              color: "#809A8E",
+              flex: 0,
+            },
+            {
+              type: "text",
+              text: humanDate,
+              size: "xs",
+              color: "#9CB1A4",
+              align: "end",
+            },
+          ],
+        },
       ],
       backgroundColor: "#FAF1E0",
     },
     body: {
       type: "box",
       layout: "vertical",
+      paddingAll: "md",
+      spacing: "sm",
       contents: [
-        // Top dashed separator (receipt vibe)
+        infoRow("服務", serviceName),
+        infoRow("金額", `NT$ ${price.toLocaleString()}`),
+        infoRow("末五碼", transferLastFive),
         {
           type: "text",
-          text: dashedLine,
-          size: "xxs",
-          color: "#9CB1A4",
-          align: "center",
-        },
-        {
-          type: "box",
-          layout: "vertical",
-          spacing: "sm",
-          margin: "md",
-          contents: [
-            infoRow("服務", serviceName),
-            infoRow("日期", humanDate),
-            infoRow("時間", `${startTime} - ${endTime}`),
-            infoRow("金額", `NT$ ${price.toLocaleString()}`),
-            infoRow("末五碼", transferLastFive),
-          ],
-        },
-        // Bottom dashed separator
-        {
-          type: "text",
-          text: dashedLine,
-          size: "xxs",
-          color: "#9CB1A4",
-          align: "center",
-          margin: "md",
-        },
-        {
-          type: "text",
-          text: "老闆對帳完成後會推播通知您 🙏",
+          text: "老闆對帳完成後會再通知您 🙏",
           size: "xs",
-          color: "#809A8E",
+          color: "#9CB1A4",
           margin: "md",
           align: "center",
           wrap: true,
         },
-        ...(isVip
-          ? [
-              {
-                type: "text" as const,
-                text: "💚 感謝 VIP 顧客的長期支持",
-                size: "xs" as const,
-                color: "#C88B3B" as const,
-                margin: "md" as const,
-                align: "center" as const,
-                weight: "bold" as const,
-              },
-            ]
-          : []),
-        ...(googleReviewUrl
-          ? [
-              {
-                type: "text" as const,
-                text: "若滿意今日服務，懇請花 30 秒給我們五星好評，是對小店最大的支持 💚",
-                size: "xs" as const,
-                color: "#809A8E" as const,
-                margin: "lg" as const,
-                align: "center" as const,
-                wrap: true,
-              },
-            ]
-          : []),
       ],
     },
-    footer: footerButtons.length
-      ? {
-          type: "box",
-          layout: "vertical",
-          spacing: "sm",
-          contents: footerButtons,
-          backgroundColor: "#FAF1E0",
-        }
-      : undefined,
   };
 
   return {
     type: "flex",
-    altText: `已收到轉帳末五碼 ${transferLastFive}`,
+    altText: `已收到末五碼 ${transferLastFive}，對帳中`,
     contents: bubble,
   };
 }
+
 
 /**
  * Payment received Flex Message — sent when admin clicks「✓ 確認收款」.
@@ -313,8 +261,7 @@ export function paymentReceivedMessage(params: {
 }): FlexMessage {
   const { serviceName, date, amount, displayName, isVip, googleReviewUrl } = params;
   const humanDate = formatHumanDate(date);
-  const dashedLine = ".".repeat(28);
-  const greeting = displayName ? `${displayName}，已收款 ✓` : "已確認收款 ✓";
+  void displayName; // v4: 不再個人化 header（避免太過情緒勒索）
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const footerButtons: any[] = [];
@@ -328,7 +275,7 @@ export function paymentReceivedMessage(params: {
       },
       style: "primary" as const,
       color: "#C88B3B",
-      height: "md" as const,
+      height: "sm" as const,
     });
   }
 
@@ -337,46 +284,52 @@ export function paymentReceivedMessage(params: {
     header: {
       type: "box",
       layout: "vertical",
+      paddingAll: "md",
       contents: [
-        { type: "text", text: greeting, weight: "bold", size: "lg", color: "#003D2B", wrap: true },
+        {
+          type: "text",
+          text: "✅ 已確認收款",
+          weight: "bold",
+          size: "md",
+          color: "#003D2B",
+        },
+        {
+          type: "box",
+          layout: "horizontal",
+          margin: "sm",
+          contents: [
+            {
+              type: "text",
+              text: "✓ 對帳完成",
+              size: "xs",
+              color: "#5B8266",
+              flex: 0,
+            },
+            {
+              type: "text",
+              text: humanDate,
+              size: "xs",
+              color: "#9CB1A4",
+              align: "end",
+            },
+          ],
+        },
       ],
       backgroundColor: "#FAF1E0",
     },
     body: {
       type: "box",
       layout: "vertical",
+      paddingAll: "md",
+      spacing: "sm",
       contents: [
-        {
-          type: "text",
-          text: dashedLine,
-          size: "xxs",
-          color: "#9CB1A4",
-          align: "center",
-        },
-        {
-          type: "box",
-          layout: "vertical",
-          spacing: "sm",
-          margin: "md",
-          contents: [
-            infoRow("服務", serviceName),
-            infoRow("日期", humanDate),
-            infoRow("金額", `NT$ ${amount.toLocaleString()}`),
-          ],
-        },
-        {
-          type: "text",
-          text: dashedLine,
-          size: "xxs",
-          color: "#9CB1A4",
-          align: "center",
-          margin: "md",
-        },
+        infoRow("服務", serviceName),
+        infoRow("金額", `NT$ ${amount.toLocaleString()}`),
         {
           type: "text",
           text: isVip
-            ? "💚 感謝 VIP 顧客的長期支持，期待下次！"
-            : "💚 感謝您的光臨，期待下次！",
+            ? "💚 感謝 VIP 顧客的長期支持"
+            : "💚 感謝您的光臨，期待下次",
           size: "sm",
           color: isVip ? "#C88B3B" : "#003D2B",
           weight: "bold",
@@ -384,28 +337,14 @@ export function paymentReceivedMessage(params: {
           margin: "lg",
           wrap: true,
         },
-        ...(googleReviewUrl
-          ? [
-              {
-                type: "text" as const,
-                text: "若滿意今日服務，懇請花 30 秒給我們五星好評 💚",
-                size: "xs" as const,
-                color: "#809A8E" as const,
-                align: "center" as const,
-                margin: "md" as const,
-                wrap: true,
-              },
-            ]
-          : []),
       ],
     },
     footer: footerButtons.length
       ? {
           type: "box",
           layout: "vertical",
-          spacing: "sm",
+          paddingAll: "md",
           contents: footerButtons,
-          backgroundColor: "#FAF1E0",
         }
       : undefined,
   };
