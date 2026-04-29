@@ -30,7 +30,12 @@ export async function GET(request: NextRequest) {
     const [customers, total] = await Promise.all([
       prisma.user.findMany({
         where,
-        orderBy: { lastVisitAt: "desc" },
+        // Search context (admin booking-sheet typeahead) sorts alphabetically so
+        // first-time customers (lastVisitAt = null) aren't pushed off the bottom.
+        // List context (no search) keeps lastVisitAt DESC for the customers page.
+        orderBy: search
+          ? [{ displayName: "asc" }, { lastVisitAt: "desc" }]
+          : { lastVisitAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
         select: {

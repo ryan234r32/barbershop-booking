@@ -169,8 +169,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2b. Update user profile if provided
-    if (input.realName || input.displayName || input.phone || input.birthday) {
+    // 2b. Update user profile if provided.
+    //     Skip entirely when admin picked an existing customer (useExistingCustomer):
+    //     if admin chose them from the suggestion list they're booking, not editing —
+    //     edits go through PATCH /api/customers/[id]. Otherwise an accidental space
+    //     in the name field overwrites the real customer's displayName.
+    if (
+      !useExistingCustomer &&
+      (input.realName || input.displayName || input.phone || input.birthday)
+    ) {
       const profileUpdate: Record<string, unknown> = {};
       if (input.realName) profileUpdate.realName = input.realName;
       if (input.displayName) profileUpdate.displayName = input.displayName;
