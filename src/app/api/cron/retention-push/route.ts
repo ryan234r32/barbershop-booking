@@ -6,6 +6,14 @@
  * customers. Anti-spam guarded: cooldown / opt-out / daily limit / send window.
  *
  * Plan §14.4 / §14.5
+ *
+ * ⚠️  NOT YET WIRED IN vercel.json — pending owner approval of plan §14.8
+ *     (B1-B6: discount %, loyal-customer skip, perm n=8 sample size, hair-care
+ *     opt-out, send window, daily cap). Manual invocation works (admin can hit
+ *     this endpoint with the cron secret); the schedule is intentionally absent
+ *     from vercel.json to prevent unsolicited LINE pushes to real customers.
+ *     To enable: add `{ path: "/api/cron/retention-push", schedule: "0 2 * * *" }`
+ *     to vercel.json crons array.
  */
 
 import { NextRequest } from "next/server";
