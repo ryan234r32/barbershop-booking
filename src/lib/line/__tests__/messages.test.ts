@@ -307,8 +307,8 @@ describe("paymentGuideMessage", () => {
     expect(bodyStr).toMatch(/"text":"1234 5678 9012"[^}]*"weight":"bold"/);
   });
 
-  it("guides customer to confirm-after-transfer", () => {
-    const msg = paymentGuideMessage(params);
+  it("guides customer to confirm-after-transfer (when amount provided)", () => {
+    const msg = paymentGuideMessage({ ...params, amount: 800 });
     const bodyStr = JSON.stringify(msg.contents);
     expect(bodyStr).toContain("完成轉帳後");
     expect(bodyStr).toContain("確定完成匯款");
@@ -372,12 +372,29 @@ describe("paymentGuideMessage", () => {
     expect(bodyStr).toContain('"clipboardText":"123456789012"');
   });
 
-  it("includes a 確定完成匯款 button that triggers the 5-digit prompt", () => {
-    const msg = paymentGuideMessage(params);
+  it("includes a 確定完成匯款 button that triggers the 5-digit prompt (when hasAmount)", () => {
+    const msg = paymentGuideMessage({ ...params, amount: 800 });
     const bodyStr = JSON.stringify(msg.contents);
     expect(bodyStr).toContain("確定完成匯款");
-    // Must be a message action (not clipboard) so webhook can intercept
     expect(bodyStr).toContain('"text":"確定完成匯款"');
+  });
+
+  // ─── 2026-04-29 bug fix: avoid stale-amount + cross-booking 5-digit drift ───
+  it("HIDES 確定完成匯款 button when no amount (no eligible booking)", () => {
+    // When customer's bookings are all already paid, we must NOT show the
+    // confirm-done button. Otherwise clicking → bot prompts 5-digit → 5-digit
+    // submission says "查無待回報" → confused customer.
+    const msg = paymentGuideMessage(params); // no amount
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).not.toContain("確定完成匯款");
+    // But copy-account button still there (customer may want it for other reason)
+    expect(bodyStr).toContain("點此複製帳號");
+  });
+
+  it("shows 目前無待付款預約 note when amount omitted", () => {
+    const msg = paymentGuideMessage(params); // no amount
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("目前無待付款預約");
   });
 
 });

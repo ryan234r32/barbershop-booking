@@ -22,6 +22,7 @@ import {
   bleachConsultationFlexMessage,
 } from "@/lib/line/messages";
 import { notifyAdminTransferReported } from "@/lib/notifications/admin-notify";
+import { pickEligibleBookingForPayment } from "@/lib/booking/payment-pick";
 import { MessageKind } from "@prisma/client";
 import { classifyIntent } from "./classify-intent";
 
@@ -322,8 +323,10 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
 
   // Priority 4: Payment / transfer
   if (intent === "payment") {
-    // 帶該客「最近一筆 CONFIRMED booking」金額 + 預約明細（讓客人看清楚是哪天的服務）
-    // 優先順序：(1) 今天 endTime 已過 → (2) 今天即將開始 → (3) 最近 3 天已過 → (4) 未來最近
+    // 用共用 helper 找該客「最近一筆待付款 booking」(payment 狀態 non-terminal)。
+    // payment-last5 intent 也用同一個 helper，確保 Flex 顯示的金額 = 5 碼會寫入的 booking。
+    // 之前兩個 handler 各自 query 造成 BUG：Flex 顯示「男性剪髮 NT$1000」但
+    // 5 碼卻寫到「漂髮 NT$2600」。
     let amount: number | undefined;
     let serviceName: string | undefined;
     let bookingDate: string | undefined;
@@ -336,36 +339,13 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
         select: { id: true },
       });
       if (user) {
-        const now = nowTaipei();
-        const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-        const sevenDaysAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-        const candidates = await prisma.booking.findMany({
-          where: {
-            userId: user.id,
-            tenantId,
-            status: "CONFIRMED",
-            date: { gte: threeDaysAgo, lte: sevenDaysAhead },
-          },
-          include: { service: { select: { name: true, price: true } } },
-          orderBy: [{ date: "asc" }, { startTime: "asc" }],
-          take: 20,
-        });
-
-        if (candidates.length > 0) {
-          const scored = candidates.map((b) => {
-            const bDateStr = b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
-            const [y, m, d] = bDateStr.split("-").map(Number);
-            const [eH] = b.endTime.split(":").map(Number);
-            const endUtc = new Date(Date.UTC(y, m - 1, d, eH - 8, 0, 0));
-            return { booking: b, distance: Math.abs(endUtc.getTime() - now.getTime()) };
-          });
-          scored.sort((a, b) => a.distance - b.distance);
-          const closest = scored[0].booking;
-          amount = closest.service.price;
-          serviceName = closest.service.name;
-          bookingDate = closest.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
-          bookingStartTime = closest.startTime;
-          bookingEndTime = closest.endTime;
+        const pick = await pickEligibleBookingForPayment(user.id, tenantId);
+        if (pick.eligible) {
+          amount = pick.eligible.service.price;
+          serviceName = pick.eligible.service.name;
+          bookingDate = pick.eligible.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+          bookingStartTime = pick.eligible.startTime;
+          bookingEndTime = pick.eligible.endTime;
         }
       }
     }
@@ -444,35 +424,16 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
     if (!user) {
       return reply({ type: "text", text: "查無您的預約資料 🙏" });
     }
-    const now = nowTaipei();
-    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-    const sevenDaysAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const candidates = await prisma.booking.findMany({
-      where: {
-        userId: user.id,
-        tenantId,
-        status: "CONFIRMED",
-        date: { gte: threeDaysAgo, lte: sevenDaysAhead },
-      },
-      include: { service: { select: { price: true } } },
-      orderBy: [{ date: "asc" }, { startTime: "asc" }],
-      take: 20,
-    });
-    if (candidates.length === 0) {
+    const pick = await pickEligibleBookingForPayment(user.id, tenantId);
+    if (!pick.eligible) {
       return reply({
         type: "text",
-        text: "查無您近期的預約金額，若有疑問請洽店家 🙏",
+        text: pick.hasOnlyPaidBookings
+          ? "您最近的預約款項已對帳中或已完成，目前無待付金額 🙏"
+          : "查無您近期的預約金額，若有疑問請洽店家 🙏",
       });
     }
-    const scored = candidates.map((b) => {
-      const bDateStr = b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
-      const [y, m, d] = bDateStr.split("-").map(Number);
-      const [eH] = b.endTime.split(":").map(Number);
-      const endUtc = new Date(Date.UTC(y, m - 1, d, eH - 8, 0, 0));
-      return { booking: b, distance: Math.abs(endUtc.getTime() - now.getTime()) };
-    });
-    scored.sort((a, b) => a.distance - b.distance);
-    const amt = scored[0].booking.service.price;
+    const amt = pick.eligible.service.price;
     return reply({
       type: "text",
       text:
@@ -500,53 +461,18 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
       return reply({ type: "text", text: "查無您的預約資料，若有疑問請洽店家 🙏" });
     }
 
-    // 找該客「最近一筆 CONFIRMED 且 Payment 還沒終結」的 booking。
-    // 範圍 = 前 3 天 ~ 後 7 天，挑 endTime 距離 now 最近、且 payment 還沒
-    // VERIFYING/RECEIVED/WAIVED 的那筆。
-    const now = nowTaipei();
-    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-    const sevenDaysAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const candidates = await prisma.booking.findMany({
-      where: {
-        userId: user.id,
-        tenantId,
-        status: "CONFIRMED",
-        date: { gte: threeDaysAgo, lte: sevenDaysAhead },
-      },
-      include: {
-        service: { select: { name: true, price: true } },
-        payment: true,
-      },
-      orderBy: [{ date: "asc" }, { startTime: "asc" }],
-      take: 20,
-    });
+    // 用共用 helper（同一份邏輯支撐 payment + payment-last5 兩個 intent）
+    const pick = await pickEligibleBookingForPayment(user.id, tenantId);
 
-    const eligible = candidates.filter(
-      (b) =>
-        !b.payment ||
-        b.payment.status === "PENDING" ||
-        b.payment.status === "AWAITING_BANK",
-    );
-
-    if (eligible.length === 0) {
-      const hasAnyBooking = candidates.length > 0;
+    if (!pick.eligible) {
       return reply({
         type: "text",
-        text: hasAnyBooking
-          ? `查無待回報的預約 — 你最近的預約付款已在處理中或已完成。若有疑問請洽店家 🙏`
+        text: pick.hasOnlyPaidBookings
+          ? `查無待回報的預約 — 您最近的預約款項已對帳中或已完成。若有疑問請洽店家 🙏`
           : `查無您近期的預約，請先預約後再回報匯款 🙏`,
       });
     }
-
-    const scored = eligible.map((b) => {
-      const bDateStr = b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
-      const [y, m, d] = bDateStr.split("-").map(Number);
-      const [eH] = b.endTime.split(":").map(Number);
-      const endUtc = new Date(Date.UTC(y, m - 1, d, eH - 8, 0, 0));
-      return { booking: b, distance: Math.abs(endUtc.getTime() - now.getTime()) };
-    });
-    scored.sort((a, b) => a.distance - b.distance);
-    const target = scored[0].booking;
+    const target = pick.eligible;
 
     // Atomic transition — create or upgrade PENDING/AWAITING_BANK → VERIFYING
     const payment = target.payment

@@ -1644,13 +1644,39 @@ export function paymentGuideMessage(params: {
     );
   }
 
+  // 沒有待付金額時，明確告訴客人，避免誤會（之前 bug：顯示已付過的舊預約金額）
+  if (!hasAmount) {
+    bodyContents.push(
+      { type: "separator", margin: "lg" },
+      {
+        type: "text",
+        text: "目前無待付款預約 ✓",
+        size: "sm",
+        weight: "bold",
+        color: "#5B8266",
+        align: "center",
+        margin: "lg",
+      },
+      {
+        type: "text",
+        text: "下次預約結束後，這裡會自動帶出金額",
+        size: "xs",
+        color: "#9CB1A4",
+        align: "center",
+        margin: "xs",
+      },
+    );
+  }
+
   // 簡化文案：拿掉「完成步驟」標題、不再出現「現金付款」干擾文字
   // 動線靠 footer 兩顆按鈕引導即可（複製帳號 → 確定完成匯款）
   bodyContents.push(
     { type: "separator", margin: "lg" },
     {
       type: "text",
-      text: "完成轉帳後，請點下方按鈕回報",
+      text: hasAmount
+        ? "完成轉帳後，請點下方按鈕回報"
+        : "（仍可複製帳號備用）",
       size: "xs",
       margin: "lg",
       color: "#9CB1A4",
@@ -1671,11 +1697,12 @@ export function paymentGuideMessage(params: {
     clipboardText,
   });
 
-  // Footer 兩段式視覺層級：
-  //   Step 1 (複製帳號)        — 森林綠 primary，size sm
-  //   分隔線 + 「完成轉帳後 →」 hint
-  //   Step 2 (確定完成匯款)    — 金黃 primary，size md（更明顯）
-  // 確定完成匯款是整個 flow 的關鍵 CTA，所以用更暖、更大的視覺強調
+  // Footer：
+  //   Step 1 (複製帳號)        — 森林綠 primary, sm — 永遠顯示（即使無待付）
+  //   分隔線 + hint + Step 2   — 只有 hasAmount 才出現
+  //
+  // 沒有待付金額時，「確定完成匯款」按鈕隱藏 — 避免客人按下去走 5 碼流程，
+  // 結果 bot 回「查無待回報」造成困惑。
   const footerContents: (FlexButton | FlexComponent)[] = [
     {
       type: "button",
@@ -1684,32 +1711,37 @@ export function paymentGuideMessage(params: {
       color: "#003D2B",
       height: "sm",
     },
-    {
-      type: "separator",
-      margin: "md",
-    },
-    {
-      type: "text",
-      text: "✅ 完成轉帳後請點下方",
-      size: "xs",
-      color: "#809A8E",
-      align: "center",
-      margin: "md",
-    },
-    {
-      // 2026-04-27 v2: 視覺升級。message action 故意讓 chat 留下
-      // 「確定完成匯款」氣泡，作為客人完成轉帳的明確 timestamp
-      type: "button",
-      action: {
-        type: "message",
-        label: "✓ 確定完成匯款",
-        text: "確定完成匯款",
-      },
-      style: "primary",
-      color: "#C88B3B", // 金黃色強調 — 與 brand 既有 accent 色一致
-      height: "md",
-    },
   ];
+
+  if (hasAmount) {
+    footerContents.push(
+      {
+        type: "separator",
+        margin: "md",
+      },
+      {
+        type: "text",
+        text: "✅ 完成轉帳後請點下方",
+        size: "xs",
+        color: "#809A8E",
+        align: "center",
+        margin: "md",
+      },
+      {
+        // 2026-04-27 v2: 視覺升級。message action 故意讓 chat 留下
+        // 「確定完成匯款」氣泡，作為客人完成轉帳的明確 timestamp
+        type: "button",
+        action: {
+          type: "message",
+          label: "✓ 確定完成匯款",
+          text: "確定完成匯款",
+        },
+        style: "primary",
+        color: "#C88B3B",
+        height: "md",
+      },
+    );
+  }
 
   const bubble: FlexBubble = {
     type: "bubble",
