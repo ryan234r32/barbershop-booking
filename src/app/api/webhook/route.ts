@@ -133,10 +133,19 @@ async function handleEvent(
 
       if (reply) {
         if (reply.usePush && lineUserId) {
-          // Dynamic replies (DB queries) use pushMessage to avoid 1s webhook timeout
-          lineClient.pushMessage(lineUserId, reply.message).catch((err) =>
-            logger.error("Failed to push keyword reply", err, "webhook")
-          );
+          // Dynamic replies (DB queries) use pushMessage instead of replyMessage
+          // because the reply token can race with DB latency.
+          //
+          // MUST await on Vercel: fire-and-forget promises get killed when the
+          // function response is sent. Without await, the first tap on a Rich
+          // Menu keyword (e.g. 我的預約) would not deliver the Flex reply on a
+          // cold function — user would have to tap a second time to "wake" the
+          // function. Same pattern as POST /api/bookings line 285.
+          try {
+            await lineClient.pushMessage(lineUserId, reply.message);
+          } catch (err) {
+            logger.error("Failed to push keyword reply", err, "webhook");
+          }
         } else {
           await lineClient.replyMessage(event.replyToken, reply.message);
         }
