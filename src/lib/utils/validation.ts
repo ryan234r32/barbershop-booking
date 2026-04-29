@@ -9,6 +9,12 @@ export const createBookingSchema = z.object({
   // authenticated caller (admin cookie or LIFF ID token). See booking-auth.ts.
   // Kept optional here for backwards compatibility with old clients; ignored.
   lineUserId: z.string().optional(),
+  // customerId — admin-only path. When admin manually books for an existing
+  // customer (picked from suggestions), pass user.id so we link the booking
+  // to that user instead of creating a fresh "manual-{adminId}-{uuid}" ghost.
+  // Server validates the user belongs to the same tenant before linking.
+  // LIFF callers ignore this field entirely (identity comes from token).
+  customerId: z.string().optional(),
   notes: z.string().optional(),
   realName: z.string().optional(),
   displayName: z.string().optional(),
