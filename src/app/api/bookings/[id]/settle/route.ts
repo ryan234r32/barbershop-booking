@@ -2,24 +2,24 @@
  * V3.6 §5.2 — daily 對帳 endpoint.
  *
  * PATCH /api/bookings/[id]/settle  → set settledAt = now()
- * DELETE /api/bookings/[id]/settle → clear settledAt (revert)
+ *   - If booking.status === CONFIRMED, also auto-transition to COMPLETED
+ *     (with checkedInAt = now if null) since "確認" in the daily reconciliation
+ *     view implies "this happened + payment received".
+ *   - If booking.status === COMPLETED, just set settledAt.
+ *   - If booking.status === NO_SHOW / CANCELLED, reject.
  *
- * Used by the daily view "確認" button. Idempotent — re-confirming a booking
- * returns the same timestamp without DB write. Cross-tenant safe via
- * adminUser.tenantId.
+ * DELETE /api/bookings/[id]/settle → clear settledAt (revert to unsettled).
+ *
+ * Idempotent: re-settling a settled booking returns the same timestamp.
+ * Cross-tenant safe via adminUser.tenantId.
  */
 
 import { NextRequest } from "next/server";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
-import { errorResponse, UnauthorizedError } from "@/lib/utils/errors";
+import { errorResponse, UnauthorizedError, AppError } from "@/lib/utils/errors";
 
 type RouteParams = { params: Promise<{ id: string }> };
-
-const bodySchema = z
-  .object({ expectedUpdatedAt: z.string().datetime().optional() })
-  .optional();
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
@@ -27,65 +27,47 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (!admin) throw new UnauthorizedError();
 
     const { id } = await params;
-    const body = await request.json().catch(() => null);
-    const parsed = body ? bodySchema.parse(body) : undefined;
-    const expectedUpdatedAt = parsed?.expectedUpdatedAt;
 
     const booking = await prisma.booking.findFirst({
       where: { id, tenantId: admin.tenantId },
-      select: { id: true, settledAt: true, updatedAt: true },
+      select: { id: true, status: true, settledAt: true, checkedInAt: true },
     });
     if (!booking) {
       return Response.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    // Idempotent
     if (booking.settledAt) {
       return Response.json({
         ok: true,
         settledAt: booking.settledAt,
-        updatedAt: booking.updatedAt,
         wasAlreadySettled: true,
       });
     }
 
-    const settleTime = new Date();
-    const result = await prisma.booking.updateMany({
-      where: {
-        id,
-        tenantId: admin.tenantId,
-        settledAt: null,
-        ...(expectedUpdatedAt
-          ? { updatedAt: new Date(expectedUpdatedAt) }
-          : { updatedAt: booking.updatedAt }),
-      },
-      data: { settledAt: settleTime },
-    });
-
-    if (result.count === 0) {
-      const fresh = await prisma.booking.findFirst({
-        where: { id, tenantId: admin.tenantId },
-        select: { settledAt: true, updatedAt: true },
-      });
-      return Response.json(
-        {
-          error: "stale_write",
-          message: "此預約已更新，請重新整理頁面",
-          current: fresh,
-        },
-        { status: 409 },
-      );
+    if (booking.status === "NO_SHOW") {
+      throw new AppError("無法對帳：此預約為 No-show，請另行處理", 400, "no_show_settle");
+    }
+    if (booking.status === "CANCELLED" || booking.status === "CANCELLED_BY_ADMIN") {
+      throw new AppError("無法對帳：此預約已取消", 400, "cancelled_settle");
     }
 
-    const fresh = await prisma.booking.findFirst({
-      where: { id, tenantId: admin.tenantId },
-      select: { settledAt: true, updatedAt: true },
-    });
+    const settleTime = new Date();
+    const data: {
+      settledAt: Date;
+      status?: "COMPLETED";
+      checkedInAt?: Date;
+    } = { settledAt: settleTime };
+    if (booking.status === "CONFIRMED") {
+      data.status = "COMPLETED";
+      if (booking.checkedInAt == null) data.checkedInAt = settleTime;
+    }
+
+    await prisma.booking.update({ where: { id }, data });
 
     return Response.json({
       ok: true,
-      settledAt: fresh?.settledAt ?? settleTime,
-      updatedAt: fresh?.updatedAt,
+      settledAt: settleTime,
+      autoCompleted: booking.status === "CONFIRMED",
       wasAlreadySettled: false,
     });
   } catch (err) {

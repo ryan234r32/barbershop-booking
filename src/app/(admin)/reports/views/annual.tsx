@@ -8,6 +8,7 @@ import { MTag } from "@/components/admin/reports/v3.6/m-tag";
 import { KpiCard } from "@/components/admin/reports/v3.6/kpi-card";
 import { CohortStackedBar } from "@/components/admin/reports/v3.6/cohort-bar";
 import { SectionDivider } from "@/components/admin/reports/v3.6/section-divider";
+import { DateStrip } from "@/components/admin/reports/v3.6/date-strip";
 import type {
   RfmGrid,
   YoYResult,
@@ -81,35 +82,16 @@ export function AnnualView({ period, onPeriodChange }: AnnualViewProps) {
 
   const empty = data.totals.bookings === 0;
   const yearNum = data.year;
-  const todayYear = parseInt(
-    new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" }).slice(0, 4),
-    10,
-  );
 
   return (
     <div className="space-y-5 print:bg-white">
-      {/* Year navigator */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => onPeriodChange(String(yearNum - 1))}
-          className="px-3 py-2 rounded-lg bg-[var(--color-surface)] text-sm font-medium hover:bg-[var(--color-text-muted)]/10 print:hidden"
-        >
-          ← {yearNum - 1}
-        </button>
-        <div className="flex-1 text-center bg-[var(--color-bg)] border border-[var(--color-brand)]/12 rounded-lg px-4 py-2">
-          <p className="text-base font-bold text-[var(--color-text-primary)]">{yearNum} 年度報告</p>
-          <p className="text-[10px] text-[var(--color-text-muted)] tabular-nums">
-            {data.range.fromIso} ~ {data.range.toIso}
-          </p>
-        </div>
-        <button
-          onClick={() => onPeriodChange(String(yearNum + 1))}
-          disabled={yearNum >= todayYear}
-          className="px-3 py-2 rounded-lg bg-[var(--color-surface)] text-sm font-medium hover:bg-[var(--color-text-muted)]/10 disabled:opacity-30 disabled:cursor-not-allowed print:hidden"
-        >
-          {yearNum + 1} →
-        </button>
+      {/* Year navigator — 左右滑動選年份 */}
+      <div className="print:hidden">
+        <DateStrip kind="year" selected={String(yearNum)} onSelect={onPeriodChange} />
       </div>
+      <p className="text-[10px] text-[var(--color-text-muted)] tabular-nums text-center print:hidden">
+        {data.range.fromIso} ~ {data.range.toIso}
+      </p>
 
       {empty && (
         <div className="bg-[var(--color-surface)] rounded-2xl p-12 text-center text-sm text-[var(--color-text-muted)]">
@@ -137,7 +119,14 @@ export function AnnualView({ period, onPeriodChange }: AnnualViewProps) {
                 status={statusForYoY(data.yoy.cumulativeYoyPct)}
                 benchmark={
                   data.yoy.hasLastYearData && data.yoy.cumulativeYoyPct !== null
-                    ? { label: "業界 +15~20%", target: 15 + 50, current: 50 + (data.yoy.cumulativeYoyPct ?? 0) }
+                    ? {
+                        current: 50 + Math.max(-50, Math.min(50, data.yoy.cumulativeYoyPct ?? 0)),
+                        tiers: [
+                          { at: 0, label: "-50%" },
+                          { at: 50, label: "持平" },
+                          { at: 65, label: "業界 +15~20%" },
+                        ],
+                      }
                     : undefined
                 }
               />
@@ -146,14 +135,28 @@ export function AnnualView({ period, onPeriodChange }: AnnualViewProps) {
                 primary={`NT$${data.totals.arpu.toLocaleString()}`}
                 secondary={`年訪 ${data.totals.visitFrequency.toFixed(2)} 次/人`}
                 status={statusForArpu(data.totals.visitFrequency)}
-                benchmark={{ label: "業界 4.88 次/年", target: 50, current: (data.totals.visitFrequency / 4.88) * 50 }}
+                benchmark={{
+                  current: Math.min(100, (data.totals.visitFrequency / 6) * 100),
+                  tiers: [
+                    { at: 0, label: "0 次" },
+                    { at: 81.3, label: "業界 4.88 次/年" },
+                    { at: 100, label: "頂尖 6+ 次" },
+                  ],
+                }}
               />
               <KpiCard
                 label="客戶留存基數"
                 primary={`${data.retention.retention90Days.toFixed(1)}%`}
                 secondary={`90 天回訪率`}
                 status={statusForRetention(data.retention.retention90Days)}
-                benchmark={{ label: "業界 50-60%", target: 55, current: data.retention.retention90Days }}
+                benchmark={{
+                  current: data.retention.retention90Days,
+                  tiers: [
+                    { at: 0, label: "0%" },
+                    { at: 50, label: "業界 50%" },
+                    { at: 65, label: "頂尖 65%" },
+                  ],
+                }}
               />
             </div>
           </SectionDivider>
@@ -279,7 +282,7 @@ function ExecutiveSummary({ data }: { data: AnnualResponse }) {
       </p>
       <p className="text-sm text-[var(--color-text-body)] leading-relaxed">
         {data.year} 年全年營收 <strong>NT${totals.revenue.toLocaleString()}</strong>
-        （YoY <strong className={yoy.cumulativeYoyPct === null ? "" : yoy.cumulativeYoyPct >= 0 ? "text-[var(--color-success)]" : "text-[var(--color-danger)]"}>{yoyText}</strong>）
+        （較 {data.year - 1} 年 <strong className={yoy.cumulativeYoyPct === null ? "" : yoy.cumulativeYoyPct >= 0 ? "text-[var(--color-success)]" : "text-[var(--color-danger)]"}>{yoyText}</strong>）
         ，服務 <strong>{totals.uniqueCustomers}</strong> 位不重複客戶，
         其中冠軍 + 忠實老客貢獻 <strong>{champPct.toFixed(1)}%</strong> 主要營收。
         {retentionGap > 0

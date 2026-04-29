@@ -783,10 +783,16 @@ export interface DailyView {
   totalRevenue: number;
   servedCount: number;
   avgTicket: number;
+  /** count of non-cancelled bookings whose settledAt is null — what the owner
+   * still needs to reconcile. Includes both CONFIRMED-but-not-completed and
+   * COMPLETED-not-settled. */
   pendingCount: number;
+  /** total non-cancelled bookings on this day (= 對帳進度 denominator) */
+  reconcileTotalCount: number;
   warningCount: number;
   isClosed: boolean;
   closedAt: string | null;
+  /** Cash totals: COMPLETED-only so cash + bank == revenue */
   cashTotal: number;
   cashConfirmed: number;
   cashPending: number;
@@ -797,6 +803,10 @@ export interface DailyView {
   /** comparison: 4-week median revenue for the same weekday */
   comparisonMedian4w: number;
   comparisonDeltaPct: number | null;
+  /** End-of-day status counts for the bottom summary row */
+  noShowCount: number;
+  rescheduledCount: number;
+  cancelledCount: number;
 }
 
 export async function computeDailyView(
@@ -830,6 +840,7 @@ export async function computeDailyView(
       status: true,
       settledAt: true,
       notes: true,
+      lateRescheduleCount: true,
       service: { select: { name: true, price: true } },
       payment: { select: { amount: true, status: true, method: true } },
       user: { select: { displayName: true, realName: true } },
@@ -857,23 +868,42 @@ export async function computeDailyView(
     };
   });
 
+  // Revenue / served / avg ticket — COMPLETED only (real earned money).
   const completedRows = rows.filter((r) => r.bookingStatus === "COMPLETED");
   const totalRevenue = completedRows.reduce((s, r) => s + r.amount, 0);
   const servedCount = completedRows.length;
   const avgTicket = servedCount > 0 ? Math.round(totalRevenue / servedCount) : 0;
-  const pendingCount = rows.filter(
-    (r) => r.bookingStatus === "COMPLETED" && r.settledAt == null,
-  ).length;
+
+  // 對帳進度 — total expected reconciliations (all non-cancelled rows on this day)
+  // vs how many have settledAt set. pendingCount mirrors what the owner sees in
+  // the list as "rows without ✓ 已對".
+  const reconcileTotalCount = rows.length;
+  const settledTotalCount = rows.filter((r) => r.settledAt != null).length;
+  const pendingCount = reconcileTotalCount - settledTotalCount;
   const warningCount = rows.filter((r) => r.isWarning).length;
 
-  const cashRows = rows.filter((r) => r.paymentMethod === "CASH");
-  const bankRows = rows.filter((r) => r.paymentMethod === "BANK_TRANSFER");
-  const cashTotal = cashRows.reduce((s, r) => s + r.amount, 0);
-  const cashConfirmed = cashRows.filter((r) => r.settledAt != null).length;
-  const cashPending = cashRows.length - cashConfirmed;
-  const bankTotal = bankRows.reduce((s, r) => s + r.amount, 0);
-  const bankConfirmed = bankRows.filter((r) => r.settledAt != null).length;
-  const bankPending = bankRows.length - bankConfirmed;
+  // Cash / bank totals — COMPLETED only so cash + bank == today's revenue.
+  // (Future CONFIRMED bookings are not counted; they're still in the list but
+  // contribute zero to the cash/bank cards until they settle.)
+  const completedCashRows = completedRows.filter((r) => r.paymentMethod === "CASH");
+  const completedBankRows = completedRows.filter((r) => r.paymentMethod === "BANK_TRANSFER");
+  const cashTotal = completedCashRows.reduce((s, r) => s + r.amount, 0);
+  const cashConfirmed = completedCashRows.filter((r) => r.settledAt != null).length;
+  const cashPending = completedCashRows.length - cashConfirmed;
+  const bankTotal = completedBankRows.reduce((s, r) => s + r.amount, 0);
+  const bankConfirmed = completedBankRows.filter((r) => r.settledAt != null).length;
+  const bankPending = completedBankRows.length - bankConfirmed;
+
+  // End-of-day status counts (footer summary)
+  const noShowCount = rows.filter((r) => r.bookingStatus === "NO_SHOW").length;
+  const rescheduledCount = bookings.filter((b) => b.lateRescheduleCount > 0).length;
+  const cancelledCount = await prisma.booking.count({
+    where: {
+      tenantId,
+      date: { gte: dayStart, lte: dayEnd },
+      status: { in: ["CANCELLED", "CANCELLED_BY_ADMIN"] },
+    },
+  });
 
   // Comparison: 4-week median revenue same weekday
   const dayObj = new Date(Date.UTC(y, m - 1, d));
@@ -906,6 +936,7 @@ export async function computeDailyView(
     servedCount,
     avgTicket,
     pendingCount,
+    reconcileTotalCount,
     warningCount,
     isClosed: closedAt != null,
     closedAt,
@@ -915,6 +946,9 @@ export async function computeDailyView(
     bankTotal,
     bankConfirmed,
     bankPending,
+    noShowCount,
+    rescheduledCount,
+    cancelledCount,
     rows,
     comparisonMedian4w: median4w,
     comparisonDeltaPct,
