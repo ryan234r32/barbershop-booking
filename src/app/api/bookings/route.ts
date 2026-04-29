@@ -96,13 +96,17 @@ export async function POST(request: NextRequest) {
     const input = createBookingSchema.parse(body);
 
     // Derive identity from auth, NOT from body.
-    // Admin-created bookings synthesize a per-booking lineUserId since walk-in/phone
-    // customers may have no LINE account. LIFF path uses the verified token subject.
-    const authedLineUserId =
-      auth.type === "admin"
+    // - Admin path: if admin picked an existing customer (input.customerId), we
+    //   link the booking to that user later. Otherwise we synthesize a fresh
+    //   "manual-{adminId}-{uuid}" walk-in user.
+    // - LIFF path: always use the verified token subject; customerId ignored.
+    const tenantId = auth.tenantId;
+    const useExistingCustomer = auth.type === "admin" && !!input.customerId;
+    const authedLineUserId = useExistingCustomer
+      ? "" // unused — we'll fetch the user by id below
+      : auth.type === "admin"
         ? `manual-${auth.adminId}-${randomUUID()}`
         : auth.lineUserId;
-    const tenantId = auth.tenantId;
 
     // 1. Get service details
     const service = await prisma.service.findUnique({
@@ -134,21 +138,35 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Get or create user
-    let user = await prisma.user.findUnique({
-      where: {
-        tenantId_lineUserId: {
-          tenantId,
-          lineUserId: authedLineUserId,
-        },
-      },
-    });
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          tenantId,
-          lineUserId: authedLineUserId,
+    // 2a. Admin manual booking with existing customer picked → look up by id,
+    //     enforce tenant isolation. Reject mismatches with 404 instead of
+    //     silently falling back to ghost-user creation (would defeat the fix).
+    let user;
+    if (useExistingCustomer) {
+      const existing = await prisma.user.findUnique({
+        where: { id: input.customerId },
+      });
+      if (!existing || existing.tenantId !== tenantId) {
+        return Response.json({ error: "Customer not found" }, { status: 404 });
+      }
+      user = existing;
+    } else {
+      user = await prisma.user.findUnique({
+        where: {
+          tenantId_lineUserId: {
+            tenantId,
+            lineUserId: authedLineUserId,
+          },
         },
       });
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            tenantId,
+            lineUserId: authedLineUserId,
+          },
+        });
+      }
     }
 
     // 2b. Update user profile if provided

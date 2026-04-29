@@ -1,11 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
 import useSWR from "swr";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { MCard } from "@/components/admin/reports/v3.6/m-card";
 import { MTag } from "@/components/admin/reports/v3.6/m-tag";
-import { MToggle } from "@/components/admin/reports/v3.6/m-toggle";
+import { DateStrip } from "@/components/admin/reports/v3.6/date-strip";
 import { KpiCard } from "@/components/admin/reports/v3.6/kpi-card";
 import { AlertBanner } from "@/components/admin/reports/v3.6/alert-banner";
 import { ThreeWayDecomposition } from "@/components/admin/reports/v3.6/three-way-decomposition";
@@ -72,22 +71,6 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
     { revalidateOnFocus: false },
   );
 
-  // 3-month toggle: prev / current / next (next disabled if future)
-  const todayPeriod = useMemo(() => {
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
-    return today.slice(0, 7);
-  }, []);
-  const toggleOptions = useMemo(() => {
-    const [yStr, mStr] = period.split("-").map(Number);
-    const prev = shiftMonth(yStr, mStr, -1);
-    const next = shiftMonth(yStr, mStr, +1);
-    return [
-      { value: prev, label: monthLabel(prev) },
-      { value: period, label: monthLabel(period) },
-      { value: next, label: monthLabel(next), disabled: next > todayPeriod },
-    ];
-  }, [period, todayPeriod]);
-
   if (isLoading || !data) {
     return (
       <div className="space-y-4">
@@ -114,8 +97,8 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
 
   return (
     <div className="space-y-5">
-      {/* ① Header — 月份切換器 */}
-      <MToggle options={toggleOptions} value={period} onChange={onPeriodChange} />
+      {/* ① Header — 月份切換器（左右滑動） */}
+      <DateStrip kind="month" selected={period} onSelect={onPeriodChange} />
 
       {empty && (
         <div className="bg-[var(--color-surface)] rounded-2xl p-12 text-center text-sm text-[var(--color-text-muted)] space-y-2">
@@ -142,12 +125,12 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                   {data.momChangePct !== null && (
                     <MTag tone={data.momChangePct >= 0 ? "success" : "danger"}>
-                      MoM {data.momChangePct >= 0 ? "+" : ""}{data.momChangePct.toFixed(1)}%
+                      較上月 {data.momChangePct >= 0 ? "+" : ""}{data.momChangePct.toFixed(1)}%
                     </MTag>
                   )}
                   {data.yoyChangePct !== null && (
                     <MTag tone={data.yoyChangePct >= 0 ? "success" : "danger"}>
-                      YoY {data.yoyChangePct >= 0 ? "+" : ""}{data.yoyChangePct.toFixed(1)}%
+                      較去年同月 {data.yoyChangePct >= 0 ? "+" : ""}{data.yoyChangePct.toFixed(1)}%
                     </MTag>
                   )}
                 </div>
@@ -198,9 +181,15 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
             <KpiCard
               label="新客 90 天回訪率"
               primary={`${data.retention.retention90Days.toFixed(1)}%`}
-              secondary={`業界 50%+`}
               status={statusForRetention(data.retention.retention90Days)}
-              benchmark={{ label: "業界基準 50%", target: 50, current: data.retention.retention90Days }}
+              benchmark={{
+                current: data.retention.retention90Days,
+                tiers: [
+                  { at: 0, label: "0%" },
+                  { at: 40, label: "業界平均 40%" },
+                  { at: 65, label: "頂尖 65%" },
+                ],
+              }}
             />
             <KpiCard
               label="離店再預約率"
@@ -213,11 +202,18 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
               }
               comparisonLabel="上月"
               status={statusForPrebook(data.prebook.rate)}
-              benchmark={{ label: "業界基準 50%", target: 50, current: data.prebook.rate }}
+              benchmark={{
+                current: data.prebook.rate,
+                tiers: [
+                  { at: 0, label: "0%" },
+                  { at: 50, label: "警戒 50%" },
+                  { at: 70, label: "業界目標 70%" },
+                ],
+              }}
             />
             <KpiCard
-              label="月活躍客戶"
-              primary={`${customers}`}
+              label="月活躍客戶數"
+              primary={`${customers} 人`}
               secondary={`新客 ${t.newCustomers} · 老客 ${customers - t.newCustomers}`}
               deltaPct={
                 data.previousTotals.uniqueCustomers > 0
@@ -232,9 +228,8 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
               status={statusForActive(customers)}
             />
             <KpiCard
-              label="染燙佔比"
+              label="染燙服務佔比"
               primary={`${data.chemicalShare.toFixed(1)}%`}
-              secondary={`業界 35%+`}
               deltaPct={
                 data.chemicalShareLastMonth > 0
                   ? Math.round((data.chemicalShare - data.chemicalShareLastMonth) * 10) / 10
@@ -242,14 +237,29 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
               }
               comparisonLabel="上月"
               status={statusForChemical(data.chemicalShare)}
-              benchmark={{ label: "業界基準 35%", target: 35, current: data.chemicalShare }}
+              benchmark={{
+                current: data.chemicalShare,
+                tiers: [
+                  { at: 0, label: "本月" },
+                  { at: 35, label: "業界目標 40%" },
+                  { at: 60, label: "頂尖 60%" },
+                ],
+              }}
             />
           </div>
 
-          {/* ⑤ 12 個月 YoY 對比 */}
-          <SectionDivider number="01" title="12 月 YoY 對比" subtitle="今年 vs 去年同月">
+          {/* ⑤ 12 個月與去年同期對照 */}
+          <SectionDivider
+            number="01"
+            title="過去 12 個月 vs 去年同期"
+            subtitle="點任一月份柱狀，看詳細數字 + 同期比"
+          >
             <MCard padding="md">
-              <YoYBars data={data.yoy} hasLastYearData={data.yoy.hasLastYearData} />
+              <YoYBars
+                data={data.yoy}
+                hasLastYearData={data.yoy.hasLastYearData}
+                anchorYear={parseInt(period.slice(0, 4), 10)}
+              />
             </MCard>
           </SectionDivider>
 
@@ -397,13 +407,6 @@ function SetTargetButton({
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
-
-function shiftMonth(year: number, month: number, delta: number): string {
-  const idx = year * 12 + (month - 1) + delta;
-  const y = Math.floor(idx / 12);
-  const m = (idx % 12) + 1;
-  return `${y}-${String(m).padStart(2, "0")}`;
-}
 
 function monthLabel(period: string): string {
   const m = parseInt(period.slice(5, 7), 10);

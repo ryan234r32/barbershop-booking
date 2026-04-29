@@ -5,6 +5,8 @@ import useSWR from "swr";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { MCard } from "@/components/admin/reports/v3.6/m-card";
 import { MTag } from "@/components/admin/reports/v3.6/m-tag";
+import { DateStrip } from "@/components/admin/reports/v3.6/date-strip";
+import { NewBookingSheet } from "@/components/admin/new-booking-sheet";
 import type { DailyView, DailyBookingRow } from "@/lib/reports/v3.6/aggregates";
 
 interface DailyResponse {
@@ -20,7 +22,7 @@ const fetcher = (url: string) =>
   });
 
 interface DailyViewProps {
-  date: string; // YYYY-MM-DD
+  date: string;
   onDateChange: (next: string) => void;
 }
 
@@ -31,58 +33,50 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
     { revalidateOnFocus: false },
   );
   const [filter, setFilter] = useState<"all" | "pending" | "warning">("all");
+  const [backfillOpen, setBackfillOpen] = useState(false);
 
   const filteredRows = useMemo(() => {
     const rows = data?.data.rows ?? [];
     if (filter === "all") return rows;
-    if (filter === "pending") return rows.filter((r) => r.bookingStatus === "COMPLETED" && r.settledAt == null);
+    if (filter === "pending") return rows.filter((r) => r.settledAt == null);
     return rows.filter((r) => r.isWarning);
   }, [data, filter]);
-
-  if (isLoading || !data) {
-    return (
-      <div className="space-y-4">
-        <div className="h-32 bg-[var(--color-surface)] rounded-2xl animate-pulse" />
-        <div className="h-48 bg-[var(--color-surface)] rounded-2xl animate-pulse" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-[var(--color-danger)]/10 rounded-xl p-5 text-sm text-[var(--color-danger)]">
-        資料載入失敗：{String(error)}
-      </div>
-    );
-  }
-
-  const d = data.data;
 
   const settleOne = async (id: string) => {
     const res = await fetch(`/api/bookings/${id}/settle`, {
       method: "PATCH",
       headers: adminHeaders(),
     });
-    if (res.ok) mutate();
-    else alert("確認失敗");
+    if (res.ok) {
+      mutate();
+      return;
+    }
+    const err = await res.json().catch(() => ({} as { error?: string; message?: string }));
+    alert(`確認失敗（${res.status}）：${err.message ?? err.error ?? "請稍後再試"}`);
   };
 
   const settleAll = async () => {
-    const pending = d.rows.filter((r) => r.bookingStatus === "COMPLETED" && r.settledAt == null);
-    await Promise.all(
+    const rows = data?.data.rows ?? [];
+    const pending = rows.filter((r) => r.settledAt == null && r.bookingStatus !== "NO_SHOW");
+    if (pending.length === 0) return;
+    if (!confirm(`一次確認 ${pending.length} 筆未對帳預約？`)) return;
+    const results = await Promise.all(
       pending.map((r) =>
         fetch(`/api/bookings/${r.id}/settle`, {
           method: "PATCH",
           headers: adminHeaders(),
-        }),
+        }).then((res) => res.ok),
       ),
     );
+    const failed = results.filter((ok) => !ok).length;
+    if (failed > 0) alert(`完成 ${pending.length - failed} 筆，失敗 ${failed} 筆`);
     mutate();
   };
 
   const dayClose = async () => {
-    if (d.pendingCount > 0) {
-      alert(`還有 ${d.pendingCount} 筆未對帳，請先確認`);
+    if (!data) return;
+    if (data.data.pendingCount > 0) {
+      alert(`還有 ${data.data.pendingCount} 筆未對帳，請先確認`);
       return;
     }
     if (!confirm("確定結班？結束後當日資料鎖定，不能直接編輯（可從補登流程進入）")) return;
@@ -107,42 +101,46 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
     if (res.ok) mutate();
   };
 
+  if (isLoading || !data) {
+    return (
+      <div className="space-y-4">
+        <div className="h-12 bg-[var(--color-surface)] rounded-xl animate-pulse" />
+        <div className="h-32 bg-[var(--color-surface)] rounded-2xl animate-pulse" />
+        <div className="h-48 bg-[var(--color-surface)] rounded-2xl animate-pulse" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-[var(--color-danger)]/10 rounded-xl p-5 text-sm text-[var(--color-danger)]">
+        資料載入失敗：{String(error)}
+      </div>
+    );
+  }
+
+  const d = data.data;
+
   return (
     <div className="space-y-4">
-      {/* Header — 日期 + 切換器 */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => onDateChange(shiftDay(date, -1))}
-          className="px-3 py-2 rounded-lg bg-[var(--color-surface)] text-sm font-medium hover:bg-[var(--color-text-muted)]/10"
-        >
-          ← 前一天
-        </button>
-        <div className="flex-1 text-center bg-[var(--color-bg)] border border-[var(--color-brand)]/12 rounded-lg px-3 py-2">
-          <p className="text-sm font-bold text-[var(--color-text-primary)] tabular-nums">
-            {date} · {d.weekdayLabel}
-          </p>
-          <p className="text-[10px] text-[var(--color-text-muted)]">
-            {d.isClosed ? `🔒 已結班 · ${formatTime(d.closedAt)}` : "營業中"}
-          </p>
-        </div>
-        <button
-          onClick={() => onDateChange(shiftDay(date, +1))}
-          disabled={date >= todayIso()}
-          className="px-3 py-2 rounded-lg bg-[var(--color-surface)] text-sm font-medium hover:bg-[var(--color-text-muted)]/10 disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          後一天 →
-        </button>
-      </div>
+      {/* Date strip — 左右滑動選日期 */}
+      <DateStrip kind="day" selected={date} onSelect={onDateChange} />
+
+      {d.isClosed && (
+        <p className="text-[11px] text-center text-[var(--color-text-muted)]">
+          🔒 已結班 · {formatTime(d.closedAt)}
+        </p>
+      )}
 
       {/* Hero — 三段總覽 */}
       <MCard padding="lg">
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
           <HeroStat
             label="今日營收"
-            value={`NT$${d.totalRevenue.toLocaleString()}`}
+            value={formatRevenue(d.totalRevenue)}
             sub={
               d.comparisonDeltaPct !== null
-                ? `${d.comparisonDeltaPct >= 0 ? "↑" : "↓"} ${Math.abs(d.comparisonDeltaPct).toFixed(0)}% vs 4 週同日中位`
+                ? `${d.comparisonDeltaPct >= 0 ? "↑" : "↓"} ${Math.abs(d.comparisonDeltaPct).toFixed(0)}% vs 同日 4 週中位`
                 : "尚無比較資料"
             }
             highlight
@@ -154,16 +152,18 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
           />
           <HeroStat
             label="對帳進度"
-            value={`${d.servedCount - d.pendingCount}/${d.servedCount}`}
+            value={`${d.reconcileTotalCount - d.pendingCount}/${d.reconcileTotalCount}`}
             sub={`${d.pendingCount} 筆待確認`}
           />
         </div>
 
-        {/* Progress bar of confirmed/pending */}
-        {d.servedCount > 0 && (
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {Array.from({ length: Math.min(d.servedCount, 14) }).map((_, i) => {
-              const isConfirmed = i < d.servedCount - d.pendingCount;
+        {d.reconcileTotalCount > 0 && (
+          <div
+            className="grid gap-1 mb-2"
+            style={{ gridTemplateColumns: `repeat(${Math.min(d.reconcileTotalCount, 14)}, minmax(0, 1fr))` }}
+          >
+            {Array.from({ length: Math.min(d.reconcileTotalCount, 14) }).map((_, i) => {
+              const isConfirmed = i < d.reconcileTotalCount - d.pendingCount;
               return (
                 <div
                   key={i}
@@ -176,14 +176,14 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
           </div>
         )}
 
-        <div className="flex items-center justify-between mt-2">
-          <p className="text-[11px] text-[var(--color-text-muted)]">
+        <div className="flex items-center justify-between mt-2 gap-2">
+          <p className="text-[11px] text-[var(--color-text-muted)] truncate">
             💡 點擊每筆確認，或按右側「全部確認」
           </p>
           {d.pendingCount > 0 && !d.isClosed && (
             <button
               onClick={settleAll}
-              className="text-xs px-3 py-1.5 rounded-md bg-[var(--color-brand)] text-[var(--color-bg)] font-semibold"
+              className="shrink-0 text-xs px-3 py-1.5 rounded-md bg-[var(--color-brand)] text-[var(--color-bg)] font-semibold"
             >
               全部確認 →
             </button>
@@ -191,7 +191,6 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
         </div>
       </MCard>
 
-      {/* 支付方式分類雙卡 */}
       <div className="grid grid-cols-2 gap-3">
         <PaymentCard
           icon="💵"
@@ -209,9 +208,8 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
         />
       </div>
 
-      {/* 對帳清單 */}
       <MCard padding="md">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 gap-2">
           <p className="text-sm font-semibold text-[var(--color-text-primary)]">今日預約對帳</p>
           <FilterTabs
             value={filter}
@@ -240,16 +238,22 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
         )}
       </MCard>
 
-      {/* 例外操作 */}
       {!d.isClosed && (
         <div className="grid grid-cols-3 gap-2">
-          <ExceptionButton icon="➕" label="新增 Walk-in" href="/calendar?walkin=1" />
-          <ExceptionButton icon="⊘" label="標記 No-show" href="#" />
-          <ExceptionButton icon="📝" label="補登訂單" href="/calendar?backfill=1" />
+          <ExceptionButton icon="➕" label="新增 Walk-in" onClick={() => setBackfillOpen(true)} />
+          <a
+            href="/calendar"
+            className="flex flex-col items-center justify-center px-3 py-3 rounded-xl bg-[var(--color-surface)] hover:bg-[var(--color-text-muted)]/10 transition-colors text-[11px] font-medium text-[var(--color-text-body)] gap-1"
+          >
+            <span className="text-lg">📅</span>
+            <span>到日曆編輯</span>
+          </a>
+          <ExceptionButton icon="📝" label="補登訂單" onClick={() => setBackfillOpen(true)} />
         </div>
       )}
 
-      {/* 結班按鈕 */}
+      <DayStatusFooter d={d} />
+
       {!d.isClosed ? (
         <button
           onClick={dayClose}
@@ -290,6 +294,18 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
           </div>
         </div>
       )}
+
+      <NewBookingSheet
+        open={backfillOpen}
+        onOpenChange={setBackfillOpen}
+        date={date}
+        time="11:00"
+        duration={1}
+        onCreated={() => {
+          setBackfillOpen(false);
+          mutate();
+        }}
+      />
     </div>
   );
 }
@@ -308,12 +324,12 @@ function HeroStat({
   highlight?: boolean;
 }) {
   return (
-    <div>
-      <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
+    <div className="min-w-0">
+      <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] truncate">
         {label}
       </p>
       <p
-        className={`text-xl font-bold tabular-nums leading-tight mt-0.5 ${
+        className={`text-base sm:text-lg font-bold tabular-nums leading-tight mt-0.5 truncate ${
           highlight ? "text-[var(--color-brand)]" : "text-[var(--color-text-primary)]"
         }`}
       >
@@ -322,6 +338,13 @@ function HeroStat({
       <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5 truncate">{sub}</p>
     </div>
   );
+}
+
+/** Compact revenue formatter — keeps NT$18,700 short on small screens. */
+function formatRevenue(rev: number): string {
+  if (rev >= 100000) return `NT$${Math.round(rev / 1000)}k`;
+  if (rev >= 10000) return `NT$${(rev / 10000).toFixed(1)}萬`;
+  return `NT$${rev.toLocaleString()}`;
 }
 
 function PaymentCard({
@@ -453,29 +476,49 @@ function BookingRow({
   );
 }
 
-function ExceptionButton({ icon, label, href }: { icon: string; label: string; href: string }) {
+function ExceptionButton({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  onClick: () => void;
+}) {
   return (
-    <a
-      href={href}
+    <button
+      onClick={onClick}
       className="flex flex-col items-center justify-center px-3 py-3 rounded-xl bg-[var(--color-surface)] hover:bg-[var(--color-text-muted)]/10 transition-colors text-[11px] font-medium text-[var(--color-text-body)] gap-1"
     >
       <span className="text-lg">{icon}</span>
       <span>{label}</span>
-    </a>
+    </button>
   );
 }
 
-// ─── helpers ─────────────────────────────────────────────────────────────
-
-function shiftDay(iso: string, delta: number): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + delta);
-  return dt.toISOString().slice(0, 10);
-}
-
-function todayIso(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+function DayStatusFooter({ d }: { d: DailyView }) {
+  if (d.rescheduledCount + d.noShowCount + d.cancelledCount === 0) return null;
+  const items: Array<{ label: string; n: number; color: string }> = [
+    { label: "改期", n: d.rescheduledCount, color: "var(--color-warning)" },
+    { label: "No-show", n: d.noShowCount, color: "var(--color-danger)" },
+    { label: "取消", n: d.cancelledCount, color: "var(--color-text-muted)" },
+  ];
+  return (
+    <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-[var(--color-surface)]/40 text-xs flex-wrap">
+      <span className="text-[var(--color-text-muted)] shrink-0">今日狀況：</span>
+      {items.map((i) => (
+        <span key={i.label} className="inline-flex items-center gap-1 tabular-nums">
+          <span
+            className="inline-block w-1.5 h-1.5 rounded-full"
+            style={{ backgroundColor: i.color }}
+          />
+          <span className="text-[var(--color-text-body)]">
+            {i.label} {i.n}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function formatTime(iso: string | null): string {

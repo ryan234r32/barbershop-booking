@@ -43,6 +43,12 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<CustomerSuggestion[]>([]);
+  // When admin picks from suggestions, we hold the chosen user.id + a snapshot
+  // of what was bound. Booking POST sends customerId so server links to the
+  // existing user instead of creating yet another "manual-{adminId}-{uuid}"
+  // ghost record. Cleared whenever name/phone is edited away from the bound
+  // values (so accidental edits don't silently reuse a stale binding).
+  const [boundCustomer, setBoundCustomer] = useState<CustomerSuggestion | null>(null);
   const { toast } = useToast();
 
   const { data: servicesData } = useSWR("/api/services", fetcher);
@@ -57,9 +63,14 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
     }
   }, [duration, services, serviceId]);
 
-  // Customer search
+  // Customer search — skip when name/phone match the currently bound customer
+  // (avoids a redundant query right after picking from the suggestions list).
   useEffect(() => {
     if (customerName.length < 1) { setSuggestions([]); return; }
+    if (boundCustomer && customerName === boundCustomer.displayName) {
+      setSuggestions([]);
+      return;
+    }
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/customers?search=${encodeURIComponent(customerName)}&limit=5`);
@@ -68,12 +79,29 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
       } catch { /* silent */ }
     }, 300);
     return () => clearTimeout(timer);
-  }, [customerName]);
+  }, [customerName, boundCustomer]);
 
   const selectCustomer = (c: CustomerSuggestion) => {
     setCustomerName(c.displayName);
     setPhone(c.phone || "");
     setSuggestions([]);
+    setBoundCustomer(c);
+  };
+
+  const handleNameChange = (next: string) => {
+    setCustomerName(next);
+    // Edited away from the bound name → drop the binding so we don't
+    // accidentally link a stranger's booking to that customer record.
+    if (boundCustomer && next !== boundCustomer.displayName) {
+      setBoundCustomer(null);
+    }
+  };
+
+  const handlePhoneChange = (next: string) => {
+    setPhone(next);
+    if (boundCustomer && next !== (boundCustomer.phone || "")) {
+      setBoundCustomer(null);
+    }
   };
 
   const handleSubmit = async () => {
@@ -89,6 +117,9 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
         method: "POST",
         headers: adminHeaders(),
         body: JSON.stringify({
+          // customerId only sent when admin explicitly picked from the
+          // suggestion list AND hasn't edited the bound name/phone since.
+          customerId: boundCustomer?.id,
           displayName: customerName.trim(),
           phone: phone.trim() || undefined,
           serviceId,
@@ -110,6 +141,7 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
       setPhone("");
       setServiceId("");
       setNotes("");
+      setBoundCustomer(null);
     } catch (err) {
       toast({ type: "error", message: err instanceof Error ? err.message : "新增失敗" });
     } finally {
@@ -161,10 +193,16 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
               <label className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider block mb-1">客人姓名</label>
               <input
                 value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
+                onChange={(e) => handleNameChange(e.target.value)}
                 className="w-full border-b border-[var(--color-brand)] bg-transparent py-2 text-sm text-[var(--color-text-body)] outline-none placeholder:text-[var(--color-text-disabled)]"
                 placeholder="搜尋或輸入姓名"
               />
+              {boundCustomer && (
+                <p className="text-[11px] text-[#1a503c] mt-1 flex items-center gap-1">
+                  <span aria-hidden>✓</span>
+                  已綁定既有客戶（{segmentLabels[boundCustomer.segment] || ""} · {boundCustomer.totalVisits} 次）
+                </p>
+              )}
               {suggestions.length > 0 && (
                 <div className="absolute top-full left-0 right-0 bg-[var(--color-bg)] border border-[var(--color-surface)] rounded-lg shadow-sm z-10 mt-1">
                   {suggestions.map((c) => (
@@ -188,7 +226,7 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
               <label className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider block mb-1">電話</label>
               <input
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => handlePhoneChange(e.target.value)}
                 className="w-full border-b border-[var(--color-brand)] bg-transparent py-2 text-sm text-[var(--color-text-body)] outline-none placeholder:text-[var(--color-text-disabled)]"
                 placeholder="選填"
               />
