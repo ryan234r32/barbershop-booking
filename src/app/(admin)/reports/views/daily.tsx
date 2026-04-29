@@ -35,24 +35,72 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
   const [filter, setFilter] = useState<"all" | "pending" | "warning">("all");
   const [backfillOpen, setBackfillOpen] = useState(false);
 
-  const filteredRows = useMemo(() => {
+  // Optimistic settle: track ids the user just clicked. UI marks them as
+  // settled instantly; we still hit the API and SWR refetches in the background.
+  const [optimisticSettled, setOptimisticSettled] = useState<Set<string>>(new Set());
+
+  const decoratedRows = useMemo(() => {
     const rows = data?.data.rows ?? [];
-    if (filter === "all") return rows;
-    if (filter === "pending") return rows.filter((r) => r.settledAt == null);
-    return rows.filter((r) => r.isWarning);
-  }, [data, filter]);
+    return rows.map((r) =>
+      optimisticSettled.has(r.id) && !r.settledAt
+        ? { ...r, settledAt: new Date().toISOString() }
+        : r,
+    );
+  }, [data, optimisticSettled]);
+
+  const filteredRows = useMemo(() => {
+    if (filter === "all") return decoratedRows;
+    if (filter === "pending") return decoratedRows.filter((r) => r.settledAt == null);
+    return decoratedRows.filter((r) => r.isWarning);
+  }, [decoratedRows, filter]);
+
+  // Effective pending count after optimistic toggles
+  const effectivePendingCount = useMemo(() => {
+    if (!data) return 0;
+    const opt = optimisticSettled.size;
+    return Math.max(0, data.data.pendingCount - opt);
+  }, [data, optimisticSettled]);
+  const reconcileTotal = data?.data.reconcileTotalCount ?? 0;
+  const settledCount = reconcileTotal - effectivePendingCount;
+  const progressPct = reconcileTotal > 0 ? Math.round((settledCount / reconcileTotal) * 100) : 0;
 
   const settleOne = async (id: string) => {
-    const res = await fetch(`/api/bookings/${id}/settle`, {
-      method: "PATCH",
-      headers: adminHeaders(),
-    });
-    if (res.ok) {
-      mutate();
-      return;
+    // optimistic flip
+    setOptimisticSettled((prev) => new Set(prev).add(id));
+    try {
+      const res = await fetch(`/api/bookings/${id}/settle`, {
+        method: "PATCH",
+        headers: adminHeaders(),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({} as { error?: string; message?: string }));
+        // rollback
+        setOptimisticSettled((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        alert(`確認失敗（${res.status}）：${err.message ?? err.error ?? "請稍後再試"}`);
+        return;
+      }
+      // Refetch in background — SWR will reconcile and clear the optimistic
+      // entry once server data agrees.
+      const fresh = await mutate();
+      if (fresh?.data.rows.some((r) => r.id === id && r.settledAt)) {
+        setOptimisticSettled((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
+    } catch (e) {
+      setOptimisticSettled((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      alert(`確認失敗：${String(e)}`);
     }
-    const err = await res.json().catch(() => ({} as { error?: string; message?: string }));
-    alert(`確認失敗（${res.status}）：${err.message ?? err.error ?? "請稍後再試"}`);
   };
 
   const settleAll = async () => {
@@ -132,64 +180,38 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
         </p>
       )}
 
-      {/* Hero — 三段總覽 */}
-      <MCard padding="lg">
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
-          <HeroStat
-            label="今日營收"
-            value={formatRevenue(d.totalRevenue)}
-            sub={
-              d.comparisonDeltaPct !== null
-                ? `${d.comparisonDeltaPct >= 0 ? "↑" : "↓"} ${Math.abs(d.comparisonDeltaPct).toFixed(0)}% vs 同日 4 週中位`
-                : "尚無比較資料"
-            }
-            highlight
-          />
-          <HeroStat
-            label="服務客數"
-            value={`${d.servedCount}`}
-            sub={`客單 NT$${d.avgTicket.toLocaleString()}`}
-          />
-          <HeroStat
-            label="對帳進度"
-            value={`${d.reconcileTotalCount - d.pendingCount}/${d.reconcileTotalCount}`}
-            sub={`${d.pendingCount} 筆待確認`}
-          />
-        </div>
+      {/* Hero — 大字三段總覽（Pass 2 §4 字體放大） */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <BigStatCard
+          label="今日應收"
+          value={formatRevenue(d.totalRevenue)}
+          sub={
+            d.comparisonDeltaPct !== null
+              ? `${d.comparisonDeltaPct >= 0 ? "↑" : "↓"} ${Math.abs(d.comparisonDeltaPct).toFixed(0)}% vs 同日 4 週中位`
+              : "尚無比較資料"
+          }
+          tone="brand"
+        />
+        <BigStatCard
+          label="服務客數"
+          value={`${d.servedCount}`}
+          sub={`客單 NT$${d.avgTicket.toLocaleString()}`}
+        />
+        <BigStatCard
+          label="對帳進度"
+          value={`${settledCount}/${reconcileTotal}`}
+          sub={effectivePendingCount > 0 ? `${effectivePendingCount} 筆待確認` : "✓ 已對完"}
+        />
+      </div>
 
-        {d.reconcileTotalCount > 0 && (
-          <div
-            className="grid gap-1 mb-2"
-            style={{ gridTemplateColumns: `repeat(${Math.min(d.reconcileTotalCount, 14)}, minmax(0, 1fr))` }}
-          >
-            {Array.from({ length: Math.min(d.reconcileTotalCount, 14) }).map((_, i) => {
-              const isConfirmed = i < d.reconcileTotalCount - d.pendingCount;
-              return (
-                <div
-                  key={i}
-                  className={`h-2 rounded-full ${
-                    isConfirmed ? "bg-[var(--color-success)]" : "bg-[var(--color-surface)]"
-                  }`}
-                />
-              );
-            })}
-          </div>
-        )}
-
-        <div className="flex items-center justify-between mt-2 gap-2">
-          <p className="text-[11px] text-[var(--color-text-muted)] truncate">
-            💡 點擊每筆確認，或按右側「全部確認」
-          </p>
-          {d.pendingCount > 0 && !d.isClosed && (
-            <button
-              onClick={settleAll}
-              className="shrink-0 text-xs px-3 py-1.5 rounded-md bg-[var(--color-brand)] text-[var(--color-bg)] font-semibold"
-            >
-              全部確認 →
-            </button>
-          )}
-        </div>
-      </MCard>
+      {/* 漸變進度條（Pass 2 §3 紅→橘→綠） */}
+      {reconcileTotal > 0 && (
+        <ProgressGradient
+          pct={progressPct}
+          rightLabel={`${settledCount} / ${reconcileTotal}`}
+          settleAll={effectivePendingCount > 0 && !d.isClosed ? settleAll : undefined}
+        />
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <PaymentCard
@@ -239,17 +261,13 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
       </MCard>
 
       {!d.isClosed && (
-        <div className="grid grid-cols-3 gap-2">
-          <ExceptionButton icon="➕" label="新增 Walk-in" onClick={() => setBackfillOpen(true)} />
-          <a
-            href="/calendar"
-            className="flex flex-col items-center justify-center px-3 py-3 rounded-xl bg-[var(--color-surface)] hover:bg-[var(--color-text-muted)]/10 transition-colors text-[11px] font-medium text-[var(--color-text-body)] gap-1"
-          >
-            <span className="text-lg">📅</span>
-            <span>到日曆編輯</span>
-          </a>
-          <ExceptionButton icon="📝" label="補登訂單" onClick={() => setBackfillOpen(true)} />
-        </div>
+        <button
+          onClick={() => setBackfillOpen(true)}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[var(--color-surface)] hover:bg-[var(--color-text-muted)]/10 transition-colors text-sm font-semibold text-[var(--color-text-body)]"
+        >
+          <span className="text-lg">➕</span>
+          <span>新增預約 / 補登訂單</span>
+        </button>
       )}
 
       <DayStatusFooter d={d} />
@@ -312,31 +330,75 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
 
 // ─── Sub-components ──────────────────────────────────────────────────────
 
-function HeroStat({
+/** Pass 2 — Hero card with bigger font matching 現金/轉帳 size. Each KPI is a
+ * standalone card, not a tight 3-column grid. */
+function BigStatCard({
   label,
   value,
   sub,
-  highlight,
+  tone,
 }: {
   label: string;
   value: string;
   sub: string;
-  highlight?: boolean;
+  tone?: "brand";
 }) {
   return (
-    <div className="min-w-0">
-      <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] truncate">
-        {label}
-      </p>
+    <MCard padding="md">
+      <p className="text-xs text-[var(--color-text-muted)]">{label}</p>
       <p
-        className={`text-base sm:text-lg font-bold tabular-nums leading-tight mt-0.5 truncate ${
-          highlight ? "text-[var(--color-brand)]" : "text-[var(--color-text-primary)]"
+        className={`text-xl sm:text-2xl font-bold tabular-nums leading-tight mt-1 truncate ${
+          tone === "brand" ? "text-[var(--color-brand)]" : "text-[var(--color-text-primary)]"
         }`}
       >
         {value}
       </p>
       <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5 truncate">{sub}</p>
-    </div>
+    </MCard>
+  );
+}
+
+/** Pass 2 §3 — gradient progress bar (red → orange → green) for daily 對帳.
+ * Color comes from the % itself: < 30% red, 30-70% orange, > 70% green. */
+function ProgressGradient({
+  pct,
+  rightLabel,
+  settleAll,
+}: {
+  pct: number;
+  rightLabel: string;
+  settleAll?: () => void;
+}) {
+  const clamped = Math.min(100, Math.max(0, pct));
+  // Hue maps 0% → 0 (red), 50% → 30 (orange), 100% → 130 (green)
+  const hue = Math.round((clamped / 100) * 130);
+  const fillColor = `hsl(${hue} 75% 45%)`;
+  return (
+    <MCard padding="md">
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <p className="text-xs font-semibold text-[var(--color-text-primary)]">
+          對帳進度 <span className="font-mono tabular-nums">{clamped}%</span>
+        </p>
+        <p className="text-[10px] text-[var(--color-text-muted)] tabular-nums">{rightLabel}</p>
+      </div>
+      <div className="h-3 rounded-full overflow-hidden bg-[var(--color-surface)]">
+        <div
+          className="h-full rounded-full transition-all duration-300"
+          style={{
+            width: `${clamped}%`,
+            background: `linear-gradient(90deg, hsl(0 75% 50%) 0%, hsl(30 80% 50%) 50%, ${fillColor} 100%)`,
+          }}
+        />
+      </div>
+      {settleAll && (
+        <button
+          onClick={settleAll}
+          className="w-full mt-3 text-xs px-3 py-2 rounded-md bg-[var(--color-brand)] text-[var(--color-bg)] font-semibold"
+        >
+          全部確認 →
+        </button>
+      )}
+    </MCard>
   );
 }
 
@@ -388,7 +450,7 @@ function FilterTabs({
   const opts: Array<{ key: "all" | "pending" | "warning"; label: string; n: number }> = [
     { key: "all", label: "全部", n: counts.all },
     { key: "pending", label: "待確認", n: counts.pending },
-    { key: "warning", label: "異常", n: counts.warning },
+    { key: "warning", label: "特殊", n: counts.warning },
   ];
   return (
     <div className="flex items-center gap-1 text-[10px]">
@@ -476,25 +538,6 @@ function BookingRow({
   );
 }
 
-function ExceptionButton({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: string;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex flex-col items-center justify-center px-3 py-3 rounded-xl bg-[var(--color-surface)] hover:bg-[var(--color-text-muted)]/10 transition-colors text-[11px] font-medium text-[var(--color-text-body)] gap-1"
-    >
-      <span className="text-lg">{icon}</span>
-      <span>{label}</span>
-    </button>
-  );
-}
 
 function DayStatusFooter({ d }: { d: DailyView }) {
   if (d.rescheduledCount + d.noShowCount + d.cancelledCount === 0) return null;
