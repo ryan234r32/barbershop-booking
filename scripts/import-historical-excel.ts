@@ -30,8 +30,20 @@ import { PrismaPg } from "@prisma/adapter-pg";
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
-const EXCEL_FILE = path.join(__dirname, "..", "docs", "2025預約表Ken老師.xlsx");
-const MONTH_SHEET_PATTERN = /^2025\d{2}$/;
+// CLI args: --year=YYYY --file=path/to.xlsx --commit --reset
+function getArg(name: string, fallback?: string): string | undefined {
+  const prefix = `--${name}=`;
+  const found = process.argv.find((a) => a.startsWith(prefix));
+  if (found) return found.slice(prefix.length);
+  return fallback;
+}
+
+const TARGET_YEAR = getArg("year", "2025")!;
+const EXCEL_FILE = path.resolve(
+  process.cwd(),
+  getArg("file") ?? `docs/${TARGET_YEAR}預約表Ken老師.xlsx`,
+);
+const MONTH_SHEET_PATTERN = new RegExp(`^${TARGET_YEAR}\\d{2}$`);
 
 const DRY_RUN = !process.argv.includes("--commit");
 const RESET = process.argv.includes("--reset");
