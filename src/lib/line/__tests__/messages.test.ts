@@ -334,6 +334,21 @@ describe("paymentGuideMessage", () => {
     expect(bodyStr).toContain("男性剪髮");
   });
 
+  it("shows booking context line (service · date · time range) when booking info provided", () => {
+    const msg = paymentGuideMessage({
+      ...params,
+      amount: 800,
+      serviceName: "男性剪髮",
+      bookingDate: "2026-04-29",
+      bookingStartTime: "14:00",
+      bookingEndTime: "15:00",
+    });
+    const bodyStr = JSON.stringify(msg.contents);
+    // Context joins service + date + time with " · "
+    expect(bodyStr).toContain("男性剪髮 · ");
+    expect(bodyStr).toContain("14:00–15:00");
+  });
+
   it("never includes 複製金額 button (removed 2026-04-27 — redundant)", () => {
     const noAmount = paymentGuideMessage(params);
     const withAmount = paymentGuideMessage({ ...params, amount: 800 });

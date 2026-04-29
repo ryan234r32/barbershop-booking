@@ -1521,6 +1521,10 @@ export function paymentGuideMessage(params: {
   bankAccountNumber: string;
   amount?: number;
   serviceName?: string;
+  /** Booking date (YYYY-MM-DD) — used to render「今天 (週三) 14:00–15:00 男性剪髮」context line */
+  bookingDate?: string;
+  bookingStartTime?: string;
+  bookingEndTime?: string;
 }): FlexMessage {
   const {
     bankName,
@@ -1528,6 +1532,9 @@ export function paymentGuideMessage(params: {
     bankAccountNumber,
     amount,
     serviceName,
+    bookingDate,
+    bookingStartTime,
+    bookingEndTime,
   } = params;
 
   const hasAmount = typeof amount === "number" && amount > 0;
@@ -1599,13 +1606,29 @@ export function paymentGuideMessage(params: {
         ],
       },
     ];
-    if (serviceName) {
+
+    // 「對應預約」context 行 — 客人需要看到金額是哪天哪場服務
+    // 格式：「男性剪髮 · 今天 (週三) 14:00–15:00」(servicename 在前最重要)
+    const contextParts: string[] = [];
+    if (serviceName) contextParts.push(serviceName);
+    if (bookingDate) {
+      const dateStr = formatHumanDate(bookingDate);
+      const timeStr =
+        bookingStartTime && bookingEndTime
+          ? ` ${bookingStartTime}–${bookingEndTime}`
+          : bookingStartTime
+            ? ` ${bookingStartTime}`
+            : "";
+      contextParts.push(`${dateStr}${timeStr}`);
+    }
+    if (contextParts.length > 0) {
       amountBlockContents.push({
         type: "text",
-        text: serviceName,
+        text: contextParts.join(" · "),
         size: "xs",
         color: "#9CB1A4",
         align: "end",
+        wrap: true,
       });
     }
 

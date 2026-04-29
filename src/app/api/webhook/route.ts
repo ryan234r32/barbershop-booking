@@ -322,10 +322,13 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
 
   // Priority 4: Payment / transfer
   if (intent === "payment") {
-    // 帶該客「最近一筆 CONFIRMED booking」金額。優先順序：
-    // (1) 今天 endTime 已過的 (剛剪完) → (2) 今天即將開始的 → (3) 最近 3 天 endTime 已過的 → (4) 未來最近的
+    // 帶該客「最近一筆 CONFIRMED booking」金額 + 預約明細（讓客人看清楚是哪天的服務）
+    // 優先順序：(1) 今天 endTime 已過 → (2) 今天即將開始 → (3) 最近 3 天已過 → (4) 未來最近
     let amount: number | undefined;
     let serviceName: string | undefined;
+    let bookingDate: string | undefined;
+    let bookingStartTime: string | undefined;
+    let bookingEndTime: string | undefined;
 
     if (lineUserId) {
       const user = await prisma.user.findUnique({
@@ -349,7 +352,6 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
         });
 
         if (candidates.length > 0) {
-          // Score each booking by abs distance (ms) from now (using endTime in Taipei)
           const scored = candidates.map((b) => {
             const bDateStr = b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
             const [y, m, d] = bDateStr.split("-").map(Number);
@@ -361,6 +363,9 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
           const closest = scored[0].booking;
           amount = closest.service.price;
           serviceName = closest.service.name;
+          bookingDate = closest.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+          bookingStartTime = closest.startTime;
+          bookingEndTime = closest.endTime;
         }
       }
     }
@@ -371,6 +376,9 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
       bankAccountNumber: tenant?.bankAccountNumber || "請洽店家",
       amount,
       serviceName,
+      bookingDate,
+      bookingStartTime,
+      bookingEndTime,
     }));
   }
 
