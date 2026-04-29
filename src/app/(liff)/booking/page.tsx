@@ -11,6 +11,7 @@ import { SuccessStep } from "@/components/liff/booking/success-step";
 import { UserInfoSheet } from "@/components/liff/booking/user-info-sheet";
 import { LoadingScreen } from "@/components/liff/loading-screen";
 import { IconArrowBack, IconClose } from "@/components/liff/icons";
+import { Modal } from "@/components/ui/modal";
 
 interface Service {
   id: string;
@@ -46,6 +47,10 @@ export default function BookingPage() {
   const [policyAgreed, setPolicyAgreed] = useState(false);
   const [showUserInfoSheet, setShowUserInfoSheet] = useState(false);
   const [userInfo, setUserInfo] = useState<{ name: string; phone: string; birthday?: string } | null>(null);
+  // Slot-conflict UX: when two clients race for the same slot and we lose,
+  // server returns code=SLOT_UNAVAILABLE. Show a blocking modal, bounce back
+  // to calendar, and refresh availability so the taken slot greys out.
+  const [slotConflictOpen, setSlotConflictOpen] = useState(false);
 
   // Load services
   useEffect(() => {
@@ -129,6 +134,18 @@ export default function BookingPage() {
       const data = await res.json();
 
       if (!res.ok) {
+        if (data.code === "SLOT_UNAVAILABLE") {
+          // Race lost — bounce back to calendar so they pick again, refresh
+          // availability so the just-taken slot disappears, and show a
+          // blocking modal so the user definitely sees what happened.
+          setSelectedTime("");
+          if (selectedService && selectedDate) {
+            loadSlots(selectedDate, selectedService.id);
+          }
+          setStep("calendar");
+          setSlotConflictOpen(true);
+          return;
+        }
         toast({ type: "error", message: data.error || "預約失敗，請稍後再試" });
         return;
       }
@@ -369,6 +386,24 @@ export default function BookingPage() {
         defaultName={displayName || ""}
         defaultPhone=""
       />
+
+      {/* Slot conflict modal — fires when another customer wins the race */}
+      <Modal
+        isOpen={slotConflictOpen}
+        title="時段剛被預約走了 😅"
+      >
+        <p className="text-sm text-[#003D2B]/80 leading-relaxed mb-6">
+          您選的時段在剛剛被另一位客人搶先預約了。
+          <br />
+          請重新選擇其他時段，造成不便請見諒 🙇
+        </p>
+        <button
+          onClick={() => setSlotConflictOpen(false)}
+          className="w-full h-12 rounded-lg bg-[#003D2B] text-[#FFF8F1] font-bold text-sm tracking-wide active:scale-[0.98] transition-transform"
+        >
+          我知道了，重新選時段
+        </button>
+      </Modal>
     </div>
   );
 }
