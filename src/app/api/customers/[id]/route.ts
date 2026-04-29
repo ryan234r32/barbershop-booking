@@ -38,7 +38,55 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return Response.json({ error: "Customer not found" }, { status: 404 });
     }
 
-    return Response.json({ customer });
+    // Status counts across ALL bookings (not just the 20 in `bookings`)
+    const statusGroups = await prisma.booking.groupBy({
+      by: ["status"],
+      where: { userId: id },
+      _count: { _all: true },
+    });
+    const statusCounts: Record<string, number> = {};
+    let totalBookings = 0;
+    for (const g of statusGroups) {
+      statusCounts[g.status] = g._count._all;
+      totalBookings += g._count._all;
+    }
+
+    // Total revenue from all COMPLETED bookings — sum service.price.
+    const completedBookings = await prisma.booking.findMany({
+      where: { userId: id, status: "COMPLETED" },
+      select: { service: { select: { price: true } } },
+    });
+    const totalRevenue = completedBookings.reduce(
+      (sum, b) => sum + (b.service?.price || 0),
+      0,
+    );
+
+    // Average revisit interval (days) — only meaningful with ≥2 visits.
+    let avgIntervalDays: number | null = null;
+    if (
+      customer.firstVisitAt &&
+      customer.lastVisitAt &&
+      customer.totalVisits > 1
+    ) {
+      const span =
+        new Date(customer.lastVisitAt).getTime() -
+        new Date(customer.firstVisitAt).getTime();
+      avgIntervalDays = Math.round(
+        span / (1000 * 60 * 60 * 24) / (customer.totalVisits - 1),
+      );
+    }
+
+    const stats = {
+      totalBookings,
+      statusCounts,
+      totalRevenue,
+      avgPrice: completedBookings.length > 0
+        ? Math.round(totalRevenue / completedBookings.length)
+        : null,
+      avgIntervalDays,
+    };
+
+    return Response.json({ customer, stats });
   } catch (error) {
     return errorResponse(error);
   }
@@ -56,7 +104,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const body = await request.json();
 
     // Only allow these fields to be updated
-    const allowed = ["realName", "phone", "email", "notes", "tags", "isVip", "bookingRestricted", "violationCount", "birthday"];
+    const allowed = ["realName", "phone", "email", "gender", "notes", "tags", "isVip", "bookingRestricted", "violationCount", "birthday"];
     const data: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in body) data[key] = body[key];
