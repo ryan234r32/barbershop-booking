@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { useToast } from "@/components/ui/toast";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
-import { EcpayAtmTab } from "@/components/admin/ecpay-atm-tab";
 
 /* ------------------------------------------------------------------ */
 /*  Types (match GET /api/admin/payments response)                     */
@@ -81,28 +80,13 @@ function relativeTime(iso: string | null): string {
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-type MethodTab = "atm" | "manual" | "cash";
+type MethodTab = "manual" | "cash";
 
 export default function PaymentsPage() {
   usePageTitle("付款對帳");
   const { toast } = useToast();
 
-  // Top-level method switcher. Default to "manual" so owner reflex (末五碼 search)
-  // is unchanged. ATM tab only mounts when feature flag is on.
   const [method, setMethod] = useState<MethodTab>("manual");
-  const [ecpayEnabled, setEcpayEnabled] = useState<boolean>(false);
-  const [atmAttention, setAtmAttention] = useState<number>(0);
-
-  useEffect(() => {
-    // Feature-flag probe via Agent C's public config endpoint. Public/no auth.
-    fetch("/api/payments/config")
-      .then((r) => (r.ok ? r.json() : { ecpayEnabled: false }))
-      .then((c: { ecpayEnabled?: boolean }) =>
-        setEcpayEnabled(Boolean(c.ecpayEnabled))
-      )
-      .catch(() => setEcpayEnabled(false));
-  }, []);
-
   const [tab, setTab] = useState<TabKey>("VERIFYING");
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -180,12 +164,9 @@ export default function PaymentsPage() {
     if (method === "cash") {
       return items.filter((i) => i.method === "CASH" || i.method === null);
     }
-    if (method === "manual") {
-      return items.filter(
-        (i) => i.method === "BANK_TRANSFER" || i.method === null,
-      );
-    }
-    return items;
+    return items.filter(
+      (i) => i.method === "BANK_TRANSFER" || i.method === null,
+    );
   }, [data, method]);
 
   return (
@@ -194,28 +175,7 @@ export default function PaymentsPage() {
         <h1 className="text-2xl font-bold text-foreground">付款對帳</h1>
       </div>
 
-      {/* Method switcher (top-level). ATM tab hidden when ECPAY_ENABLED=false. */}
       <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg" role="tablist">
-        {ecpayEnabled && (
-          <button
-            role="tab"
-            aria-selected={method === "atm"}
-            onClick={() => setMethod("atm")}
-            className={`flex-1 py-2 text-sm rounded-md transition-colors relative
-              ${method === "atm"
-                ? "bg-card text-foreground font-medium shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-              }`}
-          >
-            🏦 ATM 自動對帳
-            {atmAttention > 0 && (
-              <span
-                className="absolute top-1 right-2 w-2 h-2 rounded-full bg-amber-500"
-                aria-label={`${atmAttention} 筆需注意`}
-              />
-            )}
-          </button>
-        )}
         <button
           role="tab"
           aria-selected={method === "manual"}
@@ -242,23 +202,19 @@ export default function PaymentsPage() {
         </button>
       </div>
 
-      {method === "atm" ? (
-        <EcpayAtmTab onAttentionCount={setAtmAttention} />
-      ) : (
-        <ManualAndCashContent
-          query={query}
-          setQuery={setQuery}
-          searchRef={searchRef}
-          summary={summary}
-          tab={tab}
-          setTab={setTab}
-          loading={loading}
-          filteredItems={filteredItems}
-          debouncedQuery={debouncedQuery}
-          handleMarkReceived={handleMarkReceived}
-          pendingAction={pendingAction}
-        />
-      )}
+      <ManualAndCashContent
+        query={query}
+        setQuery={setQuery}
+        searchRef={searchRef}
+        summary={summary}
+        tab={tab}
+        setTab={setTab}
+        loading={loading}
+        filteredItems={filteredItems}
+        debouncedQuery={debouncedQuery}
+        handleMarkReceived={handleMarkReceived}
+        pendingAction={pendingAction}
+      />
     </div>
   );
 }
