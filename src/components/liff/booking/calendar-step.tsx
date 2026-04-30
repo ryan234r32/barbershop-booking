@@ -67,7 +67,9 @@ export function CalendarStep({
     (day: number | null) => {
       if (day === null) return { selectable: false, isToday: false, isPast: false, isMonday: false };
       const date = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), day);
-      const isPast = date <= todayStart;
+      // 2026-04-30 fix: was `<=` 把今天也當過去 → 不能預約當天
+      // 改 `<` 讓今天可選；老闆需求是「隨時都能預約」，不設最早預約時間限制
+      const isPast = date < todayStart;
       const isMonday = date.getDay() === 1; // Monday = closed
       const isBeyondMax = date > maxDate;
       const isToday =
