@@ -20,12 +20,20 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { preload } from "swr";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { todayInTaipei } from "@/lib/utils/time";
+import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { MToggle } from "@/components/admin/reports/v3.6/m-toggle";
 import { DailyView } from "./views/daily";
 import { MonthlyView } from "./views/monthly";
 import { AnnualView } from "./views/annual";
+
+const reportsFetcher = (url: string) =>
+  fetch(url, { headers: adminHeaders() }).then((r) => {
+    if (!r.ok) throw new Error(String(r.status));
+    return r.json();
+  });
 
 type ViewKind = "daily" | "monthly" | "annual";
 
@@ -60,6 +68,18 @@ function ReportsPageInner() {
 
   const [view, setView] = useState<ViewKind>(initialView);
   const [period, setPeriod] = useState<string>(initialPeriod);
+
+  // Prefetch the other two views on mount so tab-switching is instant.
+  // Boss's typical flow: open /reports → switch between daily/monthly/annual
+  // multiple times. By firing all three in parallel here, the second + third
+  // tab clicks hit SWR cache (memory if same session, localStorage if PWA
+  // restart) instead of waiting on 15 parallel DB queries each.
+  useEffect(() => {
+    const today = todayInTaipei();
+    preload(`/api/reports/v3.6?view=daily&date=${today}`, reportsFetcher);
+    preload(`/api/reports/v3.6?view=monthly&period=${today.slice(0, 7)}`, reportsFetcher);
+    preload(`/api/reports/v3.6?view=annual&period=${today.slice(0, 4)}`, reportsFetcher);
+  }, []);
 
   // Mirror state to URL (without history pollution)
   useEffect(() => {

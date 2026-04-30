@@ -1,9 +1,11 @@
 "use client";
 
+import { SWRConfig } from "swr";
 import { AdminProvider, useAdmin } from "@/lib/admin/auth-context";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { AdminTabBar } from "@/components/admin/tab-bar";
 import { ToastProvider } from "@/components/ui/toast";
+import { localStorageProvider } from "@/lib/swr/persistent-cache";
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const { admin, loading } = useAdmin();
@@ -33,8 +35,10 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
 
 export function AdminClientShell({ children }: { children: React.ReactNode }) {
   return (
-    <AdminProvider>
-      <AdminLayoutInner>{children}</AdminLayoutInner>
-    </AdminProvider>
+    <SWRConfig value={{ provider: localStorageProvider }}>
+      <AdminProvider>
+        <AdminLayoutInner>{children}</AdminLayoutInner>
+      </AdminProvider>
+    </SWRConfig>
   );
 }
