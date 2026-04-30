@@ -402,13 +402,18 @@ function BigStatCard({
     <MCard padding="md">
       <p className="text-xs text-[var(--color-text-muted)]">{label}</p>
       <p
-        className={`text-base sm:text-2xl font-bold tabular-nums leading-tight mt-1 whitespace-nowrap ${
+        className={`text-lg sm:text-2xl font-bold tabular-nums leading-tight mt-1 whitespace-nowrap ${
           tone === "brand" ? "text-[var(--color-brand)]" : "text-[var(--color-text-primary)]"
         }`}
       >
         {value}
       </p>
-      <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5 truncate">{sub}</p>
+      <p
+        className="text-[11px] text-[var(--color-text-muted)] mt-1 leading-snug line-clamp-2 break-words"
+        title={sub}
+      >
+        {sub}
+      </p>
     </MCard>
   );
 }
@@ -568,16 +573,24 @@ function BookingRow({
           }
         : null;
 
+  // V3.8 daily-row redesign：
+  // - 字體放大 (text-base on mobile, was text-sm)
+  // - 客戶名 truncate 改為允許換行（避免長名 "Test 陳昶龍 Ryan" 被砍）
+  // - Action 按鈕大 1 號 (px-3 py-1.5 text-xs，原本 px-2 py-1 text-[10px] 太小難按)
+  // - row vertical padding py-2.5 → py-3 (更多呼吸空間)
   return (
     <div
-      className={`group grid grid-cols-[2.75rem_1fr_auto_auto] sm:grid-cols-[3.5rem_1fr_5rem_6rem_4.5rem] items-center gap-x-2 sm:gap-x-3 gap-y-1 px-3 py-2.5 rounded-md text-sm ${baseBg}`}
+      className={`group grid grid-cols-[2.75rem_1fr_auto_auto] sm:grid-cols-[3.5rem_1fr_5rem_6rem_5rem] items-center gap-x-2.5 sm:gap-x-3 gap-y-1.5 px-3 py-3 rounded-lg ${baseBg}`}
     >
-      <span className="font-mono tabular-nums text-[var(--color-text-muted)] text-xs sm:text-sm">
+      <span className="font-mono tabular-nums text-[var(--color-text-muted)] text-sm self-start pt-0.5">
         {row.startTime}
       </span>
       <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
-          <p className="font-semibold text-[var(--color-text-primary)] truncate">
+        <div className="flex items-start gap-1.5 flex-wrap">
+          <p
+            className="font-semibold text-[var(--color-text-primary)] text-sm sm:text-base leading-tight break-all"
+            title={row.customerName}
+          >
             {row.customerName}
           </p>
           {sourceBadge && (
@@ -590,7 +603,7 @@ function BookingRow({
           )}
         </div>
         <div className="flex items-center justify-between gap-2 mt-1">
-          <p className="text-[11px] text-[var(--color-text-muted)] truncate">
+          <p className="text-xs text-[var(--color-text-muted)] truncate" title={row.serviceName}>
             {row.serviceName}
             {row.notes && (
               <span className="hidden sm:inline"> · {row.notes.slice(0, 20)}</span>
@@ -598,56 +611,56 @@ function BookingRow({
           </p>
           {paymentPill && (
             <span
-              className={`sm:hidden shrink-0 inline-flex items-center px-1.5 py-px rounded-sm text-[10px] font-semibold leading-tight tabular-nums ${paymentPill.tone}`}
+              className={`sm:hidden shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold leading-tight tabular-nums ${paymentPill.tone}`}
             >
               {paymentPill.label}
             </span>
           )}
         </div>
       </div>
-      <span className="text-right font-mono tabular-nums text-[var(--color-text-body)] font-semibold whitespace-nowrap">
+      <span className="text-right font-mono tabular-nums text-[var(--color-text-primary)] text-sm sm:text-base font-bold whitespace-nowrap self-start pt-0.5">
         NT${row.amount.toLocaleString()}
       </span>
-      <span className="hidden sm:flex justify-center">
+      <span className="hidden sm:flex justify-center self-start pt-0.5">
         {paymentPill && (
           <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold leading-tight tabular-nums ${paymentPill.tone}`}
+            className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-bold leading-tight tabular-nums ${paymentPill.tone}`}
           >
             {paymentPill.label}
           </span>
         )}
       </span>
-      {variant === "confirmed" ? (
-        // V3.6 Pass 3 §2 — clickable settle tag. Click it (mobile-first; hover
-        // is unreliable on touch) → confirm dialog → DELETE settle. Confirmed
-        // state is hard to undo accidentally because of the explicit prompt.
-        <button
-          onClick={onUnsettle}
-          disabled={isClosed}
-          aria-label="撤回對帳"
-          title="點擊撤回對帳"
-          className="inline-flex items-center justify-center gap-0.5 px-2 py-1 rounded-md bg-[var(--color-success)]/15 text-[var(--color-success)] text-[10px] font-semibold hover:bg-[var(--color-warning)]/15 hover:text-[var(--color-warning)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[var(--color-success)]/15 disabled:hover:text-[var(--color-success)] group-hover:[&_.unsettle-icon]:inline group-active:[&_.settled-label]:hidden group-active:[&_.unsettle-icon]:inline"
-        >
-          <span className="settled-label group-hover:hidden">✓ 已對</span>
-          <span className="unsettle-icon hidden group-hover:inline">↶ 撤回</span>
-        </button>
-      ) : variant === "warning" ? (
-        <button
-          onClick={onConfirm}
-          disabled={isClosed}
-          className="px-2 py-1 rounded-md bg-[var(--color-warning)]/15 text-[var(--color-warning)] text-[10px] font-semibold disabled:opacity-30"
-        >
-          標記
-        </button>
-      ) : (
-        <button
-          onClick={onConfirm}
-          disabled={isClosed}
-          className="px-2 py-1 rounded-md bg-[var(--color-brand)] text-[var(--color-bg)] text-[10px] font-semibold disabled:opacity-30"
-        >
-          確認
-        </button>
-      )}
+      <div className="self-start pt-0.5 flex justify-end">
+        {variant === "confirmed" ? (
+          // 已對 → 點擊可撤回（confirm dialog 確認）
+          <button
+            onClick={onUnsettle}
+            disabled={isClosed}
+            aria-label="撤回對帳"
+            title="點擊撤回對帳"
+            className="inline-flex items-center justify-center gap-0.5 px-3 py-1.5 rounded-md bg-[var(--color-success)]/15 text-[var(--color-success)] text-xs font-bold hover:bg-[var(--color-warning)]/15 hover:text-[var(--color-warning)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[var(--color-success)]/15 disabled:hover:text-[var(--color-success)] group-hover:[&_.unsettle-icon]:inline group-active:[&_.settled-label]:hidden group-active:[&_.unsettle-icon]:inline whitespace-nowrap"
+          >
+            <span className="settled-label group-hover:hidden">✓ 已對</span>
+            <span className="unsettle-icon hidden group-hover:inline">↶ 撤回</span>
+          </button>
+        ) : variant === "warning" ? (
+          <button
+            onClick={onConfirm}
+            disabled={isClosed}
+            className="px-3 py-1.5 rounded-md bg-[var(--color-warning)]/20 text-[var(--color-warning)] text-xs font-bold disabled:opacity-30 whitespace-nowrap"
+          >
+            標記
+          </button>
+        ) : (
+          <button
+            onClick={onConfirm}
+            disabled={isClosed}
+            className="px-4 py-1.5 rounded-md bg-[var(--color-brand)] text-[var(--color-bg)] text-xs font-bold disabled:opacity-30 whitespace-nowrap shadow-sm"
+          >
+            確認
+          </button>
+        )}
+      </div>
     </div>
   );
 }
