@@ -61,8 +61,8 @@ export function YoYBars({ data, hasLastYearData, anchorYear }: YoYBarsProps) {
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs">
         <p className="text-[var(--color-text-muted)] tabular-nums">
-          {anchorYear} 年累計 NT${(data.thisYearTotal / 10000).toFixed(1)}萬，
-          {anchorYear - 1} 年累計 NT${(data.lastYearTotal / 10000).toFixed(1)}萬
+          {anchorYear} 年累計 {(data.thisYearTotal / 10000).toFixed(1)}萬，
+          {anchorYear - 1} 年累計 {(data.lastYearTotal / 10000).toFixed(1)}萬
           {data.cumulativeYoyPct !== null && (
             <span
               className={`ml-1 font-semibold ${
@@ -105,7 +105,7 @@ export function YoYBars({ data, hasLastYearData, anchorYear }: YoYBarsProps) {
                   fontSize="9"
                   fill="var(--color-text-muted)"
                 >
-                  NT${(v / 1000).toFixed(0)}k
+                  {(v / 1000).toFixed(0)}k
                 </text>
               </g>
             );
@@ -185,10 +185,10 @@ export function YoYBars({ data, hasLastYearData, anchorYear }: YoYBarsProps) {
                   {p.monthLabel}
                 </text>
                 <text x={tipX + 8} y={tipY + 28} fontSize="10" fill="white" opacity={0.9}>
-                  {anchorYear - 1}: NT${(p.lastYear / 1000).toFixed(0)}k
+                  {anchorYear - 1}: {(p.lastYear / 1000).toFixed(0)}k
                 </text>
                 <text x={tipX + 8} y={tipY + 41} fontSize="10" fill="white" fontWeight="bold">
-                  {anchorYear}: NT${(p.thisYear / 1000).toFixed(0)}k
+                  {anchorYear}: {(p.thisYear / 1000).toFixed(0)}k
                 </text>
                 {p.yoyPct !== null && (
                   <text
