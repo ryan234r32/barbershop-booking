@@ -11,7 +11,7 @@
     },
     {
       "path": "/api/cron/at-risk",
-      "schedule": "0 20 * * 0"
+      "schedule": "0 20 * * *"
     },
     {
       "path": "/api/cron/weekly-report",

@@ -817,12 +817,14 @@ export async function computeDailyView(
   tenantId: string,
   dateIso: string,
 ): Promise<DailyView> {
+  // Booking.date is `@db.Date` (PG DATE — date-only). Using a Date timestamp
+  // range with gte/lte triggers PG date casting that quietly expands the
+  // bounds to ±1 day (V3.6 demo bug 2026-04-30: showed 4/29 + 4/30 union).
+  // Pass the ISO date string directly; Prisma handles DATE equality cleanly.
   const [yStr, mStr, dStr] = dateIso.split("-");
   const y = parseInt(yStr, 10);
   const m = parseInt(mStr, 10);
   const d = parseInt(dStr, 10);
-  const dayStart = new Date(Date.UTC(y, m - 1, d, -8, 0, 0));
-  const dayEnd = new Date(Date.UTC(y, m - 1, d, 15, 59, 59, 999));
 
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
@@ -834,7 +836,7 @@ export async function computeDailyView(
   const bookings = await prisma.booking.findMany({
     where: {
       tenantId,
-      date: { gte: dayStart, lte: dayEnd },
+      date: dateIso,
       status: { notIn: ["CANCELLED", "CANCELLED_BY_ADMIN"] },
     },
     select: {
@@ -893,8 +895,11 @@ export async function computeDailyView(
   // Cash / bank totals — COMPLETED only so cash + bank == today's revenue.
   // (Future CONFIRMED bookings are not counted; they're still in the list but
   // contribute zero to the cash/bank cards until they settle.)
-  const completedCashRows = completedRows.filter((r) => r.paymentMethod === "CASH");
+  // NULL paymentMethod (no Payment record yet) defaults to CASH — admin reflex
+  // for walk-in cash sales is no payment record, and previously they fell into
+  // a third bucket making cashTotal + bankTotal != totalRevenue (V3.6 demo bug).
   const completedBankRows = completedRows.filter((r) => r.paymentMethod === "BANK_TRANSFER");
+  const completedCashRows = completedRows.filter((r) => r.paymentMethod !== "BANK_TRANSFER");
   const cashTotal = completedCashRows.reduce((s, r) => s + r.amount, 0);
   const cashConfirmed = completedCashRows.filter((r) => r.settledAt != null).length;
   const cashPending = completedCashRows.length - cashConfirmed;
@@ -908,7 +913,7 @@ export async function computeDailyView(
   const cancelledCount = await prisma.booking.count({
     where: {
       tenantId,
-      date: { gte: dayStart, lte: dayEnd },
+      date: dateIso,
       status: { in: ["CANCELLED", "CANCELLED_BY_ADMIN"] },
     },
   });

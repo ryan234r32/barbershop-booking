@@ -131,3 +131,29 @@ export function getDayOfWeek(date: Date): number {
   );
   return taipeiDate.getDay();
 }
+
+/**
+ * For a Taipei calendar date "YYYY-MM-DD", returns the half-open UTC range
+ * [start, end) representing 00:00:00 to 24:00:00 of that Taipei day.
+ *
+ * Use this when querying timestamp columns (Booking.createdAt, Payment.createdAt
+ * etc.) for "all events that happened in this Taipei calendar day".
+ *
+ * **DO NOT use this for `@db.Date` columns** (Booking.date, User.lastServiceDate).
+ * For those, pass the date string directly: `where: { date: "2026-04-30" }` —
+ * Prisma + PG handle DATE equality correctly. Range queries with timestamps
+ * against a DATE column trigger date casting that quietly expands the bounds
+ * by ±1 day. See V3.6 daily-view 4/30→4/29+4/30 incident.
+ *
+ * Example:
+ *   const [from, to] = taipeiDateRange("2026-04-30");
+ *   // from = 2026-04-29T16:00:00.000Z (Taipei 04-30 00:00)
+ *   // to   = 2026-04-30T16:00:00.000Z (Taipei 05-01 00:00, exclusive)
+ */
+export function taipeiDateRange(dateIso: string): [Date, Date] {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  return [
+    new Date(Date.UTC(y, m - 1, d, -8, 0, 0, 0)),
+    new Date(Date.UTC(y, m - 1, d + 1, -8, 0, 0, 0)),
+  ];
+}
