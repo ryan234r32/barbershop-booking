@@ -157,56 +157,63 @@ export function LiffProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Get profile — non-blocking: if it fails, still allow usage
+        // Identity from the decoded ID token is available *immediately* after
+        // init — no extra round-trip. /api/liff/init only needs the raw idToken
+        // (server re-verifies and reads name/picture from the verified payload),
+        // so we can fire it in parallel with getProfile() to save 200-500ms.
         let userId: string | null = null;
         let displayName: string | null = null;
         let pictureUrl: string | null = null;
-
         try {
-          const profile = await liff.getProfile();
-          userId = profile.userId;
-          displayName = profile.displayName;
-          pictureUrl = profile.pictureUrl || null;
-        } catch (profileErr) {
-          console.warn("Failed to get LINE profile, continuing without it:", profileErr);
-          try {
-            const decodedToken = liff.getDecodedIDToken();
-            userId = decodedToken?.sub || null;
-            displayName = decodedToken?.name || null;
-            pictureUrl = decodedToken?.picture || null;
-          } catch {
-            console.warn("Failed to get decoded token too");
-          }
+          const decoded = liff.getDecodedIDToken();
+          userId = decoded?.sub || null;
+          displayName = decoded?.name || null;
+          pictureUrl = decoded?.picture || null;
+        } catch {
+          // No decoded token — getProfile() below is our last fallback
         }
 
-        // Initialize session on backend and get stored user profile
+        const idTokenForInit = liff.getIDToken?.() || "";
+
+        const [profileResult, initResult] = await Promise.allSettled([
+          liff.getProfile(),
+          idTokenForInit
+            ? fetch("/api/liff/init", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-LIFF-ID-Token": idTokenForInit,
+                },
+                // Server reads name/picture from the verified token payload.
+                // Empty body is fine; kept for API stability.
+                body: JSON.stringify({}),
+              })
+            : Promise.reject(new Error("no idToken")),
+        ]);
+
+        if (profileResult.status === "fulfilled") {
+          userId = profileResult.value.userId;
+          displayName = profileResult.value.displayName;
+          pictureUrl = profileResult.value.pictureUrl || null;
+        } else {
+          console.warn("Failed to get LINE profile, using decoded token fallback:", profileResult.reason);
+        }
+
         let realName: string | null = null;
         let phone: string | null = null;
         let birthday: string | null = null;
 
-        if (userId) {
+        if (initResult.status === "fulfilled" && initResult.value.ok) {
           try {
-            const idToken = liff.getIDToken?.() || "";
-            const initRes = await fetch("/api/liff/init", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                ...(idToken ? { "X-LIFF-ID-Token": idToken } : {}),
-              },
-              // Body is now for optional profile hints only; server uses the verified
-              // token's sub for lineUserId. Keeping displayName/pictureUrl as fallbacks
-              // in case the token payload omits them (profile scope not granted).
-              body: JSON.stringify({ displayName, pictureUrl }),
-            });
-            if (initRes.ok) {
-              const initData = await initRes.json();
-              realName = initData.user?.realName || null;
-              phone = initData.user?.phone || null;
-              birthday = initData.user?.birthday || null;
-            }
-          } catch (initErr) {
-            console.warn("Failed to init backend session:", initErr);
+            const initData = await initResult.value.json();
+            realName = initData.user?.realName || null;
+            phone = initData.user?.phone || null;
+            birthday = initData.user?.birthday || null;
+          } catch (parseErr) {
+            console.warn("Failed to parse /api/liff/init response:", parseErr);
           }
+        } else if (initResult.status === "rejected") {
+          console.warn("Failed to init backend session:", initResult.reason);
         }
 
         const idToken = liff.getIDToken?.() || null;

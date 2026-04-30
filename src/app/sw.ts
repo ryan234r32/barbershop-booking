@@ -31,21 +31,14 @@ const serwist = new Serwist({
   },
 });
 
-// LIFF 路徑排除 — 不快取客人端頁面
-const LIFF_PATHS = ["/booking", "/my-bookings", "/payment"];
-
-self.addEventListener("fetch", (event) => {
-  const url = new URL(event.request.url);
-
-  // 不處理 LIFF 路徑和 LINE 相關域名
-  if (
-    LIFF_PATHS.some((p) => url.pathname.startsWith(p)) ||
-    url.hostname.includes("line.me") ||
-    url.hostname.includes("line-scdn.net")
-  ) {
-    return; // 讓瀏覽器正常處理
-  }
-});
+// Note: defaultCache (Serwist) already handles LIFF pages safely:
+//   • _next/static/*  → CacheFirst (content-hashed, never stale)
+//   • HTML documents  → NetworkFirst (LIFF pages always fetch fresh, fall back
+//                        to cache offline)
+//   • _next/data RSC  → StaleWhileRevalidate (snappy nav, refreshes in bg)
+// The previous LIFF_PATHS exclusion listener was a no-op (no event.respondWith)
+// and has been removed. line.me / line-scdn.net are cross-origin and Serwist
+// won't try to cache them anyway.
 
 // Web Push 推播接收
 self.addEventListener("push", (event) => {
