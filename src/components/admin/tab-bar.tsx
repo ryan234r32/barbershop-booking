@@ -3,16 +3,22 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import useSWR from "swr";
-import { Calendar, MessageSquare, LayoutDashboard, FileBarChart } from "lucide-react";
+import {
+  Calendar,
+  FileBarChart,
+  Users,
+  MessageSquare,
+  MoreHorizontal,
+} from "lucide-react";
 
-// V3.5 Phase 3: tab bar promotes 儀表板 (今日對帳) to the bottom-bar so the
-// 8pm settlement workflow is one tap away on mobile. /more was barely used —
-// secondary nav lives in the sidebar (lg:hidden hamburger).
+// V3.8 consolidation: 老闆指定主選單 4 個 + 更多。日曆是 app 根，報表 = V3.6
+// 三視角，顧客 = 客戶管理，訊息 = LINE 客服。其他全進「更多」（/more 頁）。
 const TABS = [
-  { href: "/calendar", label: "日曆", icon: Calendar },
-  { href: "/messages", label: "訊息", icon: MessageSquare },
-  { href: "/dashboard", label: "儀表板", icon: LayoutDashboard },
+  { href: "/calendar", label: "行事曆", icon: Calendar },
   { href: "/reports", label: "報表", icon: FileBarChart },
+  { href: "/customers", label: "顧客", icon: Users },
+  { href: "/messages", label: "訊息", icon: MessageSquare },
+  { href: "/more", label: "更多", icon: MoreHorizontal },
 ] as const;
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());

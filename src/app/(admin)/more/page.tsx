@@ -4,25 +4,23 @@ import Link from "next/link";
 import { useAdmin } from "@/lib/admin/auth-context";
 import { NotificationToggle } from "@/components/admin/notification-toggle";
 import {
-  Users,
   Scissors,
   Megaphone,
   Gift,
-  CalendarClock,
-  Download,
+  Ticket,
   Settings,
   LogOut,
   ChevronRight,
   Lock,
 } from "lucide-react";
 
+// V3.8 consolidation: 老闆指定主選單 4 個（行事曆/報表/顧客/訊息）+ 更多。
+// /customers 升到主選單，/dashboard /payments /cash-flow 暫保留但不在 nav。
 const MENU_ITEMS = [
-  { href: "/customers", label: "顧客管理", icon: Users },
-  { href: "/services", label: "服務項目管理", icon: Scissors },
+  { href: "/lottery", label: "抽獎", icon: Gift },
   { href: "/campaigns", label: "行銷推播", icon: Megaphone },
-  { href: "/lottery", label: "上線抽獎", icon: Gift },
-  { href: "/more/schedule", label: "營業時間與公休", icon: CalendarClock },
-  { href: "/more/export", label: "匯出資料", icon: Download },
+  { href: "/coupons", label: "優惠券", icon: Ticket },
+  { href: "/services", label: "服務項目管理", icon: Scissors },
   { href: "/settings", label: "店鋪設定", icon: Settings },
   { href: "/more/password", label: "修改密碼", icon: Lock },
 ];

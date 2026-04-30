@@ -4,42 +4,47 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAdmin } from "@/lib/admin/auth-context";
 import { useState, useEffect } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
-  LayoutDashboard,
   Calendar,
-  Plus,
   Users,
   Scissors,
   Megaphone,
-  Wallet,
-  Coins,
   Ticket,
   FileBarChart,
   Settings,
+  MessageSquare,
+  Gift,
+  Lock,
   X,
 } from "lucide-react";
 
 interface NavItem {
   href: string;
   label: string;
-  Icon: typeof LayoutDashboard;
+  Icon: LucideIcon;
   badge?: string;
 }
 
-const NAV_ITEMS: readonly NavItem[] = [
-  // V3.5 Phase 4: 行事曆是 app 的根 — 排第一，其他頁面從這裡發散出去。
+// V3.8 consolidation: 主選單 4 + 更多群組。老闆 2026-04-30 指定結構。
+// /dashboard、/cash-flow、/payments 暫保留但不在 nav（PR 4 砍 dashboard）。
+const MAIN_NAV: readonly NavItem[] = [
   { href: "/calendar", label: "行事曆", Icon: Calendar },
-  { href: "/dashboard", label: "儀表板", Icon: LayoutDashboard },
-  { href: "/bookings/new", label: "新增預約", Icon: Plus },
-  { href: "/customers", label: "顧客管理", Icon: Users },
-  { href: "/services", label: "服務項目", Icon: Scissors },
-  { href: "/coupons", label: "優惠券", Icon: Ticket, badge: "BETA" },
-  { href: "/reports", label: "報表", Icon: FileBarChart, badge: "BETA" },
-  { href: "/campaigns", label: "行銷推播", Icon: Megaphone },
-  { href: "/payments", label: "付款對帳", Icon: Wallet },
-  { href: "/cash-flow", label: "每日現金流", Icon: Coins, badge: "V3.5" },
-  { href: "/settings", label: "設定", Icon: Settings },
+  { href: "/reports", label: "報表", Icon: FileBarChart },
+  { href: "/customers", label: "顧客", Icon: Users },
+  { href: "/messages", label: "訊息", Icon: MessageSquare },
 ] as const;
+
+const MORE_NAV: readonly NavItem[] = [
+  { href: "/lottery", label: "抽獎", Icon: Gift },
+  { href: "/campaigns", label: "行銷推播", Icon: Megaphone },
+  { href: "/coupons", label: "優惠券", Icon: Ticket },
+  { href: "/services", label: "服務項目", Icon: Scissors },
+  { href: "/settings", label: "店鋪設定", Icon: Settings },
+  { href: "/more/password", label: "修改密碼", Icon: Lock },
+] as const;
+
+const ALL_NAV = [...MAIN_NAV, ...MORE_NAV];
 
 export function AdminSidebar() {
   const pathname = usePathname();
@@ -51,7 +56,7 @@ export function AdminSidebar() {
   // 而不是漢堡選單。漢堡只在 /calendar 上才出現。Tab bar 仍然永遠顯示。
   const isOnCalendar = pathname === "/calendar" || pathname.startsWith("/calendar/");
   const currentPageLabel =
-    NAV_ITEMS.find(
+    ALL_NAV.find(
       (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
     )?.label ?? "理髮廳";
 
@@ -70,32 +75,69 @@ export function AdminSidebar() {
         <p className="text-xs text-muted-foreground mt-0.5">管理後台</p>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-          const Icon = item.Icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`
-                flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors
-                ${isActive
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "text-muted-foreground hover:bg-background hover:text-foreground"
-                }
-              `}
-            >
-              <Icon size={18} strokeWidth={isActive ? 2.2 : 1.7} />
-              <span className="flex-1">{item.label}</span>
-              {item.badge && (
-                <span className="text-[9px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-[var(--color-brand)]/15 text-[var(--color-brand)]">
-                  {item.badge}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 p-4 overflow-y-auto">
+        {/* 主選單 — 4 個核心功能 */}
+        <div className="space-y-1">
+          {MAIN_NAV.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+            const Icon = item.Icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`
+                  flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors
+                  ${isActive
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:bg-background hover:text-foreground"
+                  }
+                `}
+              >
+                <Icon size={18} strokeWidth={isActive ? 2.2 : 1.7} />
+                <span className="flex-1">{item.label}</span>
+                {item.badge && (
+                  <span className="text-[9px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-[var(--color-brand)]/15 text-[var(--color-brand)]">
+                    {item.badge}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* 更多群組 */}
+        <div className="mt-6">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-3 mb-2">
+            更多
+          </p>
+          <div className="space-y-1">
+            {MORE_NAV.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+              const Icon = item.Icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`
+                    flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors
+                    ${isActive
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:bg-background hover:text-foreground"
+                    }
+                  `}
+                >
+                  <Icon size={18} strokeWidth={isActive ? 2.2 : 1.7} />
+                  <span className="flex-1">{item.label}</span>
+                  {item.badge && (
+                    <span className="text-[9px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-[var(--color-brand)]/15 text-[var(--color-brand)]">
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
       </nav>
 
       <div className="p-4 border-t border-border/50">
