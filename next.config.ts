@@ -41,6 +41,8 @@ const nextConfig: NextConfig = {
       { source: "/analytics", destination: "/reports?view=monthly", permanent: false },
       // V3.8 consolidation: /consultations admin UI 砍掉，回日曆
       { source: "/consultations", destination: "/calendar", permanent: false },
+      // V3.8 consolidation: /dashboard 由 V3.6 daily view 取代
+      { source: "/dashboard", destination: "/reports?view=daily", permanent: false },
     ];
   },
 };

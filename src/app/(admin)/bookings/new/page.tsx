@@ -77,7 +77,7 @@ export default function NewBookingPage() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push("/calendar");
     } catch {
       alert("網路錯誤");
     } finally {

@@ -158,10 +158,10 @@ export default function BookingDetailPage() {
             {error || "找不到此預約"}
           </h2>
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/calendar")}
             className="mt-4 px-4 py-2 bg-secondary hover:bg-secondary rounded-lg text-sm text-foreground/80 transition-colors"
           >
-            返回儀表板
+            返回行事曆
           </button>
         </div>
       </div>
@@ -174,7 +174,7 @@ export default function BookingDetailPage() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/calendar")}
             className="p-2 hover:bg-secondary rounded-lg transition-colors"
             aria-label="返回"
           >
