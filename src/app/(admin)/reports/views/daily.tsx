@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { MCard } from "@/components/admin/reports/v3.6/m-card";
-import { MTag } from "@/components/admin/reports/v3.6/m-tag";
 import { DateStrip } from "@/components/admin/reports/v3.6/date-strip";
 import { NewBookingSheet } from "@/components/admin/new-booking-sheet";
 import type { DailyView, DailyBookingRow } from "@/lib/reports/v3.6/aggregates";
@@ -100,6 +99,50 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
         return next;
       });
       alert(`確認失敗：${String(e)}`);
+    }
+  };
+
+  // V3.6 Pass 3 §2 — undo settle. Confirm gate to prevent thumb-fat reverts;
+  // optimistic flip the row back to pending; rollback on API error. Server will
+  // also fire a `paymentSettleRevokedMessage` apology to the customer (V3.7 §G).
+  const unsettleOne = async (id: string) => {
+    if (!confirm("撤回此筆對帳？\n客戶會收到「對帳記錄已撤銷」的補正 LINE 訊息。")) return;
+    // Optimistically un-settle: pull the row out of the optimistic-settled set
+    // (no-op if it wasn't there) and clear `settledAt` via SWR mutation.
+    await mutate(
+      (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          data: {
+            ...current.data,
+            rows: current.data.rows.map((r) =>
+              r.id === id ? { ...r, settledAt: null } : r,
+            ),
+          },
+        };
+      },
+      { revalidate: false },
+    );
+    setOptimisticSettled((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    try {
+      const res = await fetch(`/api/bookings/${id}/settle`, {
+        method: "DELETE",
+        headers: adminHeaders(),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({} as { error?: string; message?: string }));
+        alert(`撤回失敗（${res.status}）：${err.message ?? err.error ?? "請稍後再試"}`);
+      }
+    } catch (e) {
+      alert(`撤回失敗：${String(e)}`);
+    } finally {
+      // Always re-sync with server (success → row stays unsettled, error → row pops back)
+      mutate();
     }
   };
 
@@ -254,6 +297,7 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
                 row={r}
                 isClosed={d.isClosed}
                 onConfirm={() => settleOne(r.id)}
+                onUnsettle={() => unsettleOne(r.id)}
               />
             ))}
           </div>
@@ -475,10 +519,12 @@ function BookingRow({
   row,
   isClosed,
   onConfirm,
+  onUnsettle,
 }: {
   row: DailyBookingRow;
   isClosed: boolean;
   onConfirm: () => void;
+  onUnsettle: () => void;
 }) {
   const variant = row.settledAt
     ? "confirmed"
@@ -504,7 +550,7 @@ function BookingRow({
 
   return (
     <div
-      className={`grid grid-cols-[3.5rem_1fr_5rem_5.5rem_4.5rem] items-center gap-2 px-2 py-2 rounded-md text-xs ${baseBg}`}
+      className={`group grid grid-cols-[3.5rem_1fr_5rem_5.5rem_4.5rem] items-center gap-2 px-2 py-2 rounded-md text-xs ${baseBg}`}
     >
       <span className="font-mono tabular-nums text-[var(--color-text-muted)]">
         {row.startTime}
@@ -538,7 +584,19 @@ function BookingRow({
         {paymentLabel}
       </span>
       {variant === "confirmed" ? (
-        <MTag tone="success">✓ 已對</MTag>
+        // V3.6 Pass 3 §2 — clickable settle tag. Click it (mobile-first; hover
+        // is unreliable on touch) → confirm dialog → DELETE settle. Confirmed
+        // state is hard to undo accidentally because of the explicit prompt.
+        <button
+          onClick={onUnsettle}
+          disabled={isClosed}
+          aria-label="撤回對帳"
+          title="點擊撤回對帳"
+          className="inline-flex items-center justify-center gap-0.5 px-2 py-1 rounded-md bg-[var(--color-success)]/15 text-[var(--color-success)] text-[10px] font-semibold hover:bg-[var(--color-warning)]/15 hover:text-[var(--color-warning)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[var(--color-success)]/15 disabled:hover:text-[var(--color-success)] group-hover:[&_.unsettle-icon]:inline group-active:[&_.settled-label]:hidden group-active:[&_.unsettle-icon]:inline"
+        >
+          <span className="settled-label group-hover:hidden">✓ 已對</span>
+          <span className="unsettle-icon hidden group-hover:inline">↶ 撤回</span>
+        </button>
       ) : variant === "warning" ? (
         <button
           onClick={onConfirm}

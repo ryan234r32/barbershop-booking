@@ -41,6 +41,11 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
   const [phone, setPhone] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [notes, setNotes] = useState("");
+  // V3.6 Pass 3 — admin/QA flag. When checked we prepend `[TEST] ` to notes
+  // so dashboards / admins can filter these out of revenue & retention.
+  // Idempotent: re-submitting the same booking won't double-prefix because
+  // we only touch notes at POST time.
+  const [isTest, setIsTest] = useState(false);
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<CustomerSuggestion[]>([]);
   // When admin picks from suggestions, we hold the chosen user.id + a snapshot
@@ -118,6 +123,12 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
     try {
       // Auth comes from the admin_token cookie (or Bearer header on iOS PWA).
       // The server generates a synthetic lineUserId internally — we never send one.
+      const trimmedNotes = notes.trim();
+      const finalNotes = isTest
+        ? trimmedNotes
+          ? `[TEST] ${trimmedNotes}`
+          : `[TEST]`
+        : trimmedNotes || undefined;
       const res = await fetch("/api/bookings", {
         method: "POST",
         headers: adminHeaders(),
@@ -131,7 +142,7 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
           date,
           startTime: time,
           source,
-          notes: notes.trim() || undefined,
+          notes: finalNotes,
         }),
       });
       if (!res.ok) {
@@ -147,6 +158,7 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
       setServiceId("");
       setNotes("");
       setBoundCustomer(null);
+      setIsTest(false);
     } catch (err) {
       toast({ type: "error", message: err instanceof Error ? err.message : "新增失敗" });
     } finally {
@@ -263,7 +275,7 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
             </div>
 
             {/* Notes */}
-            <div className="mb-6">
+            <div className="mb-3">
               <label className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider block mb-1">備註</label>
               <textarea
                 value={notes}
@@ -272,6 +284,23 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
                 className="w-full bg-[var(--color-surface)] rounded-lg p-3 text-sm text-[var(--color-text-body)] placeholder:text-[var(--color-text-disabled)] outline-none resize-none"
                 placeholder="輸入備註（選填）"
               />
+            </div>
+
+            {/* V3.6 Pass 3 — [TEST] flag. Prepends "[TEST]" to notes so this
+                booking can be filtered out of dashboards / revenue / retention. */}
+            <div className="mb-6">
+              <label className="flex items-center gap-2 cursor-pointer select-none py-1">
+                <input
+                  type="checkbox"
+                  checked={isTest}
+                  onChange={(e) => setIsTest(e.target.checked)}
+                  className="w-4 h-4 accent-[var(--color-warning)]"
+                />
+                <span className="text-sm text-[var(--color-text-body)]">
+                  <span className="font-mono text-[var(--color-warning)] mr-1">[TEST]</span>
+                  標記為測試 — 不計入營收統計
+                </span>
+              </label>
             </div>
 
           </div>
