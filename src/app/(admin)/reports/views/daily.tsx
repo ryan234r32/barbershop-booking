@@ -249,7 +249,7 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
         <BigStatCard
           label="服務客數"
           value={`${d.servedCount}`}
-          sub={`客單 NT$${d.avgTicket.toLocaleString()}`}
+          sub={`客單 ${d.avgTicket.toLocaleString()}`}
         />
         <BigStatCard
           label="對帳進度"
@@ -462,11 +462,11 @@ function ProgressGradient({
   );
 }
 
-/** Compact revenue formatter — keeps NT$18,700 short on small screens. */
+/** Compact revenue formatter (V3.8: 拿掉 NT$ 前綴 — 老闆說「大家都知道是台幣」). */
 function formatRevenue(rev: number): string {
-  if (rev >= 100000) return `NT$${Math.round(rev / 1000)}k`;
-  if (rev >= 10000) return `NT$${(rev / 10000).toFixed(1)}萬`;
-  return `NT$${rev.toLocaleString()}`;
+  if (rev >= 100000) return `${Math.round(rev / 1000)}k`;
+  if (rev >= 10000) return `${(rev / 10000).toFixed(1)}萬`;
+  return rev.toLocaleString();
 }
 
 function PaymentCard({
@@ -488,8 +488,8 @@ function PaymentCard({
         <span className="text-lg">{icon}</span>
         <p className="text-sm font-semibold text-[var(--color-text-primary)]">{label}</p>
       </div>
-      <p className="text-xl font-bold tabular-nums text-[var(--color-text-primary)]">
-        NT${total.toLocaleString()}
+      <p className="text-2xl font-bold tabular-nums text-[var(--color-text-primary)]">
+        {total.toLocaleString()}
       </p>
       <p className="text-[10px] text-[var(--color-text-muted)] mt-1 tabular-nums">
         已確認 {confirmed} · 待 {pending}
@@ -555,7 +555,10 @@ function BookingRow({
         ? "bg-[var(--color-warning)]/8 border border-[var(--color-warning)]/25"
         : "bg-[var(--color-bg)] border border-[var(--color-brand)]/8";
 
-  const sourceBadge = formatSourceBadge(row.bookingSource);
+  // V3.8: 老闆反映「應該是分現場和轉帳，而不是 LINE」— 拿掉 source badge
+  // (LIFF/PHONE/WALK_IN/ADMIN)，只保留 payment method pill (現金/轉帳·12345)。
+  // const sourceBadge = formatSourceBadge(row.bookingSource);  // disabled per
+  void formatSourceBadge;  // 保留 function 但 not used，避免 TS unused warning
   // V3.8 §3 老闆反映：要看到末 5 碼 + 現場/轉帳 分明。把付款方式做成 pill：
   // - 現金 → 綠色 pill「現金」
   // - 轉帳含末 5 碼 → 琥珀 pill「轉帳·12345」（強調，提醒老闆對帳）
@@ -586,22 +589,12 @@ function BookingRow({
         {row.startTime}
       </span>
       <div className="min-w-0">
-        <div className="flex items-start gap-1.5 flex-wrap">
-          <p
-            className="font-semibold text-[var(--color-text-primary)] text-sm sm:text-base leading-tight break-all"
-            title={row.customerName}
-          >
-            {row.customerName}
-          </p>
-          {sourceBadge && (
-            <span
-              className={`shrink-0 inline-flex items-center px-1.5 py-px rounded-sm text-[10px] font-semibold leading-tight ${sourceBadge.tone}`}
-              title={sourceBadge.title}
-            >
-              {sourceBadge.label}
-            </span>
-          )}
-        </div>
+        <p
+          className="font-semibold text-[var(--color-text-primary)] text-sm sm:text-base leading-tight break-all"
+          title={row.customerName}
+        >
+          {row.customerName}
+        </p>
         <div className="flex items-center justify-between gap-2 mt-1">
           <p className="text-xs text-[var(--color-text-muted)] truncate" title={row.serviceName}>
             {row.serviceName}

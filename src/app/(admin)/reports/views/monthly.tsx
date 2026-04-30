@@ -120,7 +120,7 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
                   {data.range.label}營收
                 </p>
                 <p className="text-3xl font-bold tabular-nums text-[var(--color-text-primary)] mt-1">
-                  NT${revenue.toLocaleString()}
+                  {revenue.toLocaleString()}
                 </p>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                   {data.momChangePct !== null && (
@@ -163,7 +163,7 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
                 <ProgressBar
                   value={data.target.achievementRate}
                   benchmark={data.target.paceExpectedRate}
-                  rightLabel={`目標 NT$${data.target.targetRevenue.toLocaleString()} · 進度線 ${data.target.paceExpectedRate.toFixed(0)}%`}
+                  rightLabel={`目標 ${data.target.targetRevenue.toLocaleString()} · 進度線 ${data.target.paceExpectedRate.toFixed(0)}%`}
                   tone={data.target.achievementRate >= data.target.paceExpectedRate ? "success" : "warning"}
                 />
               </div>
@@ -185,8 +185,7 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
               benchmark={{
                 current: data.retention.retention90Days,
                 tiers: [
-                  { at: 0, label: "0%" },
-                  { at: 40, label: "業界平均 40%" },
+                  { at: 40, label: "業界 40%" },
                   { at: 65, label: "頂尖 65%" },
                 ],
               }}
@@ -205,9 +204,8 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
               benchmark={{
                 current: data.prebook.rate,
                 tiers: [
-                  { at: 0, label: "0%" },
                   { at: 50, label: "警戒 50%" },
-                  { at: 70, label: "業界目標 70%" },
+                  { at: 70, label: "目標 70%" },
                 ],
               }}
             />
@@ -240,8 +238,7 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
               benchmark={{
                 current: data.chemicalShare,
                 tiers: [
-                  { at: 0, label: "本月" },
-                  { at: 35, label: "業界目標 40%" },
+                  { at: 35, label: "目標 40%" },
                   { at: 60, label: "頂尖 60%" },
                 ],
               }}
@@ -341,7 +338,7 @@ function ServiceMixWidget({
                   style={{ width: `${pct}%` }}
                 />
                 <span className="absolute inset-0 flex items-center pl-2 text-[10px] text-[var(--color-text-primary)] font-mono">
-                  NT${s.revenue.toLocaleString()} ({s.count})
+                  {s.revenue.toLocaleString()} ({s.count})
                 </span>
               </div>
               <span className="w-10 text-right font-mono text-[var(--color-text-muted)] tabular-nums">
@@ -358,7 +355,7 @@ function ServiceMixWidget({
             💰 染燙合計 {chemicalShare.toFixed(1)}%（{chemDelta >= 0 ? "+" : ""}{chemDelta.toFixed(1)}pp vs 上月），距業界目標 {targetShare}% 還差 {gapPp.toFixed(1)}pp
           </p>
           <p className="text-[var(--color-text-body)] mt-1">
-            本月染燙營收 NT${Math.round(monthlyChemRev).toLocaleString()}，達標可增加約 NT${Math.round(upliftRev).toLocaleString()}/月
+            本月染燙營收 {Math.round(monthlyChemRev).toLocaleString()}，達標可增加約 {Math.round(upliftRev).toLocaleString()}/月
           </p>
         </div>
       )}
@@ -377,7 +374,7 @@ function SetTargetButton({
     <button
       onClick={() => {
         const input = window.prompt(
-          `設定 ${monthLabel(period)} 月目標營收（NT$）：`,
+          `設定 ${monthLabel(period)} 月目標營收：`,
           currentTarget ? String(currentTarget) : "",
         );
         if (!input) return;

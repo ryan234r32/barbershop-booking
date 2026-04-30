@@ -112,7 +112,7 @@ export function AnnualView({ period, onPeriodChange }: AnnualViewProps) {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <KpiCard
                 label="全年營收"
-                primary={`NT$${(data.totals.revenue / 10000).toFixed(1)}萬`}
+                primary={`${(data.totals.revenue / 10000).toFixed(1)}萬`}
                 secondary={`${data.totals.revenue.toLocaleString()} 元`}
                 deltaPct={data.yoy.cumulativeYoyPct ?? null}
                 comparisonLabel={`${yearNum - 1} 年`}
@@ -132,7 +132,7 @@ export function AnnualView({ period, onPeriodChange }: AnnualViewProps) {
               />
               <KpiCard
                 label="客戶終身價值 ARPU"
-                primary={`NT$${data.totals.arpu.toLocaleString()}`}
+                primary={`${data.totals.arpu.toLocaleString()}`}
                 secondary={`年訪 ${data.totals.visitFrequency.toFixed(2)} 次/人`}
                 status={statusForArpu(data.totals.visitFrequency)}
                 benchmark={{
@@ -166,7 +166,7 @@ export function AnnualView({ period, onPeriodChange }: AnnualViewProps) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <SmallStat label="不重複客戶" value={data.totals.uniqueCustomers.toLocaleString()} />
               <SmallStat label="年訪頻率" value={`${data.totals.visitFrequency.toFixed(2)} 次/人`} />
-              <SmallStat label="平均客單" value={`NT$${data.totals.arpu.toLocaleString()}`} />
+              <SmallStat label="平均客單" value={`${data.totals.arpu.toLocaleString()}`} />
               <SmallStat label="中位回訪間隔" value={`${data.totals.medianGapDays} 天`} />
             </div>
 
@@ -281,7 +281,7 @@ function ExecutiveSummary({ data }: { data: AnnualResponse }) {
         EXECUTIVE SUMMARY
       </p>
       <p className="text-sm text-[var(--color-text-body)] leading-relaxed">
-        {data.year} 年全年營收 <strong>NT${totals.revenue.toLocaleString()}</strong>
+        {data.year} 年全年營收 <strong>{totals.revenue.toLocaleString()}</strong>
         （較 {data.year - 1} 年 <strong className={yoy.cumulativeYoyPct === null ? "" : yoy.cumulativeYoyPct >= 0 ? "text-[var(--color-success)]" : "text-[var(--color-danger)]"}>{yoyText}</strong>）
         ，服務 <strong>{totals.uniqueCustomers}</strong> 位不重複客戶，
         其中冠軍 + 忠實老客貢獻 <strong>{champPct.toFixed(1)}%</strong> 主要營收。
@@ -327,14 +327,14 @@ function ServiceStructureTable({
           {shares.map((s) => (
             <tr key={s.category} className="border-b border-[var(--color-brand)]/5">
               <td className="py-2 font-semibold text-[var(--color-text-primary)]">{s.category}</td>
-              <td className="py-2 text-right tabular-nums">NT${s.revenue.toLocaleString()}</td>
+              <td className="py-2 text-right tabular-nums">{s.revenue.toLocaleString()}</td>
               <td className="py-2 text-right tabular-nums">{s.share.toFixed(1)}%</td>
               <td className="py-2 text-right tabular-nums text-[var(--color-text-muted)]">{s.count}</td>
             </tr>
           ))}
           <tr className="font-bold">
             <td className="py-2">總計</td>
-            <td className="py-2 text-right tabular-nums">NT${totalRev.toLocaleString()}</td>
+            <td className="py-2 text-right tabular-nums">{totalRev.toLocaleString()}</td>
             <td className="py-2 text-right tabular-nums">100%</td>
             <td className="py-2 text-right tabular-nums">
               {shares.reduce((s, x) => s + x.count, 0)}
@@ -377,7 +377,7 @@ function SeasonalityChart({ sparkline }: { sparkline: MonthSpark[] }) {
               fontSize="10"
               fill="var(--color-text-muted)"
             >
-              月均 NT${Math.round(avg / 1000)}k
+              月均 {Math.round(avg / 1000)}k
             </text>
           </>
         )}
@@ -464,13 +464,13 @@ function Highlights({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <SmallStat
           label="最高單月"
-          value={`NT$${(highlights.highestMonthRevenue / 10000).toFixed(1)}萬`}
+          value={`${(highlights.highestMonthRevenue / 10000).toFixed(1)}萬`}
         />
         <SmallStat label="服務總次數" value={highlights.totalServiceCount.toLocaleString()} />
         <SmallStat label="不重複客戶" value={highlights.uniqueCustomers.toLocaleString()} />
         <SmallStat
           label="最高單筆消費"
-          value={`NT$${highlights.highestSingleTicket.toLocaleString()}`}
+          value={`${highlights.highestSingleTicket.toLocaleString()}`}
         />
       </div>
 
@@ -503,7 +503,7 @@ function Highlights({
                   {c.displayName ?? "—"}
                 </p>
                 <p className="text-[10px] text-[var(--color-text-muted)] tabular-nums">
-                  訪問 {c.visitCount} 次 · 消費 NT${c.totalSpend.toLocaleString()}
+                  訪問 {c.visitCount} 次 · 消費 {c.totalSpend.toLocaleString()}
                 </p>
               </div>
               {i === 0 && <MTag tone="brand">年度冠軍</MTag>}
@@ -560,7 +560,7 @@ function ScenarioPicker({
           : chosenS?.monthlyTargets ?? {},
       }),
     }).then((r) => {
-      if (r.ok) alert(`${year} 年目標已儲存：NT$${target.toLocaleString()}`);
+      if (r.ok) alert(`${year} 年目標已儲存：${target.toLocaleString()}`);
       else alert("儲存失敗");
     });
   };
@@ -587,7 +587,7 @@ function ScenarioPicker({
                 {s.recommended && <MTag tone="brand">推薦</MTag>}
               </div>
               <p className="text-base font-bold tabular-nums text-[var(--color-brand)]">
-                {s.key === "custom" ? "自訂金額" : `NT$${(s.targetAnnual / 10000).toFixed(1)}萬`}
+                {s.key === "custom" ? "自訂金額" : `${(s.targetAnnual / 10000).toFixed(1)}萬`}
               </p>
               <p className="text-[10px] text-[var(--color-text-muted)] mt-1 leading-snug">
                 {s.key === "custom"
@@ -601,7 +601,7 @@ function ScenarioPicker({
 
       {chosen === "custom" && (
         <div className="mt-3 flex items-center gap-2">
-          <span className="text-sm text-[var(--color-text-body)]">目標年營收 NT$</span>
+          <span className="text-sm text-[var(--color-text-body)]">目標年營收</span>
           <input
             type="text"
             inputMode="numeric"
