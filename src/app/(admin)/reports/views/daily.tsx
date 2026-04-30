@@ -550,9 +550,9 @@ function BookingRow({
 
   return (
     <div
-      className={`group grid grid-cols-[3.5rem_1fr_5rem_5.5rem_4.5rem] items-center gap-2 px-2 py-2 rounded-md text-xs ${baseBg}`}
+      className={`group grid grid-cols-[3rem_1fr_auto_auto] sm:grid-cols-[3.5rem_1fr_5rem_5.5rem_4.5rem] items-center gap-2 sm:gap-3 px-3 py-2.5 rounded-md text-sm ${baseBg}`}
     >
-      <span className="font-mono tabular-nums text-[var(--color-text-muted)]">
+      <span className="font-mono tabular-nums text-[var(--color-text-muted)] text-xs sm:text-sm">
         {row.startTime}
       </span>
       <div className="min-w-0">
@@ -562,23 +562,28 @@ function BookingRow({
           </p>
           {sourceBadge && (
             <span
-              className={`shrink-0 inline-flex items-center px-1.5 py-px rounded-sm text-[9px] font-semibold leading-tight ${sourceBadge.tone}`}
+              className={`shrink-0 inline-flex items-center px-1.5 py-px rounded-sm text-[10px] font-semibold leading-tight ${sourceBadge.tone}`}
               title={sourceBadge.title}
             >
               {sourceBadge.label}
             </span>
           )}
         </div>
-        <p className="text-[10px] text-[var(--color-text-muted)] truncate">
+        <p className="text-[11px] text-[var(--color-text-muted)] truncate mt-0.5">
           {row.serviceName}
-          {row.notes && ` · ${row.notes.slice(0, 20)}`}
+          <span className="hidden sm:inline">
+            {row.notes && ` · ${row.notes.slice(0, 20)}`}
+          </span>
+          <span className="sm:hidden">
+            {" · "}{paymentLabel}
+          </span>
         </p>
       </div>
-      <span className="text-right font-mono tabular-nums text-[var(--color-text-body)]">
+      <span className="text-right font-mono tabular-nums text-[var(--color-text-body)] font-semibold whitespace-nowrap">
         NT${row.amount.toLocaleString()}
       </span>
       <span
-        className="text-center text-[10px] text-[var(--color-text-muted)] tabular-nums truncate"
+        className="hidden sm:block text-center text-[11px] text-[var(--color-text-muted)] tabular-nums truncate"
         title={paymentLabel}
       >
         {paymentLabel}

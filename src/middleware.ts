@@ -64,8 +64,8 @@ export function middleware(request: NextRequest) {
   // Cookie-only check — iOS Safari ITP can purge HttpOnly cookies after ~7 days
   // even though Max-Age is 30d. The login page auto-restores the session from
   // localStorage if a `from` query param is present.
-  // V3.8: removed /dashboard, /consultations, /analytics (pages deleted)
-  const adminPaths = ["/calendar", "/bookings", "/customers", "/services", "/coupons", "/reports", "/campaigns", "/payments", "/settings", "/dev"];
+  // V3.8: removed /dashboard, /consultations, /analytics, /payments, /cash-flow (pages deleted)
+  const adminPaths = ["/calendar", "/bookings", "/customers", "/services", "/coupons", "/reports", "/campaigns", "/settings", "/dev"];
   if (adminPaths.some((p) => pathname.startsWith(p))) {
     const token = request.cookies.get("admin_token");
     if (!token) {
@@ -82,17 +82,13 @@ export const config = {
   matcher: [
     "/",
     "/api/:path*",
-    "/dashboard/:path*",
     "/calendar/:path*",
     "/bookings/:path*",
     "/customers/:path*",
     "/services/:path*",
-    "/consultations/:path*",
     "/coupons/:path*",
     "/reports/:path*",
-    "/analytics/:path*",
     "/campaigns/:path*",
-    "/payments/:path*",
     "/settings/:path*",
     "/dev/:path*",
   ],

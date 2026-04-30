@@ -27,7 +27,6 @@ interface NavItem {
 }
 
 // V3.8 consolidation: 主選單 4 + 更多群組。老闆 2026-04-30 指定結構。
-// /dashboard、/cash-flow、/payments 暫保留但不在 nav（PR 4 砍 dashboard）。
 const MAIN_NAV: readonly NavItem[] = [
   { href: "/calendar", label: "行事曆", Icon: Calendar },
   { href: "/reports", label: "報表", Icon: FileBarChart },
@@ -55,6 +54,19 @@ export function AdminSidebar() {
   // V3.5 Phase 4: 日曆是 app 的根 — 其他頁面在行動版 top bar 顯示「X 回日曆」
   // 而不是漢堡選單。漢堡只在 /calendar 上才出現。Tab bar 仍然永遠顯示。
   const isOnCalendar = pathname === "/calendar" || pathname.startsWith("/calendar/");
+  // V3.8: 「更多」群組裡的 sub-page (lottery / campaigns / coupons / services /
+  // settings / more/password) 按 X 應該回 /more，不是 /calendar — 老闆 2026-04-30
+  // 反映從更多進去的 sub-page 應該回到更多。其他主選單頁 (reports / customers /
+  // messages / bookings) 維持 X → /calendar。
+  const isInMoreGroup =
+    pathname === "/more" ||
+    pathname.startsWith("/more/") ||
+    MORE_NAV.some(
+      (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
+    );
+  const backTarget =
+    isInMoreGroup && pathname !== "/more" ? "/more" : "/calendar";
+  const backLabel = backTarget === "/more" ? "返回更多" : "返回日曆";
   const currentPageLabel =
     ALL_NAV.find(
       (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
@@ -186,9 +198,9 @@ export function AdminSidebar() {
         ) : (
           <>
             <button
-              onClick={() => router.push("/calendar")}
+              onClick={() => router.push(backTarget)}
               className="p-2 -ml-2 text-muted-foreground hover:text-foreground"
-              aria-label="返回日曆"
+              aria-label={backLabel}
             >
               <X className="w-6 h-6" strokeWidth={2.2} />
             </button>

@@ -43,6 +43,10 @@ const nextConfig: NextConfig = {
       { source: "/consultations", destination: "/calendar", permanent: false },
       // V3.8 consolidation: /dashboard 由 V3.6 daily view 取代
       { source: "/dashboard", destination: "/reports?view=daily", permanent: false },
+      // V3.8 consolidation: /payments + /cash-flow 砍掉 (老闆說末5碼搜尋不要)
+      { source: "/payments", destination: "/reports?view=daily", permanent: false },
+      { source: "/payments/:path*", destination: "/reports?view=daily", permanent: false },
+      { source: "/cash-flow", destination: "/reports?view=daily", permanent: false },
     ];
   },
 };
