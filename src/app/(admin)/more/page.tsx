@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 
 // V3.8 consolidation: 老闆指定主選單 4 個（行事曆/報表/顧客/訊息）+ 更多。
-// /customers 升到主選單，/dashboard /payments /cash-flow 暫保留但不在 nav。
 const MENU_ITEMS = [
   { href: "/lottery", label: "抽獎", icon: Gift },
   { href: "/campaigns", label: "行銷推播", icon: Megaphone },

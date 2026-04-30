@@ -138,7 +138,7 @@ export async function notifyAdminTransferReported(params: {
       const result = await sendWebPushToAdmin(tenantId, {
         title: "待對帳轉帳",
         body: `${displayName} · 末5碼 ${transferLastFive} · NT$${amount}`,
-        url: `/payments?q=${encodeURIComponent(transferLastFive)}`,
+        url: `/bookings/${bookingId}`,
         tag: `payment-verify-${bookingId}`,
       });
       webPushSent = result.sent;

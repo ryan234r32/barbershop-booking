@@ -214,22 +214,23 @@ export default function SettingsPage() {
       {/* Holidays */}
       <section className="bg-card rounded-xl border border-border p-6">
         <h2 className="font-semibold text-foreground mb-4">假日設定</h2>
-        <div className="flex gap-2 mb-4">
+        {/* V3.8 fix: mobile width 太窄三欄擠壓「新增」會溢位 → flex-col on mobile */}
+        <div className="flex flex-col sm:flex-row gap-2 mb-4">
           <input
             type="date"
             value={newHoliday.date}
             onChange={(e) => setNewHoliday({ ...newHoliday, date: e.target.value })}
-            className="px-3 py-2 border rounded-lg text-sm"
+            className="px-3 py-2 border rounded-lg text-sm w-full sm:w-auto"
           />
           <input
             value={newHoliday.reason}
             onChange={(e) => setNewHoliday({ ...newHoliday, reason: e.target.value })}
             placeholder="原因（選填）"
-            className="flex-1 px-3 py-2 border rounded-lg text-sm"
+            className="flex-1 px-3 py-2 border rounded-lg text-sm min-w-0"
           />
           <button
             onClick={handleAddHoliday}
-            className="px-3 py-2 bg-primary text-white rounded-lg text-sm"
+            className="px-4 py-2 bg-primary text-white rounded-lg text-sm whitespace-nowrap shrink-0"
           >
             新增
           </button>
