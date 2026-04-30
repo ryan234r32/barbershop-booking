@@ -7,10 +7,21 @@
  * GET /api/reports/v3.6?view=annual&period=YYYY
  *
  * Auth: admin JWT cookie (or Authorization: Bearer fallback).
- * Cache: s-maxage=60, stale-while-revalidate=120.
+ *
+ * Caching strategy (V3.6 perf-pass-2):
+ *   - Each view's response is wrapped in `unstable_cache` keyed by
+ *     (tenantId, period). TTL 60s — handles cold-start lambda warmup
+ *     and shields the DB from rapid tab-switching by the same admin.
+ *   - HTTP cache header s-maxage=60 stays as a CDN-layer hint, but
+ *     authenticated requests usually bypass edge cache anyway —
+ *     the data-cache layer is what makes tab-switching feel instant.
+ *   - When response shape changes, bump the version suffix in the
+ *     `unstable_cache` keyParts (e.g. "reports-monthly-v1" → "v2") to
+ *     invalidate stale cached payloads.
  */
 
 import { NextRequest } from "next/server";
+import { unstable_cache } from "next/cache";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
 import { todayInTaipei } from "@/lib/utils/time";
 import { errorResponse } from "@/lib/utils/errors";
@@ -44,6 +55,208 @@ import {
   type NarrativeContext,
 } from "@/lib/reports/v3.6/aggregates";
 
+const CACHE_TTL_SECONDS = 60;
+
+const buildDailyPayload = unstable_cache(
+  async (tenantId: string, dateIso: string) => {
+    const data = await computeDailyView(tenantId, dateIso);
+    return { view: "daily" as const, date: dateIso, data };
+  },
+  ["reports-daily-v1"],
+  { revalidate: CACHE_TTL_SECONDS, tags: ["reports"] },
+);
+
+const buildMonthlyPayload = unstable_cache(
+  async (tenantId: string, period: string, todayIso: string) => {
+    const range = rangeForMonth(period);
+    const prev = previousPeriod(range);
+
+    const [
+      totals,
+      prevTotals,
+      trend,
+      servicePie,
+      serviceMixByCustomer,
+      heatmap,
+      topServices,
+      topCustomers,
+      retention,
+      prebook,
+      prebookPrev,
+      rfm,
+      target,
+      sparkline,
+      trailing,
+    ] = await Promise.all([
+      computeTotals(tenantId, range),
+      computeTotals(tenantId, prev),
+      computeTrend(tenantId, range),
+      computeServicePie(tenantId, range),
+      computeServiceMixByCustomer(tenantId, range),
+      computeHeatmap(tenantId, range),
+      computeTopServices(tenantId, range, 10),
+      computeTopCustomers(tenantId, range, 10),
+      computeRetention(tenantId),
+      computePrebookRate(tenantId, range),
+      computePrebookRate(tenantId, prev),
+      computeRfmSegments(tenantId, range),
+      computeMonthlyTarget(tenantId, range, todayIso),
+      computeMonthlySparkline(tenantId, period),
+      computeTrailingMetrics(tenantId, period + "-15"),
+    ]);
+
+    const ctx: AlertContext = {
+      yoyTrailing3M: trailing.yoyTrailing3M,
+      retention90: retention.retention90Days,
+      prebookRate: prebook.rate,
+      ticket: totals.arpu,
+      ticket12mAvg: trailing.ticket12mAvg,
+      monthlyActiveCustomers: totals.uniqueCustomers,
+      monthlyActivePrev: prevTotals.uniqueCustomers,
+    };
+    const alerts: Alert[] = computeAlerts(ctx);
+
+    const totalChemicalRev = servicePie
+      .filter((s) => ["染", "燙", "漂"].includes(s.category))
+      .reduce((s, x) => s + x.revenue, 0);
+    const chemicalShare = totals.revenue > 0
+      ? Math.round((totalChemicalRev / totals.revenue) * 1000) / 10
+      : 0;
+
+    const prevServicePie = await computeServicePie(tenantId, prev);
+    const prevChemicalRev = prevServicePie
+      .filter((s) => ["染", "燙", "漂"].includes(s.category))
+      .reduce((s, x) => s + x.revenue, 0);
+    const chemicalShareLast = prevTotals.revenue > 0
+      ? Math.round((prevChemicalRev / prevTotals.revenue) * 1000) / 10
+      : 0;
+
+    const yoy12 = await computeYoYTrend(tenantId, parseInt(period.slice(0, 4), 10));
+    const monthIdx = parseInt(period.slice(5, 7), 10) - 1;
+    const lastYearSameMonth = yoy12.points[monthIdx]?.lastYear ?? 0;
+    const yoyChangePct = lastYearSameMonth > 0
+      ? Math.round(((totals.revenue - lastYearSameMonth) / lastYearSameMonth) * 1000) / 10
+      : null;
+    const momChangePct = prevTotals.revenue > 0
+      ? Math.round(((totals.revenue - prevTotals.revenue) / prevTotals.revenue) * 1000) / 10
+      : null;
+
+    const narrCtx: NarrativeContext = {
+      monthLabel: period,
+      revenue: totals.revenue,
+      momChangePct,
+      yoyChangePct,
+      ticket: totals.arpu,
+      ticket12mAvg: trailing.ticket12mAvg,
+      retention90: retention.retention90Days,
+      prebookRate: prebook.rate,
+      chemicalShare,
+      chemicalShareLastMonth: chemicalShareLast,
+      occupancy: totals.occupancyRate,
+      monthlyActive: totals.uniqueCustomers,
+    };
+    const summaryText = renderSummary(narrCtx);
+
+    return {
+      view: "monthly" as const,
+      period,
+      range: {
+        label: range.label,
+        fromIso: range.fromIso,
+        toIso: range.toIso,
+      },
+      previousLabel: prev.label,
+      totals,
+      previousTotals: prevTotals,
+      trend,
+      servicePie,
+      serviceMixByCustomer,
+      heatmap,
+      topServices,
+      topCustomers,
+      retention,
+      prebook,
+      prebookPrev,
+      rfm,
+      target,
+      sparkline,
+      alerts,
+      summaryText,
+      chemicalShare,
+      chemicalShareLastMonth: chemicalShareLast,
+      yoy: yoy12,
+      momChangePct,
+      yoyChangePct,
+    };
+  },
+  ["reports-monthly-v1"],
+  { revalidate: CACHE_TTL_SECONDS, tags: ["reports"] },
+);
+
+const buildAnnualPayload = unstable_cache(
+  async (tenantId: string, periodYear: string) => {
+    const range = rangeForYear(periodYear);
+    const year = parseInt(periodYear, 10);
+
+    const [
+      totals,
+      retention,
+      servicePie,
+      rfm,
+      yoy,
+      topCustomers,
+      highlights,
+      sparkline,
+    ] = await Promise.all([
+      computeTotals(tenantId, range),
+      computeRetention(tenantId),
+      computeServicePie(tenantId, range),
+      computeRfmSegments(tenantId, range),
+      computeYoYTrend(tenantId, year),
+      computeTopCustomers(tenantId, range, 5),
+      computeAnnualHighlights(tenantId, year),
+      computeMonthlySparkline(tenantId, `${year}-12`),
+    ]);
+
+    const monthHistory = sparkline.slice(0, 12).map((s) => ({
+      month: s.month,
+      revenue: s.revenue,
+    }));
+    const scenarios = generateScenarios(totals.revenue, monthHistory, year + 1);
+
+    const totalRev = servicePie.reduce((s, x) => s + x.revenue, 0) || 1;
+    const serviceShares = servicePie.map((s) => ({
+      category: s.category,
+      revenue: s.revenue,
+      share: Math.round((s.revenue / totalRev) * 1000) / 10,
+      count: s.count,
+    }));
+
+    return {
+      view: "annual" as const,
+      period: periodYear,
+      year,
+      range: {
+        label: range.label,
+        fromIso: range.fromIso,
+        toIso: range.toIso,
+      },
+      totals,
+      retention,
+      servicePie,
+      serviceShares,
+      rfm,
+      yoy,
+      topCustomers,
+      highlights,
+      sparkline,
+      scenarios,
+    };
+  },
+  ["reports-annual-v1"],
+  { revalidate: CACHE_TTL_SECONDS, tags: ["reports"] },
+);
+
 export async function GET(request: NextRequest) {
   const admin = await getAdminFromCookie(request);
   if (!admin) {
@@ -56,200 +269,21 @@ export async function GET(request: NextRequest) {
   try {
     if (view === "daily") {
       const dateIso = sp.get("date") ?? todayInTaipei();
-      const data = await computeDailyView(admin.tenantId, dateIso);
-      return jsonResponse({ view: "daily", date: dateIso, data });
+      const payload = await buildDailyPayload(admin.tenantId, dateIso);
+      return jsonResponse(payload);
     }
 
     if (view === "monthly") {
       const period = sp.get("period") ?? todayInTaipei().slice(0, 7);
-      const range = rangeForMonth(period);
-      const prev = previousPeriod(range);
-
       const todayIso = todayInTaipei();
-      const [
-        totals,
-        prevTotals,
-        trend,
-        servicePie,
-        serviceMixByCustomer,
-        heatmap,
-        topServices,
-        topCustomers,
-        retention,
-        prebook,
-        prebookPrev,
-        rfm,
-        target,
-        sparkline,
-        trailing,
-      ] = await Promise.all([
-        computeTotals(admin.tenantId, range),
-        computeTotals(admin.tenantId, prev),
-        computeTrend(admin.tenantId, range),
-        computeServicePie(admin.tenantId, range),
-        computeServiceMixByCustomer(admin.tenantId, range),
-        computeHeatmap(admin.tenantId, range),
-        computeTopServices(admin.tenantId, range, 10),
-        computeTopCustomers(admin.tenantId, range, 10),
-        computeRetention(admin.tenantId),
-        computePrebookRate(admin.tenantId, range),
-        computePrebookRate(admin.tenantId, prev),
-        computeRfmSegments(admin.tenantId, range),
-        computeMonthlyTarget(admin.tenantId, range, todayIso),
-        computeMonthlySparkline(admin.tenantId, period),
-        computeTrailingMetrics(admin.tenantId, period + "-15"),
-      ]);
-
-      // Alerts
-      const ctx: AlertContext = {
-        yoyTrailing3M: trailing.yoyTrailing3M,
-        retention90: retention.retention90Days,
-        prebookRate: prebook.rate,
-        ticket: totals.arpu,
-        ticket12mAvg: trailing.ticket12mAvg,
-        monthlyActiveCustomers: totals.uniqueCustomers,
-        monthlyActivePrev: prevTotals.uniqueCustomers,
-      };
-      const alerts: Alert[] = computeAlerts(ctx);
-
-      // NL summary
-      const totalChemicalRev = servicePie
-        .filter((s) => ["染", "燙", "漂"].includes(s.category))
-        .reduce((s, x) => s + x.revenue, 0);
-      const chemicalShare = totals.revenue > 0
-        ? Math.round((totalChemicalRev / totals.revenue) * 1000) / 10
-        : 0;
-
-      const prevServicePie = await computeServicePie(admin.tenantId, prev);
-      const prevChemicalRev = prevServicePie
-        .filter((s) => ["染", "燙", "漂"].includes(s.category))
-        .reduce((s, x) => s + x.revenue, 0);
-      const chemicalShareLast = prevTotals.revenue > 0
-        ? Math.round((prevChemicalRev / prevTotals.revenue) * 1000) / 10
-        : 0;
-
-      const yoy12 = await computeYoYTrend(admin.tenantId, parseInt(period.slice(0, 4), 10));
-      const monthIdx = parseInt(period.slice(5, 7), 10) - 1;
-      const lastYearSameMonth = yoy12.points[monthIdx]?.lastYear ?? 0;
-      const yoyChangePct = lastYearSameMonth > 0
-        ? Math.round(((totals.revenue - lastYearSameMonth) / lastYearSameMonth) * 1000) / 10
-        : null;
-      const momChangePct = prevTotals.revenue > 0
-        ? Math.round(((totals.revenue - prevTotals.revenue) / prevTotals.revenue) * 1000) / 10
-        : null;
-
-      const narrCtx: NarrativeContext = {
-        monthLabel: period,
-        revenue: totals.revenue,
-        momChangePct,
-        yoyChangePct,
-        ticket: totals.arpu,
-        ticket12mAvg: trailing.ticket12mAvg,
-        retention90: retention.retention90Days,
-        prebookRate: prebook.rate,
-        chemicalShare,
-        chemicalShareLastMonth: chemicalShareLast,
-        occupancy: totals.occupancyRate,
-        monthlyActive: totals.uniqueCustomers,
-      };
-      const summaryText = renderSummary(narrCtx);
-
-      return jsonResponse({
-        view: "monthly",
-        period,
-        range: {
-          label: range.label,
-          fromIso: range.fromIso,
-          toIso: range.toIso,
-        },
-        previousLabel: prev.label,
-        totals,
-        previousTotals: prevTotals,
-        trend,
-        servicePie,
-        serviceMixByCustomer,
-        heatmap,
-        topServices,
-        topCustomers,
-        retention,
-        prebook,
-        prebookPrev,
-        rfm,
-        target,
-        sparkline,
-        alerts,
-        summaryText,
-        chemicalShare,
-        chemicalShareLastMonth: chemicalShareLast,
-        yoy: yoy12,
-        momChangePct,
-        yoyChangePct,
-      });
+      const payload = await buildMonthlyPayload(admin.tenantId, period, todayIso);
+      return jsonResponse(payload);
     }
 
     if (view === "annual") {
       const periodYear = sp.get("period") ?? String(parseInt(todayInTaipei().slice(0, 4), 10));
-      const range = rangeForYear(periodYear);
-      const year = parseInt(periodYear, 10);
-
-      const [
-        totals,
-        retention,
-        servicePie,
-        rfm,
-        yoy,
-        topCustomers,
-        highlights,
-        sparkline,
-      ] = await Promise.all([
-        computeTotals(admin.tenantId, range),
-        computeRetention(admin.tenantId),
-        computeServicePie(admin.tenantId, range),
-        computeRfmSegments(admin.tenantId, range),
-        computeYoYTrend(admin.tenantId, year),
-        computeTopCustomers(admin.tenantId, range, 5),
-        computeAnnualHighlights(admin.tenantId, year),
-        computeMonthlySparkline(admin.tenantId, `${year}-12`),
-      ]);
-
-      // Build year-over-year history for scenario generator
-      const monthHistory = sparkline.slice(0, 12).map((s) => ({
-        month: s.month,
-        revenue: s.revenue,
-      }));
-      const scenarios = generateScenarios(totals.revenue, monthHistory, year + 1);
-
-      // Compute chemical / cut / wash shares for service structure table
-      const totalRev = servicePie.reduce((s, x) => s + x.revenue, 0) || 1;
-      const serviceShares = servicePie.map((s) => ({
-        category: s.category,
-        revenue: s.revenue,
-        share: Math.round((s.revenue / totalRev) * 1000) / 10,
-        count: s.count,
-      }));
-
-      // Tenant.yearTargets: pre-fill scenario selection if exists for next year
-      // (handled client-side; server returns scenarios + actual)
-      return jsonResponse({
-        view: "annual",
-        period: periodYear,
-        year,
-        range: {
-          label: range.label,
-          fromIso: range.fromIso,
-          toIso: range.toIso,
-        },
-        totals,
-        retention,
-        servicePie,
-        serviceShares,
-        rfm,
-        yoy,
-        topCustomers,
-        highlights,
-        sparkline,
-        scenarios,
-      });
+      const payload = await buildAnnualPayload(admin.tenantId, periodYear);
+      return jsonResponse(payload);
     }
 
     return Response.json({ error: "invalid view" }, { status: 400 });
