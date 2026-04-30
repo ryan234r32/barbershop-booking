@@ -69,6 +69,30 @@ const SEGMENT: Array<{ key: "not_yet" | "checked_in" | "no_show"; label: string 
   { key: "no_show", label: "爽約" },
 ];
 
+/// Per-state colour: amber for pending, green for done, red for no-show.
+/// Selected = coloured bg + matching text + thick coloured border (frame).
+/// Unselected stays muted so only the current state pops.
+const SEGMENT_STYLES: Record<
+  "not_yet" | "checked_in" | "no_show",
+  { selectedBg: string; selectedText: string; selectedBorder: string }
+> = {
+  not_yet: {
+    selectedBg: "bg-[var(--color-warning)]/15",
+    selectedText: "text-[var(--color-warning)]",
+    selectedBorder: "border-[var(--color-warning)]",
+  },
+  checked_in: {
+    selectedBg: "bg-[var(--color-success)]/15",
+    selectedText: "text-[var(--color-success)]",
+    selectedBorder: "border-[var(--color-success)]",
+  },
+  no_show: {
+    selectedBg: "bg-[var(--color-danger)]/15",
+    selectedText: "text-[var(--color-danger)]",
+    selectedBorder: "border-[var(--color-danger)]",
+  },
+};
+
 function segmentForBooking(b: BookingDetail): "not_yet" | "checked_in" | "no_show" | null {
   if (b.status === "NO_SHOW") return "no_show";
   if (b.status === "CONFIRMED") return b.checkedInAt ? "checked_in" : "not_yet";
@@ -489,16 +513,20 @@ function DetailView({
         </div>
       )}
 
-      {/* Status segment — only when booking is in an actionable state */}
+      {/* Status segment — only when booking is in an actionable state.
+          Each state has its own colour so the current state is unmistakable
+          even at a glance: amber=pending, green=done, red=no-show. The
+          selected button gets a thick coloured frame so the active state
+          reads from across the room. */}
       {currentSegment && (
         <div className="mb-4">
           <p className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider mb-1.5">
             狀態
           </p>
-          <div className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-[var(--color-surface)]">
+          <div className="grid grid-cols-3 gap-2">
             {SEGMENT.map((s) => {
               const selected = currentSegment === s.key;
-              const isNoShow = s.key === "no_show";
+              const styles = SEGMENT_STYLES[s.key];
               return (
                 <button
                   key={s.key}
@@ -508,12 +536,10 @@ function DetailView({
                     else if (s.key === "not_yet") onCheckin("not_yet");
                     else if (s.key === "no_show") onNoShow();
                   }}
-                  className={`py-2 text-xs font-medium rounded-md transition-all ${
+                  className={`py-3 text-sm font-bold rounded-lg border-2 transition-all ${
                     selected
-                      ? isNoShow
-                        ? "bg-[var(--color-danger)] text-[var(--color-bg)] shadow-sm"
-                        : "bg-[var(--color-bg)] text-[var(--color-text-primary)] shadow-sm"
-                      : "text-[var(--color-text-muted)] hover:text-[var(--color-text-body)]"
+                      ? `${styles.selectedBg} ${styles.selectedText} ${styles.selectedBorder} shadow-sm`
+                      : "bg-[var(--color-surface)] text-[var(--color-text-muted)] border-transparent hover:text-[var(--color-text-body)]"
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   {s.label}
