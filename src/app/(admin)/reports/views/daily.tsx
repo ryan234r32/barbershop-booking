@@ -493,17 +493,36 @@ function BookingRow({
         ? "bg-[var(--color-warning)]/8 border border-[var(--color-warning)]/25"
         : "bg-[var(--color-bg)] border border-[var(--color-brand)]/8";
 
+  const sourceBadge = formatSourceBadge(row.bookingSource);
+  const paymentLabel = row.paymentMethod === "CASH"
+    ? "現金"
+    : row.paymentMethod === "BANK_TRANSFER"
+      ? row.transferLastFive
+        ? `轉帳·${row.transferLastFive}`
+        : "轉帳"
+      : "—";
+
   return (
     <div
-      className={`grid grid-cols-[3.5rem_1fr_5rem_4rem_4.5rem] items-center gap-2 px-2 py-2 rounded-md text-xs ${baseBg}`}
+      className={`grid grid-cols-[3.5rem_1fr_5rem_5.5rem_4.5rem] items-center gap-2 px-2 py-2 rounded-md text-xs ${baseBg}`}
     >
       <span className="font-mono tabular-nums text-[var(--color-text-muted)]">
         {row.startTime}
       </span>
       <div className="min-w-0">
-        <p className="font-semibold text-[var(--color-text-primary)] truncate">
-          {row.customerName}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p className="font-semibold text-[var(--color-text-primary)] truncate">
+            {row.customerName}
+          </p>
+          {sourceBadge && (
+            <span
+              className={`shrink-0 inline-flex items-center px-1.5 py-px rounded-sm text-[9px] font-semibold leading-tight ${sourceBadge.tone}`}
+              title={sourceBadge.title}
+            >
+              {sourceBadge.label}
+            </span>
+          )}
+        </div>
         <p className="text-[10px] text-[var(--color-text-muted)] truncate">
           {row.serviceName}
           {row.notes && ` · ${row.notes.slice(0, 20)}`}
@@ -512,8 +531,11 @@ function BookingRow({
       <span className="text-right font-mono tabular-nums text-[var(--color-text-body)]">
         NT${row.amount.toLocaleString()}
       </span>
-      <span className="text-center text-[10px] text-[var(--color-text-muted)]">
-        {row.paymentMethod === "CASH" ? "現金" : row.paymentMethod === "BANK_TRANSFER" ? "轉帳" : "—"}
+      <span
+        className="text-center text-[10px] text-[var(--color-text-muted)] tabular-nums truncate"
+        title={paymentLabel}
+      >
+        {paymentLabel}
       </span>
       {variant === "confirmed" ? (
         <MTag tone="success">✓ 已對</MTag>
@@ -536,6 +558,48 @@ function BookingRow({
       )}
     </div>
   );
+}
+
+/**
+ * V3.7 §A/B — translate `BookingSource` enum into a small visual badge.
+ * Keep the label tight (max 2 chars) so the row stays scannable on mobile.
+ * Schema values: LIFF / PHONE / WALK_IN / ADMIN. Historical Excel imports
+ * land as ADMIN with `hist-` prefix on user, but the row level can't tell
+ * those apart cheaply — fall back to "日曆" which reads correctly anyway.
+ */
+function formatSourceBadge(source: string): { label: string; tone: string; title: string } | null {
+  switch (source) {
+    case "LIFF":
+      return {
+        label: "LINE",
+        tone: "bg-[#00B900]/12 text-[#0E8C0E]",
+        title: "客戶 LINE 自助預約",
+      };
+    case "PHONE":
+      return {
+        label: "電話",
+        tone: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
+        title: "電話預約",
+      };
+    case "WALK_IN":
+      return {
+        label: "現場",
+        tone: "bg-[var(--color-text-muted)]/15 text-[var(--color-text-muted)]",
+        title: "現場 walk-in",
+      };
+    case "ADMIN":
+      return {
+        label: "日曆",
+        tone: "bg-[var(--color-brand)]/12 text-[var(--color-brand)]",
+        title: "老闆從日曆建立 / 補登",
+      };
+    default:
+      return {
+        label: source.slice(0, 2),
+        tone: "bg-[var(--color-surface)] text-[var(--color-text-muted)]",
+        title: source,
+      };
+  }
 }
 
 

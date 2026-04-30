@@ -89,7 +89,51 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       avgIntervalDays,
     };
 
-    return Response.json({ customer, stats });
+    // V3.7 §E/F — payment history. Pull every Payment row tied to this user's
+    // bookings (cross-tenant safe via booking.tenantId). Sorted newest first.
+    // Cap at 50 to keep the response light; older rows are rarely needed.
+    const paymentRows = await prisma.payment.findMany({
+      where: { booking: { userId: id, tenantId: admin.tenantId } },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        bookingId: true,
+        amount: true,
+        method: true,
+        status: true,
+        transferLastFive: true,
+        verifiedAt: true,
+        receivedAt: true,
+        notes: true,
+        createdAt: true,
+        booking: {
+          select: {
+            date: true,
+            startTime: true,
+            service: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    const payments = paymentRows.map((p) => ({
+      id: p.id,
+      bookingId: p.bookingId,
+      amount: p.amount,
+      method: p.method,
+      status: p.status,
+      transferLastFive: p.transferLastFive,
+      verifiedAt: p.verifiedAt,
+      receivedAt: p.receivedAt,
+      notes: p.notes,
+      createdAt: p.createdAt,
+      bookingDate: p.booking?.date ?? null,
+      bookingStartTime: p.booking?.startTime ?? null,
+      serviceName: p.booking?.service?.name ?? null,
+    }));
+
+    return Response.json({ customer, stats, payments });
   } catch (error) {
     return errorResponse(error);
   }

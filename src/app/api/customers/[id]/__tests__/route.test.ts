@@ -10,6 +10,7 @@ const userFindFirst = vi.fn();
 const userUpdateMany = vi.fn();
 const bookingGroupBy = vi.fn();
 const bookingFindMany = vi.fn();
+const paymentFindMany = vi.fn();
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: {
@@ -19,6 +20,9 @@ vi.mock("@/lib/prisma", () => ({
     booking: {
       groupBy: (...a: unknown[]) => bookingGroupBy(...a),
       findMany: (...a: unknown[]) => bookingFindMany(...a),
+    },
+    payment: {
+      findMany: (...a: unknown[]) => paymentFindMany(...a),
     },
   },
 }));
@@ -48,6 +52,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   bookingGroupBy.mockResolvedValue([]);
   bookingFindMany.mockResolvedValue([]);
+  paymentFindMany.mockResolvedValue([]);
 });
 
 describe("GET /api/customers/[id] — tenant isolation", () => {

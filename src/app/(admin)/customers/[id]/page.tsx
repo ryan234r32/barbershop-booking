@@ -4,8 +4,25 @@ import { useState, use } from "react";
 import Link from "next/link";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import useSWR from "swr";
-import { ChevronLeft, Plus, Phone, Cake } from "lucide-react";
+import { ChevronLeft, Plus, Phone, Cake, Pencil, X } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
+
+/** V3.7 §E — payment history row from /api/customers/[id] response */
+interface PaymentRow {
+  id: string;
+  bookingId: string;
+  amount: number;
+  method: "CASH" | "BANK_TRANSFER" | "CREDIT_CARD" | string;
+  status: "PENDING" | "VERIFYING" | "RECEIVED" | "WAIVED" | string;
+  transferLastFive: string | null;
+  verifiedAt: string | null;
+  receivedAt: string | null;
+  notes: string | null;
+  createdAt: string;
+  bookingDate: string | null;
+  bookingStartTime: string | null;
+  serviceName: string | null;
+}
 
 interface CustomerDetail {
   id: string;
@@ -89,6 +106,12 @@ export default function CustomerDetailPage({
   const { data, mutate } = useSWR(`/api/customers/${id}`, fetcher);
   const customer: CustomerDetail | null = data?.customer || null;
   const stats: Stats | null = data?.stats || null;
+  const payments: PaymentRow[] = data?.payments || [];
+
+  // V3.7 §E — correction modal state. paymentId == null means closed.
+  const [correctionPaymentId, setCorrectionPaymentId] = useState<string | null>(null);
+  const [correctionReason, setCorrectionReason] = useState("");
+  const [savingCorrection, setSavingCorrection] = useState(false);
 
   if (!customer) {
     return (
@@ -145,6 +168,30 @@ export default function CustomerDetailPage({
       mutate();
     } catch {
       toast({ type: "error", message: "儲存失敗" });
+    }
+  };
+
+  const submitCorrection = async () => {
+    if (!correctionPaymentId || !correctionReason.trim()) return;
+    setSavingCorrection(true);
+    try {
+      const res = await fetch(`/api/payments/${correctionPaymentId}/note`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: correctionReason.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({} as { error?: string }));
+        throw new Error(err.error || "儲存失敗");
+      }
+      toast({ type: "success", message: "修正已記錄" });
+      setCorrectionPaymentId(null);
+      setCorrectionReason("");
+      mutate();
+    } catch (e) {
+      toast({ type: "error", message: e instanceof Error ? e.message : "儲存失敗" });
+    } finally {
+      setSavingCorrection(false);
     }
   };
 
@@ -269,6 +316,32 @@ export default function CustomerDetailPage({
         )}
       </div>
 
+      {/* V3.7 §E — Payment history. Last-5 transfer locked, "修正" appends to notes. */}
+      {payments.length > 0 && (
+        <div className="mb-4">
+          <p className="text-xs font-medium text-[var(--color-text-muted)] tracking-wider mb-2">
+            付款記錄（{payments.length}）
+          </p>
+          <div className="bg-[var(--color-surface)] rounded-xl divide-y divide-[var(--color-text-disabled)]/20">
+            {payments.slice(0, 12).map((p) => (
+              <PaymentRowItem
+                key={p.id}
+                payment={p}
+                onEdit={() => {
+                  setCorrectionPaymentId(p.id);
+                  setCorrectionReason("");
+                }}
+              />
+            ))}
+            {payments.length > 12 && (
+              <p className="text-[10px] text-[var(--color-text-muted)] text-center py-2">
+                共 {payments.length} 筆，僅顯示最新 12 筆
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Notes (Timeline) */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
@@ -365,6 +438,143 @@ export default function CustomerDetailPage({
           </button>
         )}
       </div>
+
+      {/* V3.7 §E — Correction modal. Locked transferLastFive shown read-only; the
+       * reason text gets appended to Payment.notes (audit trail preserved). */}
+      {correctionPaymentId && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4"
+          onClick={() => !savingCorrection && setCorrectionPaymentId(null)}
+        >
+          <div
+            className="w-full max-w-md bg-[var(--color-bg)] rounded-t-2xl sm:rounded-2xl p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-base font-bold text-[var(--color-text-primary)]">付款修正記錄</p>
+              <button
+                onClick={() => setCorrectionPaymentId(null)}
+                disabled={savingCorrection}
+                className="p-1 rounded hover:bg-[var(--color-surface)]"
+              >
+                <X size={18} className="text-[var(--color-text-muted)]" />
+              </button>
+            </div>
+            <p className="text-[11px] text-[var(--color-text-muted)] leading-relaxed mb-3">
+              原始末五碼會保留（不可改），您填的修正原因會以時間戳方式追加到付款備註，做為對帳憑證。
+            </p>
+            <textarea
+              value={correctionReason}
+              onChange={(e) => setCorrectionReason(e.target.value)}
+              placeholder="例：客戶誤輸入末五，實際為 67890"
+              rows={3}
+              maxLength={500}
+              className="w-full bg-[var(--color-surface)] rounded-lg p-3 text-sm text-[var(--color-text-body)] placeholder:text-[var(--color-text-disabled)] outline-none resize-none mb-3"
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setCorrectionPaymentId(null)}
+                disabled={savingCorrection}
+                className="px-4 py-2 rounded-lg text-sm text-[var(--color-text-muted)]"
+              >
+                取消
+              </button>
+              <button
+                onClick={submitCorrection}
+                disabled={savingCorrection || !correctionReason.trim()}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-[var(--color-brand)] text-[var(--color-bg)] disabled:opacity-40"
+              >
+                {savingCorrection ? "儲存中…" : "儲存修正"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const PAYMENT_STATUS_LABEL: Record<string, { label: string; tone: string }> = {
+  PENDING: { label: "待付", tone: "text-[var(--color-text-muted)]" },
+  VERIFYING: { label: "對帳中", tone: "text-[var(--color-warning)]" },
+  RECEIVED: { label: "已收款", tone: "text-[var(--color-success)]" },
+  WAIVED: { label: "免收", tone: "text-[var(--color-text-muted)]" },
+};
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  CASH: "現金",
+  BANK_TRANSFER: "轉帳",
+  CREDIT_CARD: "刷卡",
+};
+
+function PaymentRowItem({
+  payment,
+  onEdit,
+}: {
+  payment: PaymentRow;
+  onEdit: () => void;
+}) {
+  const status = PAYMENT_STATUS_LABEL[payment.status] ?? {
+    label: payment.status,
+    tone: "text-[var(--color-text-muted)]",
+  };
+  const dateAnchor = payment.receivedAt ?? payment.verifiedAt ?? payment.createdAt;
+  const dateLabel = dateAnchor
+    ? new Date(dateAnchor).toLocaleDateString("zh-TW", {
+        timeZone: "Asia/Taipei",
+        month: "numeric",
+        day: "numeric",
+      })
+    : "—";
+  const correctionLines = (payment.notes ?? "")
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="px-4 py-3">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-[var(--color-text-muted)] tabular-nums shrink-0 w-12">
+          {dateLabel}
+        </span>
+        <span className="text-sm text-[var(--color-text-primary)] flex-1 truncate">
+          {payment.serviceName ?? "—"}
+        </span>
+        <span className="text-sm font-semibold tabular-nums text-[var(--color-text-primary)]">
+          NT${payment.amount.toLocaleString()}
+        </span>
+      </div>
+      <div className="flex items-center gap-2 mt-1.5 text-[11px]">
+        <span className="text-[var(--color-text-muted)]">
+          {PAYMENT_METHOD_LABEL[payment.method] ?? payment.method}
+        </span>
+        {payment.transferLastFive && (
+          <span className="font-mono tabular-nums text-[var(--color-text-body)]">
+            末五·{payment.transferLastFive}
+          </span>
+        )}
+        <span className={`${status.tone} font-medium`}>{status.label}</span>
+        <button
+          onClick={onEdit}
+          className="ml-auto inline-flex items-center gap-0.5 text-[var(--color-brand)] hover:opacity-80"
+        >
+          <Pencil size={11} strokeWidth={1.5} />
+          修正
+        </button>
+      </div>
+      {correctionLines.length > 0 && (
+        <div className="mt-2 pl-2 border-l-2 border-[var(--color-warning)]/40 space-y-0.5">
+          {correctionLines.map((line, i) => (
+            <p
+              key={i}
+              className="text-[10px] text-[var(--color-text-muted)] leading-snug"
+            >
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

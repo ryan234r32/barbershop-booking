@@ -356,6 +356,89 @@ export function paymentReceivedMessage(params: {
   };
 }
 
+/**
+ * V3.7 §G — Payment-settle revoked Flex Message.
+ *
+ * Sent when admin clicks DELETE /api/bookings/[id]/settle (i.e. "解除對帳").
+ * The customer already received `paymentReceivedMessage` (receipt) earlier,
+ * so we owe them a correction. LINE API does not allow message deletion or
+ * editing, so this is a follow-up apology message — visually distinct from
+ * the receipt to avoid confusion.
+ */
+export function paymentSettleRevokedMessage(params: {
+  serviceName: string;
+  date: string;
+  amount: number;
+}): FlexMessage {
+  const { serviceName, date, amount } = params;
+  const humanDate = formatHumanDate(date);
+
+  const bubble: FlexBubble = {
+    type: "bubble",
+    header: {
+      type: "box",
+      layout: "vertical",
+      paddingAll: "md",
+      contents: [
+        {
+          type: "text",
+          text: "⚠️ 對帳記錄已撤銷",
+          weight: "bold",
+          size: "md",
+          color: "#8B5A2B",
+        },
+        {
+          type: "box",
+          layout: "horizontal",
+          margin: "sm",
+          contents: [
+            {
+              type: "text",
+              text: "需重新對帳",
+              size: "xs",
+              color: "#A07A4F",
+              flex: 0,
+            },
+            {
+              type: "text",
+              text: humanDate,
+              size: "xs",
+              color: "#9CB1A4",
+              align: "end",
+            },
+          ],
+        },
+      ],
+      backgroundColor: "#FFF4E5",
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      paddingAll: "md",
+      spacing: "sm",
+      contents: [
+        infoRow("服務", serviceName),
+        infoRow("金額", `NT$ ${amount.toLocaleString()}`),
+        {
+          type: "text",
+          text: "您先前收到的「已收款」訊息已撤銷，造成不便敬請見諒。對帳完成後會再通知您 🙏",
+          size: "xs",
+          color: "#5B5B5B",
+          margin: "md",
+          align: "start",
+          wrap: true,
+        },
+      ],
+    },
+  };
+
+  return {
+    type: "flex",
+    altText: `對帳記錄已撤銷 — ${serviceName} NT$${amount.toLocaleString()}`,
+    contents: bubble,
+  };
+}
+
 /** Cash selected Flex Message — sent after customer chooses pay-at-store */
 export function cashSelectedMessage(params: {
   serviceName: string;
