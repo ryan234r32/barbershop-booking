@@ -175,7 +175,7 @@ export default function CustomerDetailPage({
     if (!correctionPaymentId || !correctionReason.trim()) return;
     setSavingCorrection(true);
     try {
-      const res = await fetch(`/api/payments/${correctionPaymentId}/note`, {
+      const res = await fetch(`/api/payment-notes/${correctionPaymentId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: correctionReason.trim() }),
