@@ -2,11 +2,11 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
 export default async function Home() {
-  // If admin is logged in, redirect to dashboard
+  // If admin is logged in, redirect to calendar (V3.8: /calendar is app root)
   const cookieStore = await cookies();
   const token = cookieStore.get("admin_token");
   if (token) {
-    redirect("/dashboard");
+    redirect("/calendar");
   }
 
   // Default: show a landing page that directs to booking (LIFF) or admin login
