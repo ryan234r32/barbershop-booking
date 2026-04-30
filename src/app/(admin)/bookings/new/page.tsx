@@ -67,7 +67,7 @@ export default function NewBookingPage() {
           displayName: customerName || undefined,
           phone: customerPhone || undefined,
           source,
-          notes: `[${source === "PHONE" ? "電話" : "現場"}] ${customerName} ${customerPhone}\n${notes}`.trim(),
+          notes: `[${source === "PHONE" ? "電話預約" : "現場預約"}] ${customerName} ${customerPhone}\n${notes}`.trim(),
         }),
       });
 

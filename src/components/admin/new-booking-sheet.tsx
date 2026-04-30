@@ -188,7 +188,7 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
                       : "text-[var(--color-brand)]"
                   }`}
                 >
-                  {s === "PHONE" ? "電話" : "現場"}
+                  {s === "PHONE" ? "電話預約" : "現場預約"}
                 </button>
               ))}
             </div>
