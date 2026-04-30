@@ -52,7 +52,9 @@ function ReportsPageInner() {
     return null;
   }, [sp]);
 
-  const initialView = (sp.get("view") ?? compat?.view ?? "monthly") as ViewKind;
+  // V3.8: 老闆指定預設進「每日對帳」（原本 default monthly，但日常使用是每天
+  // 8pm 對帳，每日是更高頻的入口）。
+  const initialView = (sp.get("view") ?? compat?.view ?? "daily") as ViewKind;
   const rawInitialPeriod = sp.get("period") ?? sp.get("date") ?? compat?.period ?? defaultPeriodFor(initialView);
   const initialPeriod = normalizePeriod(initialView, rawInitialPeriod);
 
