@@ -775,6 +775,10 @@ export interface DailyBookingRow {
   settledAt: string | null;
   isWarning: boolean;
   notes: string | null;
+  /** V3.7 §A/B — booking origin badge (LIFF / ADMIN / IMPORT / etc) */
+  bookingSource: string;
+  /** V3.7 §D — last 5 digits of bank transfer (only when method=BANK_TRANSFER) */
+  transferLastFive: string | null;
 }
 
 export interface DailyView {
@@ -838,11 +842,12 @@ export async function computeDailyView(
       startTime: true,
       endTime: true,
       status: true,
+      source: true,
       settledAt: true,
       notes: true,
       lateRescheduleCount: true,
       service: { select: { name: true, price: true } },
-      payment: { select: { amount: true, status: true, method: true } },
+      payment: { select: { amount: true, status: true, method: true, transferLastFive: true } },
       user: { select: { displayName: true, realName: true } },
     },
     orderBy: { startTime: "asc" },
@@ -865,6 +870,9 @@ export async function computeDailyView(
       settledAt: b.settledAt ? b.settledAt.toISOString() : null,
       isWarning,
       notes: b.notes,
+      bookingSource: b.source,
+      transferLastFive:
+        b.payment?.method === "BANK_TRANSFER" ? b.payment.transferLastFive ?? null : null,
     };
   });
 
