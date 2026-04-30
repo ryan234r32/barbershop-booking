@@ -6,10 +6,17 @@
  * reason here ("實際末五是 67890") and we append it to Payment.notes with a
  * timestamp + adminId prefix. Reads stay 5-min-cached on the client.
  *
- * PATCH /api/payments/[paymentId]/note
+ * PATCH /api/payment-notes/[paymentId]
  *   body: { reason: string }   (1-500 chars)
  *   appends `[YYYY-MM-DD HH:MM admin=<id>] <reason>` to Payment.notes
  *   never overwrites previous notes; never touches transferLastFive.
+ *
+ * NOTE: This used to live at /api/payments/[paymentId]/note but Next.js
+ * forbids two different dynamic slug names ([bookingId] vs [paymentId]) on
+ * the same path level. The /api/payments/[bookingId]/* family is older +
+ * larger, so the note route moved out into its own /payment-notes/ tree.
+ * The conflict caused INTERNAL_FUNCTION_INVOCATION_TIMEOUT 504s on every
+ * /api/* route in prod — this rename is the hotfix.
  */
 
 import { NextRequest } from "next/server";
