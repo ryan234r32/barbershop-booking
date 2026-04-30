@@ -35,6 +35,14 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  async redirects() {
+    return [
+      // V3.8 consolidation: /analytics 已被 /reports?view=monthly 取代
+      { source: "/analytics", destination: "/reports?view=monthly", permanent: false },
+      // V3.8 consolidation: /consultations admin UI 砍掉，回日曆
+      { source: "/consultations", destination: "/calendar", permanent: false },
+    ];
+  },
 };
 
 export default withSerwist(nextConfig);

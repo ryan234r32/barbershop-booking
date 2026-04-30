@@ -616,7 +616,7 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
   }
 
   // Priority 6.6: 漂髮 → consultation flow (PRD-v3 §3, Wave 4a).
-  // High-judgement service: route to LIFF form so admin can triage in /consultations.
+  // High-judgement service: route to LIFF form, customer fills detail; admin reviews via LINE chat.
   if (intent === "service-inquiry-bleach") {
     return reply(
       bleachConsultationFlexMessage({
