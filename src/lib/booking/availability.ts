@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { generateAllSlots } from "@/lib/utils/constants";
-import { getDayOfWeek, parseTimeToHour } from "@/lib/utils/time";
+import { getDayOfWeek, parseTimeToHour, todayInTaipei, currentHourTaipei } from "@/lib/utils/time";
 import { rankAndRecommendSlots } from "./smart-suggest";
 
 export interface AvailableSlot {
@@ -73,7 +73,19 @@ export async function getAvailableSlots(params: {
   const slotsNeeded = service.slotsNeeded;
   const available: AvailableSlot[] = [];
 
+  // 2026-04-30: 過濾已過時段（只在 date === 今天時生效）。
+  // 規則：startHour > currentHour（嚴格大於），即 13:00 整點時 13 點 slot 已不可選。
+  // 老闆 walk-in 仍可走 admin 結帳介面手動建單。
+  const isToday = date === todayInTaipei();
+  const currentHour = isToday ? currentHourTaipei() : -1;
+
   for (let i = 0; i <= allSlots.length - slotsNeeded; i++) {
+    const startTime = allSlots[i];
+    const startHour = parseTimeToHour(startTime);
+
+    // Skip if this slot's start hour already past (today only)
+    if (isToday && startHour <= currentHour) continue;
+
     // Check if all consecutive slots are free
     let allFree = true;
     for (let j = 0; j < slotsNeeded; j++) {
@@ -84,8 +96,7 @@ export async function getAvailableSlots(params: {
     }
 
     if (allFree) {
-      const startTime = allSlots[i];
-      const endH = parseTimeToHour(startTime) + slotsNeeded;
+      const endH = startHour + slotsNeeded;
       const endTime = `${endH.toString().padStart(2, "0")}:00`;
 
       available.push({

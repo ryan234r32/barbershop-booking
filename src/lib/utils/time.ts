@@ -109,6 +109,21 @@ export function formatHumanDate(dateStr: string): string {
   return `${m} 月 ${d} 日 ${weekday}`;
 }
 
+/**
+ * Current hour (0-23) in Taipei timezone. Robust on Vercel UTC servers
+ * (避開 nowTaipei() 已知的 +8h shift bug).
+ *
+ * Examples (Taipei wall clock 13:42): currentHourTaipei() → 13
+ */
+export function currentHourTaipei(): number {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIMEZONE,
+    hour: "2-digit",
+    hourCycle: "h23",
+  });
+  return parseInt(fmt.format(new Date()), 10);
+}
+
 /** Get day of week (0=Sun) in Taipei timezone */
 export function getDayOfWeek(date: Date): number {
   const taipeiDate = new Date(
