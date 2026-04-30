@@ -63,6 +63,14 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
   const settledCount = reconcileTotal - effectivePendingCount;
   const progressPct = reconcileTotal > 0 ? Math.round((settledCount / reconcileTotal) * 100) : 0;
 
+  // V3.8 §5：DateStrip 預設 maxValue = today，未來日期會被 disabled。但老闆要看
+  // 5 月（未來）的預定 → 放寬到「today + 60 天」覆蓋 45 天預約窗口 + 緩衝。
+  const maxNavDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 60);
+    return d.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+  }, []);
+
   const settleOne = async (id: string) => {
     // optimistic flip
     setOptimisticSettled((prev) => new Set(prev).add(id));
@@ -214,8 +222,11 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
 
   return (
     <div className="space-y-4">
-      {/* Date strip — 左右滑動選日期 */}
-      <DateStrip kind="day" selected={date} onSelect={onDateChange} />
+      {/* Date strip — 左右滑動選日期。
+          V3.8 §5：老闆要看 5 月（未來日期）的預約 → maxValue 放寬到 60 天後，
+          覆蓋 45 天預約窗口 + 緩衝。日結 / 對帳對未來日期不適用是 expected
+          behavior，但 daily view 也是「看當日預約」工具，未來日期應可瀏覽。 */}
+      <DateStrip kind="day" selected={date} onSelect={onDateChange} maxValue={maxNavDate} />
 
       {d.isClosed && (
         <p className="text-[11px] text-center text-[var(--color-text-muted)]">
@@ -391,7 +402,7 @@ function BigStatCard({
     <MCard padding="md">
       <p className="text-xs text-[var(--color-text-muted)]">{label}</p>
       <p
-        className={`text-xl sm:text-2xl font-bold tabular-nums leading-tight mt-1 truncate ${
+        className={`text-base sm:text-2xl font-bold tabular-nums leading-tight mt-1 whitespace-nowrap ${
           tone === "brand" ? "text-[var(--color-brand)]" : "text-[var(--color-text-primary)]"
         }`}
       >
@@ -540,17 +551,26 @@ function BookingRow({
         : "bg-[var(--color-bg)] border border-[var(--color-brand)]/8";
 
   const sourceBadge = formatSourceBadge(row.bookingSource);
-  const paymentLabel = row.paymentMethod === "CASH"
-    ? "現金"
-    : row.paymentMethod === "BANK_TRANSFER"
-      ? row.transferLastFive
-        ? `轉帳·${row.transferLastFive}`
-        : "轉帳"
-      : "—";
+  // V3.8 §3 老闆反映：要看到末 5 碼 + 現場/轉帳 分明。把付款方式做成 pill：
+  // - 現金 → 綠色 pill「現金」
+  // - 轉帳含末 5 碼 → 琥珀 pill「轉帳·12345」（強調，提醒老闆對帳）
+  // - 轉帳但無末 5 碼 → 琥珀 pill「轉帳」
+  const paymentPill =
+    row.paymentMethod === "BANK_TRANSFER"
+      ? {
+          label: row.transferLastFive ? `轉帳·${row.transferLastFive}` : "轉帳",
+          tone: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
+        }
+      : row.paymentMethod === "CASH"
+        ? {
+            label: "現金",
+            tone: "bg-[var(--color-success)]/12 text-[var(--color-success)]",
+          }
+        : null;
 
   return (
     <div
-      className={`group grid grid-cols-[3rem_1fr_auto_auto] sm:grid-cols-[3.5rem_1fr_5rem_5.5rem_4.5rem] items-center gap-2 sm:gap-3 px-3 py-2.5 rounded-md text-sm ${baseBg}`}
+      className={`group grid grid-cols-[2.75rem_1fr_auto_auto] sm:grid-cols-[3.5rem_1fr_5rem_6rem_4.5rem] items-center gap-x-2 sm:gap-x-3 gap-y-1 px-3 py-2.5 rounded-md text-sm ${baseBg}`}
     >
       <span className="font-mono tabular-nums text-[var(--color-text-muted)] text-xs sm:text-sm">
         {row.startTime}
@@ -569,24 +589,33 @@ function BookingRow({
             </span>
           )}
         </div>
-        <p className="text-[11px] text-[var(--color-text-muted)] truncate mt-0.5">
-          {row.serviceName}
-          <span className="hidden sm:inline">
-            {row.notes && ` · ${row.notes.slice(0, 20)}`}
-          </span>
-          <span className="sm:hidden">
-            {" · "}{paymentLabel}
-          </span>
-        </p>
+        <div className="flex items-center justify-between gap-2 mt-1">
+          <p className="text-[11px] text-[var(--color-text-muted)] truncate">
+            {row.serviceName}
+            {row.notes && (
+              <span className="hidden sm:inline"> · {row.notes.slice(0, 20)}</span>
+            )}
+          </p>
+          {paymentPill && (
+            <span
+              className={`sm:hidden shrink-0 inline-flex items-center px-1.5 py-px rounded-sm text-[10px] font-semibold leading-tight tabular-nums ${paymentPill.tone}`}
+            >
+              {paymentPill.label}
+            </span>
+          )}
+        </div>
       </div>
       <span className="text-right font-mono tabular-nums text-[var(--color-text-body)] font-semibold whitespace-nowrap">
         NT${row.amount.toLocaleString()}
       </span>
-      <span
-        className="hidden sm:block text-center text-[11px] text-[var(--color-text-muted)] tabular-nums truncate"
-        title={paymentLabel}
-      >
-        {paymentLabel}
+      <span className="hidden sm:flex justify-center">
+        {paymentPill && (
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold leading-tight tabular-nums ${paymentPill.tone}`}
+          >
+            {paymentPill.label}
+          </span>
+        )}
       </span>
       {variant === "confirmed" ? (
         // V3.6 Pass 3 §2 — clickable settle tag. Click it (mobile-first; hover
