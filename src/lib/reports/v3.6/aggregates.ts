@@ -817,14 +817,24 @@ export async function computeDailyView(
   tenantId: string,
   dateIso: string,
 ): Promise<DailyView> {
-  // Booking.date is `@db.Date` (PG DATE — date-only). Using a Date timestamp
-  // range with gte/lte triggers PG date casting that quietly expands the
-  // bounds to ±1 day (V3.6 demo bug 2026-04-30: showed 4/29 + 4/30 union).
-  // Pass the ISO date string directly; Prisma handles DATE equality cleanly.
+  // Booking.date is `@db.Date` (PG DATE — date-only). Two ways to query:
+  //
+  //   ❌ WRONG: gte/lte with Date.UTC(y, m-1, d, -8, 0, 0) range — PG casts
+  //      both bounds to DATE in session TZ (UTC) and quietly includes ±1 day.
+  //      Original V3.6 demo bug: 4/30 query returned 4/29 + 4/30 rows.
+  //
+  //   ❌ WRONG: equality with plain "YYYY-MM-DD" string — Prisma 7 rejects
+  //      with "Invalid value for argument `date`: premature end of input.
+  //      Expected ISO-8601 DateTime." (broke production 2026-04-30 hotfix
+  //      window). Prisma's DateTime input parser wants full ISO timestamp.
+  //
+  //   ✅ RIGHT: equality with a UTC-midnight Date. `T00:00:00Z` parses fine
+  //      and casts cleanly to the target DATE in any session TZ.
   const [yStr, mStr, dStr] = dateIso.split("-");
   const y = parseInt(yStr, 10);
   const m = parseInt(mStr, 10);
   const d = parseInt(dStr, 10);
+  const dayDate = new Date(`${dateIso}T00:00:00.000Z`);
 
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
@@ -836,7 +846,7 @@ export async function computeDailyView(
   const bookings = await prisma.booking.findMany({
     where: {
       tenantId,
-      date: dateIso,
+      date: dayDate,
       status: { notIn: ["CANCELLED", "CANCELLED_BY_ADMIN"] },
     },
     select: {
@@ -913,7 +923,7 @@ export async function computeDailyView(
   const cancelledCount = await prisma.booking.count({
     where: {
       tenantId,
-      date: dateIso,
+      date: dayDate,
       status: { in: ["CANCELLED", "CANCELLED_BY_ADMIN"] },
     },
   });
