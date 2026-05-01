@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import useSWR from "swr";
 import { Search, ChevronLeft } from "lucide-react";
+import { CustomerAnalyticsView } from "@/components/admin/customers/analytics-view";
 
 interface Customer {
   id: string;
@@ -52,8 +53,11 @@ function relativeTime(dateStr: string | null): string {
   return `${Math.floor(days / 365)}年前`;
 }
 
+type View = "list" | "analytics";
+
 export default function CustomersPage() {
   usePageTitle("顧客管理");
+  const [view, setView] = useState<View>("list");
   const [search, setSearch] = useState("");
   const [segment, setSegment] = useState("");
   const [page, setPage] = useState(1);
@@ -63,7 +67,7 @@ export default function CustomersPage() {
   if (segment) params.set("segment", segment);
   params.set("page", page.toString());
 
-  const { data, isLoading } = useSWR(`/api/customers?${params}`, fetcher);
+  const { data, isLoading } = useSWR(view === "list" ? `/api/customers?${params}` : null, fetcher);
   const customers: Customer[] = data?.customers || [];
   const total: number = data?.total || 0;
   const totalPages = Math.ceil(total / 20);
@@ -80,6 +84,60 @@ export default function CustomersPage() {
         </h1>
       </div>
 
+      {/* View tabs */}
+      <div className="flex gap-1 bg-[var(--color-surface)] rounded-lg p-1 mb-4">
+        {[
+          { key: "list" as const, label: "清單" },
+          { key: "analytics" as const, label: "分析" },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setView(t.key)}
+            className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${
+              view === t.key
+                ? "bg-[var(--color-bg)] text-[var(--color-brand)] shadow-sm"
+                : "text-[var(--color-text-muted)]"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {view === "analytics" ? (
+        <CustomerAnalyticsView />
+      ) : (
+        <ListView
+          search={search}
+          setSearch={setSearch}
+          segment={segment}
+          setSegment={setSegment}
+          page={page}
+          setPage={setPage}
+          customers={customers}
+          isLoading={isLoading}
+          totalPages={totalPages}
+        />
+      )}
+    </div>
+  );
+}
+
+interface ListViewProps {
+  search: string;
+  setSearch: (v: string) => void;
+  segment: string;
+  setSegment: (v: string) => void;
+  page: number;
+  setPage: (v: number) => void;
+  customers: Customer[];
+  isLoading: boolean;
+  totalPages: number;
+}
+
+function ListView({ search, setSearch, segment, setSegment, page, setPage, customers, isLoading, totalPages }: ListViewProps) {
+  return (
+    <>
       {/* Search */}
       <div className="relative mb-3">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
@@ -165,6 +223,6 @@ export default function CustomersPage() {
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }

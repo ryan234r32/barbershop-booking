@@ -6,6 +6,7 @@ import { usePageTitle } from "@/lib/hooks/use-page-title";
 import useSWR from "swr";
 import { ChevronLeft, Plus, Phone, Cake, Pencil, X } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
+import { BasicProfileEditor } from "@/components/admin/customers/basic-profile-editor";
 
 /** V3.7 §E — payment history row from /api/customers/[id] response */
 interface PaymentRow {
@@ -102,6 +103,7 @@ export default function CustomerDetailPage({
   const { toast } = useToast();
   const [newNote, setNewNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
 
   const { data, mutate } = useSWR(`/api/customers/${id}`, fetcher);
   const customer: CustomerDetail | null = data?.customer || null;
@@ -227,41 +229,67 @@ export default function CustomerDetailPage({
 
       {/* Profile Card — 基本資料 */}
       <div className="bg-[var(--color-surface)] rounded-xl p-4 mb-3">
-        <p className="text-[10px] text-[var(--color-text-muted)] tracking-wider mb-2">基本資料</p>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <p className="text-[10px] text-[var(--color-text-muted)]">本名</p>
-            <p className="text-[var(--color-text-body)]">{customer.realName || "—"}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-[var(--color-text-muted)]">性別</p>
-            <p className="text-[var(--color-text-body)]">
-              {customer.gender ? GENDER_LABEL[customer.gender] : "—"}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] text-[var(--color-text-muted)]">手機</p>
-            {customer.phone ? (
-              <a href={`tel:${customer.phone}`} className="flex items-center gap-1 text-[var(--color-brand)]">
-                <Phone size={12} strokeWidth={1.5} />
-                {customer.phone}
-              </a>
-            ) : (
-              <p className="text-[var(--color-text-disabled)]">—</p>
-            )}
-          </div>
-          <div>
-            <p className="text-[10px] text-[var(--color-text-muted)]">生日</p>
-            {customer.birthday ? (
-              <p className="flex items-center gap-1 text-[var(--color-text-body)]">
-                <Cake size={12} strokeWidth={1.5} />
-                {customer.birthday.split("T")[0]}
-              </p>
-            ) : (
-              <p className="text-[var(--color-text-disabled)]">—</p>
-            )}
-          </div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[10px] text-[var(--color-text-muted)] tracking-wider">基本資料</p>
+          {!editingProfile && (
+            <button
+              type="button"
+              onClick={() => setEditingProfile(true)}
+              className="flex items-center gap-1 text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-brand)]"
+            >
+              <Pencil size={11} strokeWidth={1.5} />
+              編輯
+            </button>
+          )}
         </div>
+        {editingProfile ? (
+          <BasicProfileEditor
+            customerId={id}
+            initial={{
+              realName: customer.realName,
+              phone: customer.phone,
+              gender: customer.gender,
+              birthday: customer.birthday,
+            }}
+            onClose={() => setEditingProfile(false)}
+            onSaved={mutate}
+          />
+        ) : (
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div>
+              <p className="text-[10px] text-[var(--color-text-muted)]">本名</p>
+              <p className="text-[var(--color-text-body)]">{customer.realName || "—"}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-[var(--color-text-muted)]">性別</p>
+              <p className="text-[var(--color-text-body)]">
+                {customer.gender ? GENDER_LABEL[customer.gender] : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-[var(--color-text-muted)]">手機</p>
+              {customer.phone ? (
+                <a href={`tel:${customer.phone}`} className="flex items-center gap-1 text-[var(--color-brand)]">
+                  <Phone size={12} strokeWidth={1.5} />
+                  {customer.phone}
+                </a>
+              ) : (
+                <p className="text-[var(--color-text-disabled)]">—</p>
+              )}
+            </div>
+            <div>
+              <p className="text-[10px] text-[var(--color-text-muted)]">生日</p>
+              {customer.birthday ? (
+                <p className="flex items-center gap-1 text-[var(--color-text-body)]">
+                  <Cake size={12} strokeWidth={1.5} />
+                  {customer.birthday.split("T")[0]}
+                </p>
+              ) : (
+                <p className="text-[var(--color-text-disabled)]">—</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats Card — 消費數據 (6 指標) */}
