@@ -656,7 +656,7 @@ function NetProfitCard({
       >
         {net.toLocaleString()}
       </p>
-      <p className="text-[10px] text-[var(--color-text-muted)] mt-1 tabular-nums">
+      <p className="text-[10px] text-[var(--color-text-muted)] mt-1 tabular-nums leading-tight break-words">
         營收 {revenue.toLocaleString()} − 支出 {expense.toLocaleString()}
       </p>
     </MCard>
