@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
 import { errorResponse, UnauthorizedError } from "@/lib/utils/errors";
+import { invalidateReportsCache } from "@/lib/cache/invalidate";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -128,6 +129,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       where: { id, tenantId: admin.tenantId },
       select: { checkedInAt: true, updatedAt: true },
     });
+    invalidateReportsCache();
 
     return Response.json({
       ok: true,

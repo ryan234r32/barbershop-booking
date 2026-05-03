@@ -22,6 +22,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
 import { errorResponse, UnauthorizedError } from "@/lib/utils/errors";
+import { invalidateReportsCache } from "@/lib/cache/invalidate";
 
 const postSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
@@ -135,6 +136,7 @@ export async function POST(request: NextRequest) {
         },
       }),
     ]);
+    invalidateReportsCache();
 
     return Response.json({
       ok: true,
@@ -183,6 +185,7 @@ export async function DELETE(request: NextRequest) {
         where: { tenantId: admin.tenantId, date: dateObj },
       }),
     ]);
+    invalidateReportsCache();
 
     return Response.json({ ok: true, alreadyOpen: !wasClosed });
   } catch (err) {

@@ -31,6 +31,7 @@ import { errorResponse, UnauthorizedError, AppError } from "@/lib/utils/errors";
 import { getLineClient } from "@/lib/line/client";
 import { paymentReceivedMessage, paymentSettleRevokedMessage } from "@/lib/line/messages";
 import { logger } from "@/lib/utils/logger";
+import { invalidateReportsCache } from "@/lib/cache/invalidate";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -140,6 +141,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         logger.error("settle: failed to push paymentReceivedMessage", err, "bookings");
       }
     }
+    invalidateReportsCache();
 
     return Response.json({
       ok: true,
@@ -201,6 +203,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         logger.error("unsettle: failed to push paymentSettleRevokedMessage", err, "bookings");
       }
     }
+    invalidateReportsCache();
 
     return Response.json({ ok: true });
   } catch (err) {

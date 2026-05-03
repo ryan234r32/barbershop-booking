@@ -18,6 +18,7 @@ import { errorResponse, SlotUnavailableError } from "@/lib/utils/errors";
 import { addHours } from "@/lib/utils/time";
 import { logger } from "@/lib/utils/logger";
 import { requireBookingAuth, requireBookingOwnership } from "@/lib/auth/booking-auth";
+import { invalidateReportsCache } from "@/lib/cache/invalidate";
 
 const rescheduleWithIdempotencySchema = rescheduleBookingSchema.extend({
   /** Optional idempotency key — used by drag-reschedule on the calendar to
@@ -253,6 +254,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       } catch (err) {
         logger.error("Failed to notify admin (reschedule)", err, "reschedule");
       }
+    invalidateReportsCache();
 
       return Response.json(result);
     } finally {

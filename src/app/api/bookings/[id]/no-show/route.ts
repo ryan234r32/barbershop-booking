@@ -7,6 +7,7 @@ import { MAX_VIOLATIONS } from "@/lib/utils/constants";
 import { cancelBookingNotifications } from "@/lib/notifications/scheduler";
 import { notifyAdminCancellation } from "@/lib/notifications/admin-notify";
 import { logger } from "@/lib/utils/logger";
+import { invalidateReportsCache } from "@/lib/cache/invalidate";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -175,6 +176,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     } catch (err) {
       logger.error("notifyAdminCancellation (no-show) failed", err, "bookings", { bookingId: id });
     }
+    invalidateReportsCache();
 
     return Response.json({
       ok: true,
