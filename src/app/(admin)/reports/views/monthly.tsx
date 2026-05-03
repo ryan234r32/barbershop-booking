@@ -218,17 +218,22 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
             />
           </MCard>
 
-          {/* V3.7 §E — 支出 / 淨利 / 結帳天數 row */}
-          <div className="grid grid-cols-3 gap-3">
+          {/* V3.7 §E — 支出 / 淨利 / 結帳天數 row.
+              `min-w-0` on each MCard so flex children can shrink instead of
+              forcing horizontal overflow on narrow phones. Numbers use
+              `whitespace-nowrap` to avoid mid-thousands wrapping; sublines wrap. */}
+          <div className="grid grid-cols-3 gap-2">
             <MCard padding="md">
               <p className="text-[10px] tracking-wider text-[var(--color-text-muted)] uppercase">
                 本月支出
               </p>
-              <p className="text-xl font-bold tabular-nums text-[var(--color-danger)] mt-1">
+              <p className="text-base sm:text-xl font-bold tabular-nums text-[var(--color-danger)] mt-1 whitespace-nowrap">
                 -{expenseTotal.toLocaleString()}
               </p>
-              <p className="text-[10px] text-[var(--color-text-muted)] mt-1 tabular-nums">
-                固定 {expenseFixed.toLocaleString()} · 變動 {expenseVariable.toLocaleString()}
+              <p className="text-[10px] text-[var(--color-text-muted)] mt-1 tabular-nums leading-tight break-words">
+                固定 {expenseFixed.toLocaleString()}
+                <br />
+                變動 {expenseVariable.toLocaleString()}
               </p>
             </MCard>
             <MCard padding="md">
@@ -236,7 +241,7 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
                 本月淨利
               </p>
               <p
-                className="text-xl font-bold tabular-nums mt-1"
+                className="text-base sm:text-xl font-bold tabular-nums mt-1 whitespace-nowrap"
                 style={{
                   color:
                     revenue - expenseTotal >= 0
@@ -246,7 +251,7 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
               >
                 {(revenue - expenseTotal).toLocaleString()}
               </p>
-              <p className="text-[10px] text-[var(--color-text-muted)] mt-1">
+              <p className="text-[10px] text-[var(--color-text-muted)] mt-1 leading-tight">
                 淨利率 {revenue > 0 ? (((revenue - expenseTotal) / revenue) * 100).toFixed(1) : "—"}%
               </p>
             </MCard>
@@ -254,13 +259,13 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
               <p className="text-[10px] tracking-wider text-[var(--color-text-muted)] uppercase">
                 結帳天數
               </p>
-              <p className="text-xl font-bold tabular-nums text-[var(--color-text-primary)] mt-1">
+              <p className="text-base sm:text-xl font-bold tabular-nums text-[var(--color-text-primary)] mt-1 whitespace-nowrap">
                 {closedDates.size}
                 <span className="text-sm font-normal text-[var(--color-text-muted)]">
                   /{range.daysInMonth}
                 </span>
               </p>
-              <p className="text-[10px] text-[var(--color-text-muted)] mt-1">
+              <p className="text-[10px] text-[var(--color-text-muted)] mt-1 leading-tight">
                 {closesWithDiff.length > 0 ? `${closesWithDiff.length} 天有差異` : "全部準時對上"}
               </p>
             </MCard>

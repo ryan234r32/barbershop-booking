@@ -107,29 +107,40 @@ export function ExpenseEntrySheet({
   };
 
   return (
-    <Drawer.Root open={open} onOpenChange={onOpenChange}>
+    <Drawer.Root open={open} onOpenChange={onOpenChange} dismissible={false}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-[var(--color-text-body)]/50 z-50 backdrop-blur-sm" />
-        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--color-bg)] rounded-t-2xl h-[92dvh] outline-none flex flex-col">
-          <div className="mx-auto w-10 h-1 rounded-full bg-[var(--color-surface)] mt-3 mb-2 flex-shrink-0" />
-
-          <div className="flex items-center justify-between px-5 pb-2 flex-shrink-0">
+        {/* Full-screen sheet — true 100dvh, no rounded top, no drag handle.
+            Keyboard-safe via dvh: on iOS the visual viewport shrinks when
+            keyboard opens and dvh follows, so the inner scroll area pushes the
+            submit button up out of the keyboard rather than being covered. */}
+        <Drawer.Content className="fixed inset-0 z-50 bg-[var(--color-bg)] outline-none flex flex-col h-[100dvh] focus:outline-none">
+          {/* Sticky header — X top-left, title centered, brand colour bg for hierarchy */}
+          <div
+            className="flex items-center justify-between px-4 flex-shrink-0 border-b border-[var(--color-surface)]"
+            style={{ paddingTop: "max(env(safe-area-inset-top), 16px)", paddingBottom: 12 }}
+          >
             <button
               onClick={() => onOpenChange(false)}
               aria-label="關閉"
-              className="w-9 h-9 -ml-2 rounded-full flex items-center justify-center text-[var(--color-text-body)] hover:bg-[var(--color-surface)] transition-colors"
+              className="w-10 h-10 -ml-2 rounded-full flex items-center justify-center text-[var(--color-text-body)] hover:bg-[var(--color-surface)] transition-colors"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
                 <path d="M6 6l12 12M6 18L18 6" />
               </svg>
             </button>
-            <Drawer.Title className="text-sm font-semibold text-[var(--color-text-primary)]">
+            <Drawer.Title className="text-base font-semibold text-[var(--color-text-primary)]">
               新增支出
             </Drawer.Title>
-            <div className="w-9" />
+            <div className="w-10" />
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 pb-8">
+          {/* Scrollable body — extra bottom padding so the last button isn't
+              flush against the home indicator / keyboard accessory bar. */}
+          <div
+            className="flex-1 overflow-y-auto px-5"
+            style={{ paddingBottom: "max(env(safe-area-inset-bottom), 32px)" }}
+          >
             {/* Amount */}
             <div className="mt-4 mb-6">
               <div className="text-xs text-[var(--color-text-muted)] mb-1.5">金額</div>
@@ -146,7 +157,6 @@ export function ExpenseEntrySheet({
                   }}
                   placeholder="0"
                   className="flex-1 text-4xl font-semibold tracking-tight bg-transparent border-b border-[var(--color-surface)] focus:border-[var(--color-brand)] focus:outline-none py-2 text-[var(--color-text-primary)]"
-                  autoFocus
                 />
               </div>
             </div>
