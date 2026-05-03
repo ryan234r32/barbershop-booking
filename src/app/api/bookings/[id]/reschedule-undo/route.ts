@@ -36,8 +36,8 @@ interface UndoSnapshot {
   oldEndTime: string;
   newDate: string;
   newStartTime: string;
-  /** True if the original reschedule was within 2h of appointment and bumped
-   *  the user's violationCount. Undo must reverse it (codex P2 fix). */
+  /** Legacy field — pre-2026-05-03 reschedules within 2h bumped violationCount;
+   *  undo must still decrement it for snapshots written before the policy change. */
   wasLateReschedule?: boolean;
 }
 

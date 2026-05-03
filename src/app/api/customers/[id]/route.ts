@@ -24,11 +24,24 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         bookings: {
           include: {
             service: { select: { name: true, price: true } },
-            payment: { select: { status: true, method: true } },
+            // V3.x — 整合付款記錄到預約 timeline，需要付款全欄位
+            payment: {
+              select: {
+                id: true,
+                status: true,
+                method: true,
+                amount: true,
+                transferLastFive: true,
+                receivedAt: true,
+                verifiedAt: true,
+                createdAt: true,
+                notes: true,
+              },
+            },
             cancellation: { select: { isViolation: true, reason: true } },
           },
           orderBy: { date: "desc" },
-          take: 20,
+          take: 50,
         },
         cancellationRecords: {
           orderBy: { cancelledAt: "desc" },

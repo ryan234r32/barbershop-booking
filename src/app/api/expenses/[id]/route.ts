@@ -13,20 +13,11 @@ import { prisma } from "@/lib/prisma";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
 import { errorResponse, UnauthorizedError, AppError } from "@/lib/utils/errors";
 
-const EXPENSE_CATEGORIES = [
-  "consumables",
-  "utilities",
-  "rent",
-  "equipment",
-  "cleaning",
-  "marketing",
-  "tax",
-  "other",
-] as const;
+import { ALL_CATEGORIES } from "@/lib/expenses/categories";
 
 const patchSchema = z.object({
   amount: z.number().int().positive().max(10_000_000).optional(),
-  category: z.enum(EXPENSE_CATEGORIES).optional(),
+  category: z.enum(ALL_CATEGORIES).optional(),
   type: z.enum(["FIXED", "VARIABLE"]).optional(),
   paidMethod: z.enum(["CASH", "BANK_TRANSFER"]).optional(),
   notes: z.string().max(500).nullable().optional(),

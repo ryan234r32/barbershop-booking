@@ -682,12 +682,22 @@ function ExpenseRow({
     if (res.ok) onDeleted();
     else alert("刪除失敗");
   };
+  // V3.7 — 「其他」 類別把使用者填的品項放在 notes 開頭（以 ` · ` 分隔）。
+  // 顯示時把 customItem 提到主標題，剩餘 notes 放副標。
+  const isOther = expense.category === "other";
+  let primaryLabel: string = CATEGORY_LABELS[expense.category];
+  let subNote = expense.notes;
+  if (isOther && expense.notes) {
+    const parts = expense.notes.split(" · ");
+    primaryLabel = parts[0];
+    subNote = parts.length > 1 ? parts.slice(1).join(" · ") : null;
+  }
   return (
     <div className="flex items-center gap-3 py-2 px-1 border-b border-[var(--color-surface)] last:border-b-0">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-sm font-medium text-[var(--color-text-primary)] truncate">
-            {CATEGORY_LABELS[expense.category]}
+            {primaryLabel}
           </span>
           {expense.type === "FIXED" && (
             <span className="text-[9px] px-1 rounded bg-[var(--color-surface)] text-[var(--color-text-muted)] flex-shrink-0">
@@ -700,9 +710,9 @@ function ExpenseRow({
             </span>
           )}
         </div>
-        {expense.notes && (
+        {subNote && (
           <p className="text-[11px] text-[var(--color-text-muted)] truncate mt-0.5">
-            {expense.notes}
+            {subNote}
           </p>
         )}
       </div>

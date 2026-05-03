@@ -51,7 +51,6 @@ export default function ReschedulePage({
   const [selectedTime, setSelectedTime] = useState("");
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
-  const [violationAccepted, setViolationAccepted] = useState(false);
 
   useEffect(() => {
     if (!isReady) return;
@@ -139,15 +138,8 @@ export default function ReschedulePage({
 
   const oldDateDisplay = `${formatDate(booking.date)} · ${booking.startTime} — ${booking.endTime}`;
 
-  // < 2h reschedule → counts as a violation; force explicit consent.
-  const bookingDateStr = new Date(booking.date).toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
-  const [bY, bM, bD] = bookingDateStr.split("-").map(Number);
-  const [bH] = booking.startTime.split(":").map(Number);
-  const appointmentTs = Date.UTC(bY, bM - 1, bD, bH - 8, 0, 0);
-  const hoursUntilAppt = (appointmentTs - Date.now()) / (1000 * 60 * 60);
-  const isVeryLate = hoursUntilAppt > 0 && hoursUntilAppt < 2;
-  const submitDisabled =
-    !selectedDate || !selectedTime || submitting || (isVeryLate && !violationAccepted);
+  // 改期完全開放（老闆訪談 §3）— 無時間限制、不計違規。
+  const submitDisabled = !selectedDate || !selectedTime || submitting;
 
   // Success state
   if (success) {
@@ -224,28 +216,6 @@ export default function ReschedulePage({
 
       {/* Main content */}
       <main className="flex-1 pt-[7.5rem] pb-28 px-6 max-w-md mx-auto w-full">
-        {isVeryLate && (
-          <div className="mb-6 rounded-xl bg-[#FDEEEF] border border-[#A84A3B]/30 p-4">
-            <p className="text-sm font-bold text-[#93000A] mb-1">
-              2 小時內改期將計違規一次
-            </p>
-            <p className="text-xs text-[#404944] leading-relaxed mb-3">
-              根據取消政策，預約 2 小時內的線上改期會自動記錄違規一次。請於下方勾選同意後才能送出。
-            </p>
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={violationAccepted}
-                onChange={(e) => setViolationAccepted(e.target.checked)}
-                className="w-4 h-4 accent-[#A84A3B] mt-0.5 shrink-0"
-              />
-              <span className="text-xs text-[#003D2B] leading-relaxed">
-                我了解並同意此次改期將計違規一次
-              </span>
-            </label>
-          </div>
-        )}
-
         <CalendarStep
           selectedDate={selectedDate}
           selectedTime={selectedTime}
@@ -290,11 +260,9 @@ export default function ReschedulePage({
           >
             {submitting
               ? "改期中..."
-              : isVeryLate && selectedDate && selectedTime && !violationAccepted
-                ? "請先勾選同意違規條款"
-                : selectedDate && selectedTime
-                  ? `確認改期到 ${formatDate(selectedDate)} ${selectedTime} →`
-                  : "選擇新的日期與時段"}
+              : selectedDate && selectedTime
+                ? `確認改期到 ${formatDate(selectedDate)} ${selectedTime} →`
+                : "選擇新的日期與時段"}
           </button>
         </div>
       </div>
