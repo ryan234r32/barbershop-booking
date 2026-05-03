@@ -2,9 +2,18 @@
  * Historical Excel → DB import (PRD-v3 §10.1, Wave 3.B).
  *
  * Run:
- *   npx tsx scripts/import-historical-excel.ts          # dry-run, prints stats
- *   npx tsx scripts/import-historical-excel.ts --commit # actually writes DB
- *   npx tsx scripts/import-historical-excel.ts --commit --reset  # purge prior import then write
+ *   npx tsx scripts/import-historical-excel.ts                    # dry-run 2025 default
+ *   npx tsx scripts/import-historical-excel.ts --all              # dry-run 2024+2025+2026 combined
+ *   npx tsx scripts/import-historical-excel.ts --all --commit --reset --allow-no-contact  # full reimport
+ *   npx tsx scripts/import-historical-excel.ts --year=2024 --file=docs/2024預約表.xlsx --commit
+ *
+ * Multi-year (--all) shares one customer-profile map so cross-year customers
+ * keep correct firstVisitAt / lastVisitAt / totalVisits.
+ *
+ * v3.8 RC8 contact-field guard: --commit is blocked when any customer is
+ * missing a phone (legacy users without phones can never auto-link to LIFF).
+ * Pass --allow-no-contact to override for historical sheets that pre-date
+ * the rule.
  *
  * Behaviour:
  *  - Writes to DEFAULT_TENANT_ID (production 1008 Hair Studio tenant).
@@ -38,15 +47,44 @@ function getArg(name: string, fallback?: string): string | undefined {
   return fallback;
 }
 
+// Multi-file mode: --all loads docs/2024預約表.xlsx + 2025預約表Ken老師.xlsx + 2026預約表.xlsx
+// Single-file mode: --year=YYYY --file=path
+const ALL_MODE = process.argv.includes("--all");
 const TARGET_YEAR = getArg("year", "2025")!;
-const EXCEL_FILE = path.resolve(
-  process.cwd(),
-  getArg("file") ?? `docs/${TARGET_YEAR}預約表Ken老師.xlsx`,
-);
-const MONTH_SHEET_PATTERN = new RegExp(`^${TARGET_YEAR}\\d{2}$`);
+
+interface SourceFile {
+  year: string;
+  path: string;
+  pattern: RegExp;
+}
+
+const SOURCES: SourceFile[] = ALL_MODE
+  ? [
+      { year: "2024", path: path.resolve(process.cwd(), "docs/2024預約表.xlsx"), pattern: /^2024\d{2}$/ },
+      { year: "2025", path: path.resolve(process.cwd(), "docs/2025預約表Ken老師.xlsx"), pattern: /^2025\d{2}$/ },
+      { year: "2026", path: path.resolve(process.cwd(), "docs/2026預約表.xlsx"), pattern: /^2026\d{2}$/ },
+    ]
+  : [
+      {
+        year: TARGET_YEAR,
+        path: path.resolve(
+          process.cwd(),
+          getArg("file") ?? `docs/${TARGET_YEAR}預約表Ken老師.xlsx`,
+        ),
+        pattern: new RegExp(`^${TARGET_YEAR}\\d{2}$`),
+      },
+    ];
 
 const DRY_RUN = !process.argv.includes("--commit");
 const RESET = process.argv.includes("--reset");
+/**
+ * v3.8 RC8 guard: legacy users without phone can never auto-link to a LIFF
+ * account when the customer self-registers, which is what produced the
+ * duplicate-record problem in the postmortem. Default behavior now blocks
+ * `--commit` if any row lacks a phone. Pass `--allow-no-contact` to override
+ * (e.g. for the original 2024–2026 historical sheets that pre-date this rule).
+ */
+const ALLOW_NO_CONTACT = process.argv.includes("--allow-no-contact");
 const TENANT_ID = process.env.DEFAULT_TENANT_ID;
 if (!TENANT_ID) {
   console.error("✗ DEFAULT_TENANT_ID env var required");
@@ -105,6 +143,14 @@ interface RawBooking {
   hour: number;
   serviceName: string;
   customerName: string;
+  /**
+   * Customer phone parsed from Excel (if a phone column is present in a future
+   * sheet layout). Required for legacy → LIFF auto-link to ever fire (v3.8 RC8).
+   * Current historical sheets have no phone column → all rows are undefined,
+   * which trips the strict contact-field guard in main() unless `--allow-no-contact`
+   * is passed.
+   */
+  phone?: string;
   amount: number | null;
   isNewCustomer: boolean;
   isBankTransfer: boolean;
@@ -254,7 +300,25 @@ async function main() {
   console.log();
 
   if (RESET && !DRY_RUN) {
-    console.log("--- RESET: purging prior import ---");
+    // V3.8 防再犯（5/1 incident）：--reset 會刪 hist- bookings + legacy- users，
+    // 必須加雙重確認才能跑：
+    //   1. env CONFIRM_RESET_TENANT 必須等於目標 tenant id（防 copy-paste 跑錯 tenant）
+    //   2. --i-know-this-deletes-data flag 必須 explicit 加上
+    const expectedTenantConfirm = process.env.CONFIRM_RESET_TENANT;
+    const explicitFlag = process.argv.includes("--i-know-this-deletes-data");
+    if (expectedTenantConfirm !== tenant.id || !explicitFlag) {
+      console.error("");
+      console.error("✗ Refusing --reset without explicit confirmation:");
+      console.error(`  1. Set env var CONFIRM_RESET_TENANT=${tenant.id}`);
+      console.error(`  2. Pass --i-know-this-deletes-data flag`);
+      console.error("");
+      console.error("  This script DELETES all hist- bookings + legacy- users");
+      console.error("  for tenant", tenant.id, "before re-importing.");
+      console.error("  See tasks/lessons-inbox.md → 5/1 P0 incident.");
+      console.error("");
+      process.exit(1);
+    }
+    console.log("--- RESET: purging prior import (explicit confirmation passed) ---");
     const delPay = await prisma.payment.deleteMany({
       where: { booking: { tenantId: tenant.id, id: { startsWith: "hist-" } } },
     });
@@ -267,15 +331,57 @@ async function main() {
     console.log(`  deleted ${delPay.count} payments, ${delBook.count} bookings, ${delUser.count} users\n`);
   }
 
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.readFile(EXCEL_FILE);
-
   const allRaw: RawBooking[] = [];
-  for (const ws of wb.worksheets) {
-    if (!MONTH_SHEET_PATTERN.test(ws.name)) continue;
-    allRaw.push(...parseSheet(ws));
+  for (const src of SOURCES) {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(src.path);
+    let yearCount = 0;
+    for (const ws of wb.worksheets) {
+      if (!src.pattern.test(ws.name)) continue;
+      const before = allRaw.length;
+      allRaw.push(...parseSheet(ws));
+      yearCount += allRaw.length - before;
+    }
+    console.log(`  ${src.year} (${path.basename(src.path)}): ${yearCount} bookings`);
   }
-  console.log(`Parsed ${allRaw.length} bookings from Excel\n`);
+  console.log(`Parsed ${allRaw.length} bookings total\n`);
+
+  // v3.8 RC8 guard: count distinct customers missing a phone, then either
+  // hard-block the commit or surface a loud warning depending on the flag.
+  const customersWithoutPhone = new Set<string>();
+  const customersWithPhone = new Set<string>();
+  for (const r of allRaw) {
+    const slug = slugify(r.customerName);
+    if (r.phone && r.phone.trim().length > 0) {
+      customersWithPhone.add(slug);
+    } else {
+      customersWithoutPhone.add(slug);
+    }
+  }
+  // A customer counts as "with phone" if ANY row has one.
+  for (const slug of customersWithPhone) customersWithoutPhone.delete(slug);
+  const noPhoneCount = customersWithoutPhone.size;
+  const totalCustomers = customersWithPhone.size + noPhoneCount;
+  console.log(
+    `Contact info: ${customersWithPhone.size}/${totalCustomers} customers have a phone (${noPhoneCount} missing)`,
+  );
+  if (noPhoneCount > 0 && !ALLOW_NO_CONTACT) {
+    if (!DRY_RUN) {
+      console.error(
+        `\n✗ Refusing to --commit: ${noPhoneCount} customers have no phone. ` +
+          `Legacy users without phones cannot auto-link to LIFF accounts (v3.8 RC8).\n` +
+          `  Either add a phone column to the source sheet, or pass --allow-no-contact ` +
+          `to acknowledge this is a historical import.`,
+      );
+      process.exit(1);
+    } else {
+      console.warn(
+        `⚠  ${noPhoneCount} customers without a phone. --commit will be blocked unless ` +
+          `you also pass --allow-no-contact.`,
+      );
+    }
+  }
+  console.log();
 
   const mapService = buildServiceMapper(services);
 
@@ -404,7 +510,10 @@ async function main() {
             tenantId: tenant.id,
             userId,
             serviceId: m.service.id,
-            date: new Date(dateIso + "T00:00:00+08:00"),
+            // UTC midnight, NOT +08:00 — `Booking.date` is `@db.Date` (no time)
+            // and the timestamp→date cast runs in UTC. Using +08:00 makes
+            // the cast land on the *previous* UTC day (e.g. 1/2 Taipei → 1/1 stored).
+            date: new Date(`${dateIso}T00:00:00.000Z`),
             startTime,
             endTime,
             slotsOccupied: slots,
