@@ -63,6 +63,22 @@ export function AnnualView({ period, onPeriodChange }: AnnualViewProps) {
   );
   const [chosenScenario, setChosenScenario] = useState<ScenarioKey>("aggressive");
 
+  // V3.7 §F — full-year expense aggregation for the P&L decomposition.
+  const { data: yearExpenses } = useSWR<{
+    totalAmount: number;
+    expenses: Array<{ amount: number; type: "FIXED" | "VARIABLE"; date: string }>;
+  }>(
+    `/api/expenses?from=${period}-01-01&to=${period}-12-31`,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+  const expFixed = (yearExpenses?.expenses ?? [])
+    .filter((e) => e.type === "FIXED")
+    .reduce((s, e) => s + e.amount, 0);
+  const expVar = (yearExpenses?.expenses ?? [])
+    .filter((e) => e.type === "VARIABLE")
+    .reduce((s, e) => s + e.amount, 0);
+
   if (isLoading || !data) {
     return (
       <div className="space-y-4">
@@ -161,6 +177,21 @@ export function AnnualView({ period, onPeriodChange }: AnnualViewProps) {
             </div>
           </SectionDivider>
 
+          {/* V3.7 §F — 年度損益分解 (P&L)：插在 §01 ↔ §02 之間，無新編號避免動到後面 */}
+          <MCard padding="md">
+            <p className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+              年度損益分解
+            </p>
+            <p className="text-[11px] text-[var(--color-text-muted)] mb-3">
+              營收 − 固定支出 − 變動支出 = 淨利
+            </p>
+            <PLDecomposition
+              revenue={data.totals.revenue}
+              fixedCost={expFixed}
+              variableCost={expVar}
+            />
+          </MCard>
+
           {/* ② 客戶健康深度分析 */}
           <SectionDivider number="02" title="客戶健康深度分析" subtitle="客戶結構與年度貢獻分布">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -243,6 +274,124 @@ export function AnnualView({ period, onPeriodChange }: AnnualViewProps) {
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────
+
+/**
+ * V3.7 §F — 4-way P&L decomposition: Revenue / Fixed / Variable / Profit
+ * as a horizontal stacked bar + numeric breakdown.
+ */
+function PLDecomposition({
+  revenue,
+  fixedCost,
+  variableCost,
+}: {
+  revenue: number;
+  fixedCost: number;
+  variableCost: number;
+}) {
+  const profit = revenue - fixedCost - variableCost;
+  const profitable = profit >= 0;
+  // Bar width: % of revenue. Profit slot can be negative; clip to 0% if so.
+  const denom = revenue > 0 ? revenue : 1;
+  const fixedPct = Math.min(100, Math.max(0, (fixedCost / denom) * 100));
+  const varPct = Math.min(100, Math.max(0, (variableCost / denom) * 100));
+  const profitPct = Math.max(0, 100 - fixedPct - varPct);
+
+  return (
+    <div>
+      <div className="flex h-6 rounded-md overflow-hidden mb-3">
+        <div
+          className="bg-[var(--color-warning)]/70"
+          style={{ width: `${fixedPct}%` }}
+          title={`固定 ${fixedPct.toFixed(1)}%`}
+        />
+        <div
+          className="bg-[var(--color-danger)]/70"
+          style={{ width: `${varPct}%` }}
+          title={`變動 ${varPct.toFixed(1)}%`}
+        />
+        <div
+          className={`${profitable ? "bg-[var(--color-brand)]" : "bg-[var(--color-text-disabled)]/40"}`}
+          style={{ width: `${profitPct}%` }}
+          title={`淨利 ${profitPct.toFixed(1)}%`}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <PLCell
+          label="營收"
+          amount={revenue}
+          dotColour="var(--color-text-primary)"
+        />
+        <PLCell
+          label="固定支出"
+          amount={-fixedCost}
+          dotColour="var(--color-warning)"
+        />
+        <PLCell
+          label="變動支出"
+          amount={-variableCost}
+          dotColour="var(--color-danger)"
+        />
+        <PLCell
+          label="淨利"
+          amount={profit}
+          dotColour={profitable ? "var(--color-brand)" : "var(--color-danger)"}
+          tone={profitable ? "brand" : "danger"}
+          sub={
+            revenue > 0
+              ? `淨利率 ${((profit / revenue) * 100).toFixed(1)}%`
+              : undefined
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+function PLCell({
+  label,
+  amount,
+  dotColour,
+  tone,
+  sub,
+}: {
+  label: string;
+  amount: number;
+  dotColour: string;
+  tone?: "brand" | "danger";
+  sub?: string;
+}) {
+  const textColour =
+    tone === "brand"
+      ? "var(--color-brand)"
+      : tone === "danger"
+        ? "var(--color-danger)"
+        : "var(--color-text-primary)";
+  return (
+    <div className="bg-[var(--color-surface)] rounded-md p-3">
+      <div className="flex items-center gap-1.5 mb-1">
+        <span
+          className="w-2 h-2 rounded-full flex-shrink-0"
+          style={{ background: dotColour }}
+        />
+        <p className="text-[10px] tracking-wider text-[var(--color-text-muted)] uppercase">
+          {label}
+        </p>
+      </div>
+      <p
+        className="text-base font-bold tabular-nums"
+        style={{ color: textColour }}
+      >
+        {amount < 0
+          ? `-${Math.abs(amount).toLocaleString()}`
+          : amount.toLocaleString()}
+      </p>
+      {sub && (
+        <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">{sub}</p>
+      )}
+    </div>
+  );
+}
 
 function CoverPage({ year, from, to }: { year: number; from: string; to: string }) {
   return (

@@ -1381,11 +1381,21 @@ export function dailySettlementMessage(params: {
     noShow: number;
     unresolved: number;
     revenue: number;
+    /** V3.7 §G — total expenses entered for the day (cash + bank). 0 if no expenses. */
+    expenseCount?: number;
+    expenseTotal?: number;
+    /** V3.7 §G — revenue − expenseTotal (already computed by the cron caller). */
+    netProfit?: number;
   };
   dashboardUrl: string;
 }): FlexMessage {
   const { date, summary, dashboardUrl } = params;
+  const hasExpense = (summary.expenseTotal ?? 0) > 0;
 
+  // V3.7 §G — primary CTA always opens 財務/每日 (the new reconciliation hub).
+  // The legacy "前往處理（N 筆待確認）" label is preserved for visibility when
+  // there are unresolved bookings; otherwise we still show a single "完成今日結帳"
+  // CTA so the owner has one tap to act.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const footerContents: any[] = [];
   if (summary.unresolved > 0) {
@@ -1394,6 +1404,18 @@ export function dailySettlementMessage(params: {
       action: {
         type: "uri" as const,
         label: `前往處理（${summary.unresolved} 筆待確認）`,
+        uri: dashboardUrl,
+      },
+      style: "primary" as const,
+      color: "#003D2B",
+      height: "sm" as const,
+    });
+  } else {
+    footerContents.push({
+      type: "button" as const,
+      action: {
+        type: "uri" as const,
+        label: "完成今日結帳",
         uri: dashboardUrl,
       },
       style: "primary" as const,
@@ -1458,6 +1480,55 @@ export function dailySettlementMessage(params: {
             },
           ],
         },
+        // V3.7 §G — surface today's expense + net profit when any expense exists.
+        ...(hasExpense
+          ? [
+              {
+                type: "box" as const,
+                layout: "horizontal" as const,
+                margin: "sm" as const,
+                contents: [
+                  {
+                    type: "text" as const,
+                    text: `支出（${summary.expenseCount} 筆）`,
+                    size: "sm" as const,
+                    color: "#809A8E",
+                    flex: 2,
+                  },
+                  {
+                    type: "text" as const,
+                    text: `-NT$${(summary.expenseTotal ?? 0).toLocaleString()}`,
+                    size: "md" as const,
+                    color: "#B00020",
+                    weight: "bold" as const,
+                    flex: 5,
+                  },
+                ],
+              },
+              {
+                type: "box" as const,
+                layout: "horizontal" as const,
+                margin: "sm" as const,
+                contents: [
+                  {
+                    type: "text" as const,
+                    text: "淨利",
+                    size: "sm" as const,
+                    color: "#809A8E",
+                    flex: 2,
+                  },
+                  {
+                    type: "text" as const,
+                    text: `NT$${(summary.netProfit ?? 0).toLocaleString()}`,
+                    size: "lg" as const,
+                    color: (summary.netProfit ?? 0) >= 0 ? "#003D2B" : "#B00020",
+                    weight: "bold" as const,
+                    flex: 5,
+                  },
+                ],
+              },
+            ]
+          : []),
       ],
     },
     ...(footerContents.length > 0

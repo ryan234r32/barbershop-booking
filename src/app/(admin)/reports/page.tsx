@@ -25,6 +25,7 @@ import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { todayInTaipei } from "@/lib/utils/time";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { MToggle } from "@/components/admin/reports/v3.6/m-toggle";
+import { PastDueBanner } from "@/components/admin/past-due-banner";
 import { DailyView } from "./views/daily";
 import { MonthlyView } from "./views/monthly";
 import { AnnualView } from "./views/annual";
@@ -38,7 +39,7 @@ const reportsFetcher = (url: string) =>
 type ViewKind = "daily" | "monthly" | "annual";
 
 function ReportsPageInner() {
-  usePageTitle("營收報表");
+  usePageTitle("財務");
   const sp = useSearchParams();
 
   // Backwards-compat: V3.5 used ?range=year&offset=-1 — rewrite to V3.6 shape.
@@ -92,7 +93,12 @@ function ReportsPageInner() {
 
   return (
     <main className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4 print:p-0 print:max-w-none">
-      <h1 className="text-2xl font-bold text-[var(--color-text-primary)] print:hidden">營收報表</h1>
+      <h1 className="text-2xl font-bold text-[var(--color-text-primary)] print:hidden">財務</h1>
+
+      {/* V3.7 §C — 過期未對帳 banner（取代強制 modal）。零筆時自動隱藏。 */}
+      <div className="print:hidden">
+        <PastDueBanner />
+      </div>
 
       <div className="print:hidden">
         <MToggle<ViewKind>

@@ -13,9 +13,12 @@ import {
 
 // V3.8 consolidation: 老闆指定主選單 4 個 + 更多。日曆是 app 根，報表 = V3.6
 // 三視角，顧客 = 客戶管理，訊息 = LINE 客服。其他全進「更多」（/more 頁）。
+//
+// V3.7 §1 — 「報表」改名「財務」：報表 tab 現在 owns 營收 + 支出 + 淨利 + 對帳，
+// 路由維持 /reports（節省遷移成本，未來若改為 /finance 再走 redirect）。
 const TABS = [
   { href: "/calendar", label: "行事曆", icon: Calendar },
-  { href: "/reports", label: "報表", icon: FileBarChart },
+  { href: "/reports", label: "財務", icon: FileBarChart },
   { href: "/customers", label: "顧客", icon: Users },
   { href: "/messages", label: "訊息", icon: MessageSquare },
   { href: "/more", label: "更多", icon: MoreHorizontal },
