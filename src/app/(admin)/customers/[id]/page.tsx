@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, use, type ReactNode } from "react";
 import Link from "next/link";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import useSWR from "swr";
-import { ChevronLeft, Plus, Phone, Cake, Pencil, X } from "lucide-react";
+import { ChevronLeft, Plus, Phone, Cake, Pencil, X, CheckCircle2, XCircle, AlertTriangle, Circle } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { BasicProfileEditor } from "@/components/admin/customers/basic-profile-editor";
 
@@ -99,9 +99,16 @@ const SEGMENT_LABEL: Record<string, string> = {
   VIP: "VIP", REGULAR: "常客", NEW: "新客", AT_RISK: "流失中", LAPSED: "已流失",
 };
 
-const STATUS_ICON: Record<string, string> = {
-  COMPLETED: "✅", CONFIRMED: "🔵", CANCELLED: "❌", NO_SHOW: "⚠️",
+const STATUS_ICON: Record<string, ReactNode> = {
+  COMPLETED: <CheckCircle2 size={14} aria-hidden className="text-[var(--color-success)]" />,
+  CONFIRMED: <Circle size={14} aria-hidden fill="currentColor" className="text-[var(--color-brand)]" />,
+  CANCELLED: <XCircle size={14} aria-hidden className="text-[var(--color-text-muted)]" />,
+  CANCELLED_BY_ADMIN: <XCircle size={14} aria-hidden className="text-[var(--color-text-muted)]" />,
+  NO_SHOW: <AlertTriangle size={14} aria-hidden className="text-[var(--color-warning)]" />,
 };
+const STATUS_ICON_DEFAULT: ReactNode = (
+  <Circle size={14} aria-hidden fill="currentColor" className="text-[var(--color-brand)]" />
+);
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -346,10 +353,25 @@ export default function CustomerDetailPage({
           <div className="mt-3 pt-3 border-t border-[var(--color-text-disabled)]/30">
             <p className="text-[10px] text-[var(--color-text-muted)] mb-1">出席狀況（總預約 {totalBookings} 次）</p>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
-              <span className="text-[var(--color-text-body)]">✅ 完成 {completedCount}</span>
-              {upcomingCount > 0 && <span className="text-[var(--color-brand)]">🔵 即將 {upcomingCount}</span>}
-              {noShowCount > 0 && <span className="text-[var(--color-warning)]">⚠️ 未到 {noShowCount}</span>}
-              {cancelledCount > 0 && <span className="text-[var(--color-text-muted)]">❌ 取消 {cancelledCount}</span>}
+              <span className="text-[var(--color-text-body)] inline-flex items-center gap-1">
+                <CheckCircle2 size={12} aria-hidden className="text-[var(--color-success)]" />
+                完成 {completedCount}
+              </span>
+              {upcomingCount > 0 && (
+                <span className="text-[var(--color-brand)] inline-flex items-center gap-1">
+                  <Circle size={12} aria-hidden fill="currentColor" /> 即將 {upcomingCount}
+                </span>
+              )}
+              {noShowCount > 0 && (
+                <span className="text-[var(--color-warning)] inline-flex items-center gap-1">
+                  <AlertTriangle size={12} aria-hidden /> 未到 {noShowCount}
+                </span>
+              )}
+              {cancelledCount > 0 && (
+                <span className="text-[var(--color-text-muted)] inline-flex items-center gap-1">
+                  <XCircle size={12} aria-hidden /> 取消 {cancelledCount}
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -535,7 +557,7 @@ function BookingPaymentRow({
 }) {
   // 顯示完整年份（2024/5/3 格式）— 因匯入歷史資料橫跨 2024/2025/2026，沒有年份會混淆
   const bookingDateLabel = formatYMD(booking.date);
-  const statusIcon = STATUS_ICON[booking.status] ?? "🔵";
+  const statusIcon = STATUS_ICON[booking.status] ?? STATUS_ICON_DEFAULT;
   const isCancelledOrNoShow =
     booking.status === "CANCELLED" ||
     booking.status === "CANCELLED_BY_ADMIN" ||
@@ -564,7 +586,7 @@ function BookingPaymentRow({
     <div className="px-4 py-3">
       {/* 預約資訊 */}
       <div className="flex items-center gap-2">
-        <span className="text-xs shrink-0">{statusIcon}</span>
+        <span className="shrink-0 inline-flex items-center">{statusIcon}</span>
         <span className="text-[11px] text-[var(--color-text-muted)] tabular-nums shrink-0 w-[5.5rem]">
           {bookingDateLabel}
         </span>

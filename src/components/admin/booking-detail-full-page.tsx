@@ -23,6 +23,7 @@
 
 import { useEffect, useState } from "react";
 import { Drawer } from "vaul";
+import { Coins, Check } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { CheckoutFullPage } from "./checkout-full-page";
@@ -562,15 +563,15 @@ function DetailView({
         <button
           onClick={onAcknowledge}
           disabled={loading}
-          className="w-full mb-3 py-3 bg-[var(--color-brand)]/10 border border-[var(--color-brand)] text-[var(--color-brand)] font-semibold rounded-lg text-sm hover:bg-[var(--color-brand)]/20 transition-colors disabled:opacity-50"
+          className="w-full mb-3 py-3 bg-[var(--color-brand)]/10 border border-[var(--color-brand)] text-[var(--color-brand)] font-semibold rounded-lg text-sm hover:bg-[var(--color-brand)]/20 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
         >
-          ✓ 我已確認知道
+          <Check size={16} aria-hidden /> 我已確認知道
         </button>
       )}
 
       {booking.adminAcknowledgedAt && booking.status === "CONFIRMED" && (
         <p className="text-xs text-[var(--color-success)] mb-3 flex items-center gap-1">
-          ✓ 已確認 ·{" "}
+          <Check size={14} aria-hidden /> 已確認 ·{" "}
           {new Date(booking.adminAcknowledgedAt).toLocaleString("zh-TW", {
             month: "numeric",
             day: "numeric",
@@ -589,7 +590,7 @@ function DetailView({
           disabled={loading}
           className="w-full py-3.5 bg-[var(--color-brand)] text-[var(--color-bg)] font-semibold rounded-lg text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 mb-3"
         >
-          <span>💰</span>
+          <Coins size={16} aria-hidden />
           進行結帳
         </button>
       )}

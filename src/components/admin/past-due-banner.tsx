@@ -14,6 +14,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import { Banknote, Landmark } from "lucide-react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { useToast } from "@/components/ui/toast";
 
@@ -141,16 +142,16 @@ export function PastDueBanner() {
                 <button
                   onClick={() => resolve(b.id, "cash")}
                   disabled={pendingId === b.id}
-                  className="py-2 rounded-lg bg-[var(--color-success)]/10 text-[var(--color-success)] text-xs font-semibold disabled:opacity-50"
+                  className="py-2 rounded-lg bg-[var(--color-success)]/10 text-[var(--color-success)] text-xs font-semibold disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
                 >
-                  💵 現金
+                  <Banknote size={14} aria-hidden /> 現金
                 </button>
                 <button
                   onClick={() => resolve(b.id, "transfer")}
                   disabled={pendingId === b.id}
-                  className="py-2 rounded-lg bg-[var(--color-brand)]/10 text-[var(--color-brand)] text-xs font-semibold disabled:opacity-50"
+                  className="py-2 rounded-lg bg-[var(--color-brand)]/10 text-[var(--color-brand)] text-xs font-semibold disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
                 >
-                  🏦 轉帳
+                  <Landmark size={14} aria-hidden /> 轉帳
                 </button>
                 <button
                   onClick={() => resolve(b.id, "no-show")}

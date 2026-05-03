@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BarChart3, Lightbulb } from "lucide-react";
 import type { YoYResult } from "@/lib/reports/v3.6/aggregates";
 
 interface YoYBarsProps {
@@ -26,7 +27,9 @@ export function YoYBars({ data, hasLastYearData, anchorYear }: YoYBarsProps) {
   if (!hasLastYearData) {
     return (
       <div className="bg-[var(--color-surface)]/40 rounded-lg p-6 text-center text-sm text-[var(--color-text-muted)] space-y-1.5">
-        <div className="text-2xl opacity-40">📊</div>
+        <div className="flex justify-center opacity-40">
+          <BarChart3 size={28} aria-hidden />
+        </div>
         <p className="font-medium text-[var(--color-text-body)]">
           {anchorYear - 1} 年同期資料準備中
         </p>
@@ -207,8 +210,8 @@ export function YoYBars({ data, hasLastYearData, anchorYear }: YoYBarsProps) {
         </svg>
       </div>
 
-      <p className="text-[10px] text-[var(--color-text-muted)] text-center">
-        💡 點/滑入任一月份柱狀，查看詳細數字
+      <p className="text-[10px] text-[var(--color-text-muted)] text-center inline-flex items-center justify-center gap-1 w-full">
+        <Lightbulb size={12} aria-hidden /> 點/滑入任一月份柱狀，查看詳細數字
       </p>
     </div>
   );

@@ -9,8 +9,12 @@ export function AlertBanner({ alerts, onDrill }: AlertBannerProps) {
   if (alerts.length === 0) {
     return (
       <div className="bg-[var(--color-success)]/10 border-l-[3px] border-[var(--color-success)] rounded-r-lg px-4 py-3">
-        <p className="text-sm text-[var(--color-text-primary)] font-medium">
-          🟢 本月所有 KPI 達標 — 無警報
+        <p className="text-sm text-[var(--color-text-primary)] font-medium inline-flex items-center gap-1.5">
+          <span
+            className="inline-block w-2.5 h-2.5 rounded-full bg-[var(--color-success)]"
+            aria-hidden
+          />
+          本月所有 KPI 達標 — 無警報
         </p>
       </div>
     );
@@ -29,9 +33,14 @@ export function AlertBanner({ alerts, onDrill }: AlertBannerProps) {
             onClick={() => onDrill?.(a.id)}
             style={{ cursor: onDrill ? "pointer" : "default" }}
           >
-            <span className="shrink-0 mt-0.5 text-base">
-              {a.level === "red" ? "🔴" : "🟡"}
-            </span>
+            <span
+              className={`shrink-0 mt-1.5 inline-block w-2.5 h-2.5 rounded-full ${
+                a.level === "red"
+                  ? "bg-[var(--color-danger)]"
+                  : "bg-[var(--color-warning)]"
+              }`}
+              aria-hidden
+            />
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-[var(--color-text-primary)]">{a.title}</p>
               <p className="text-xs text-[var(--color-text-body)] mt-0.5">{a.detail}</p>

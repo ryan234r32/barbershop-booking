@@ -12,6 +12,7 @@
  */
 
 import { useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { useToast } from "@/components/ui/toast";
 
@@ -39,7 +40,7 @@ export function ReportIssueButton() {
       });
       // V3.8: 即使 LINE push 失敗（dev 沒設 LINE）也回 200，老闆視角永遠成功
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast({ type: "success", message: "已通知技術人員，會盡快處理 🙏" });
+      toast({ type: "success", message: "已通知技術人員，會盡快處理" });
       setOpen(false);
       setDescription("");
     } catch (err) {
@@ -61,13 +62,13 @@ export function ReportIssueButton() {
         onClick={() => setOpen(true)}
         className="fixed bottom-20 left-4 z-30 lg:left-auto lg:right-4 lg:bottom-4
           w-10 h-10 rounded-full bg-[var(--color-surface)] shadow-md
-          flex items-center justify-center text-base
+          flex items-center justify-center text-[var(--color-warning)]
           hover:bg-[var(--color-warning)]/15 hover:scale-110 transition-all
           border border-[var(--color-border)]"
         aria-label="報告系統問題"
         title="系統怪怪的？點這裡通知技術人員"
       >
-        ⚠️
+        <AlertTriangle size={18} aria-hidden />
       </button>
 
       {/* Modal */}
@@ -80,8 +81,9 @@ export function ReportIssueButton() {
             className="w-full max-w-md bg-[var(--color-bg)] rounded-2xl p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-bold text-[var(--color-text-primary)] mb-1">
-              ⚠️ 報告系統問題
+            <h2 className="text-lg font-bold text-[var(--color-text-primary)] mb-1 inline-flex items-center gap-2">
+              <AlertTriangle size={20} aria-hidden className="text-[var(--color-warning)]" />
+              報告系統問題
             </h2>
             <p className="text-xs text-[var(--color-text-muted)] mb-4">
               發現系統怪怪的？簡短描述一下，技術人員會收到 LINE 通知。

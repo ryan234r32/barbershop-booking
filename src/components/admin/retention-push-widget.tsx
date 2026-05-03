@@ -6,6 +6,7 @@
  */
 
 import useSWR from "swr";
+import { Bell, Lightbulb } from "lucide-react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 
 interface RetentionData {
@@ -48,8 +49,8 @@ export function RetentionPushWidget() {
   return (
     <div className="bg-[var(--color-bg)] border border-[var(--color-brand)]/12 rounded-2xl p-4 sm:p-5">
       <div className="flex items-baseline justify-between mb-3">
-        <p className="text-sm font-bold text-[var(--color-text-primary)]">
-          🔔 自動推播系統
+        <p className="text-sm font-bold text-[var(--color-text-primary)] inline-flex items-center gap-1.5">
+          <Bell size={16} aria-hidden /> 自動推播系統
         </p>
         <p className="text-[10px] text-[var(--color-text-muted)] tabular-nums">
           7 日轉化率 {data.conversionRate7d.toFixed(1)}%
@@ -108,8 +109,8 @@ export function RetentionPushWidget() {
         </div>
       </div>
 
-      <p className="text-[10px] text-[var(--color-text-muted)] mt-3">
-        💡 今日預定 {totalToday} 則 · 已發 {data.todaySent} 則
+      <p className="text-[10px] text-[var(--color-text-muted)] mt-3 inline-flex items-center gap-1">
+        <Lightbulb size={12} aria-hidden /> 今日預定 {totalToday} 則 · 已發 {data.todaySent} 則
       </p>
     </div>
   );

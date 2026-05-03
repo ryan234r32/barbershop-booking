@@ -7,6 +7,8 @@
  * and the owner gets the message in 2 seconds: "47% one-timer is bad, the
  * fix is auto-推播."
  */
+import { Lightbulb } from "lucide-react";
+
 export type DiagnosisLevel = "good" | "warn" | "alert";
 
 export interface Diagnosis {
@@ -17,19 +19,19 @@ export interface Diagnosis {
   recommendation?: string;
 }
 
-const LEVEL_STYLES: Record<DiagnosisLevel, { dot: string; bg: string; ring: string }> = {
+const LEVEL_STYLES: Record<DiagnosisLevel, { dotColor: string; bg: string; ring: string }> = {
   good: {
-    dot: "🟢",
+    dotColor: "bg-[var(--color-success)]",
     bg: "bg-[var(--color-success)]/8",
     ring: "ring-1 ring-[var(--color-success)]/30",
   },
   warn: {
-    dot: "🟡",
+    dotColor: "bg-[var(--color-warning)]",
     bg: "bg-[var(--color-warning)]/8",
     ring: "ring-1 ring-[var(--color-warning)]/30",
   },
   alert: {
-    dot: "🔴",
+    dotColor: "bg-[var(--color-danger)]",
     bg: "bg-[var(--color-danger)]/8",
     ring: "ring-1 ring-[var(--color-danger)]/30",
   },
@@ -39,15 +41,18 @@ export function DiagnosisBanner({ diagnosis }: { diagnosis: Diagnosis }) {
   const style = LEVEL_STYLES[diagnosis.level];
   return (
     <div className={`rounded-xl px-3 py-2.5 ${style.bg} ${style.ring}`}>
-      <p className="text-sm leading-relaxed text-[var(--color-text-body)]">
-        <span className="mr-1">{style.dot}</span>
+      <p className="text-sm leading-relaxed text-[var(--color-text-body)] inline-flex items-center flex-wrap">
+        <span
+          className={`inline-block w-2.5 h-2.5 rounded-full mr-2 ${style.dotColor}`}
+          aria-hidden
+        />
         <span className="font-bold tabular-nums">{diagnosis.current}</span>
         <span className="mx-2 text-[var(--color-text-muted)]">vs {diagnosis.benchmark}</span>
         <span>— {diagnosis.message}</span>
       </p>
       {diagnosis.recommendation && (
-        <p className="text-xs text-[var(--color-text-muted)] mt-1.5 pl-5">
-          💡 建議：{diagnosis.recommendation}
+        <p className="text-xs text-[var(--color-text-muted)] mt-1.5 pl-5 inline-flex items-center gap-1">
+          <Lightbulb size={12} aria-hidden /> 建議：{diagnosis.recommendation}
         </p>
       )}
     </div>

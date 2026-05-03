@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Phone, Scissors, Calendar, Check } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 
@@ -163,16 +164,16 @@ export function UnacknowledgedModal({ bookings, onAllAcknowledged, onStale }: Pr
               </span>
             </div>
             {current.user.phone && (
-              <p className="text-sm text-muted-foreground mt-1">
-                📞 {current.user.phone}
+              <p className="text-sm text-muted-foreground mt-1 inline-flex items-center gap-1.5">
+                <Phone size={14} aria-hidden /> {current.user.phone}
               </p>
             )}
-            <p className="text-sm text-muted-foreground mt-1">
-              ✂️ {current.service.name} · NT$
+            <p className="text-sm text-muted-foreground mt-1 inline-flex items-center gap-1.5">
+              <Scissors size={14} aria-hidden /> {current.service.name} · NT$
               {current.service.price.toLocaleString()}
             </p>
-            <p className="text-sm font-medium text-foreground mt-2">
-              📅 {formatDateTW(current.date)}　{current.startTime}–
+            <p className="text-sm font-medium text-foreground mt-2 inline-flex items-center gap-1.5">
+              <Calendar size={14} aria-hidden /> {formatDateTW(current.date)}　{current.startTime}–
               {current.endTime}
             </p>
           </div>
@@ -191,7 +192,13 @@ export function UnacknowledgedModal({ bookings, onAllAcknowledged, onStale }: Pr
           disabled={processing}
           className="w-full h-[52px] bg-[var(--color-brand)] text-[var(--color-bg)] rounded-lg font-bold text-sm disabled:opacity-50 active:scale-[0.98] transition-transform"
         >
-          {processing ? "處理中…" : "✓ 知道了"}
+          {processing ? (
+            "處理中…"
+          ) : (
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <Check size={16} aria-hidden /> 知道了
+            </span>
+          )}
         </button>
 
         <p className="text-xs text-muted-foreground text-center">
