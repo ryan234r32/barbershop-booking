@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { IconEventAvailable, IconPhone, IconWarning, IconInfo } from "@/components/liff/icons";
+import { IconEventAvailable, IconPhone, IconWarning } from "@/components/liff/icons";
 
 export function ConfirmStep({
   notes,
@@ -147,7 +147,7 @@ export function ConfirmStep({
               </div>
             </div>
 
-            {/* Block 4 — Violation conditions */}
+            {/* Block 4 — No-show = violation */}
             <div className="rounded-xl bg-[#FDEEEF] p-4">
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 bg-[#A84A3B] rounded-full flex items-center justify-center shrink-0">
@@ -155,24 +155,16 @@ export function ConfirmStep({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-0.5">
-                    <span className="font-bold text-[#93000A] text-sm">違規條件</span>
+                    <span className="font-bold text-[#93000A] text-sm">未到店 (No-show)</span>
                     <span className="bg-[#A84A3B] text-white rounded-full text-[10px] px-2 py-0.5 font-medium">
                       記違規一次
                     </span>
                   </div>
                   <p className="text-xs text-[#404944] leading-relaxed">
-                    2 小時內改期、未到店未通知，各計違規一次。
+                    未到店且未事先通知取消，將記錄為違規一次。
                   </p>
                 </div>
               </div>
-            </div>
-
-            {/* Warning footer */}
-            <div className="flex items-center gap-2 px-1 pt-1">
-              <IconInfo className="w-4 h-4 text-[#003D2B]/40 shrink-0" />
-              <p className="text-[11px] text-[#003D2B]/60">
-                累積 <span className="font-bold text-[#003D2B]">3 次</span>違規 → 暫停線上預約 30 天
-              </p>
             </div>
           </div>
         )}
