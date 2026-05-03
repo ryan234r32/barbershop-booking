@@ -22,6 +22,7 @@ type AlertKind =
   | "redis_unreachable" // health check Redis fail
   | "line_webhook_attack" // 5 連續 signature fail
   | "line_api_quota" // LINE OA 配額用完
+  | "external_monitor" // 外部 uptime monitor (Better Stack / UptimeRobot 等) 偵測 down/up
   | "manual"; // 手動測試
 
 interface AlertParams {
@@ -61,6 +62,7 @@ const KIND_LABEL: Record<AlertKind, string> = {
   redis_unreachable: "⚠️ Redis 連線失敗（預約 lock 受影響）",
   line_webhook_attack: "🛡️ LINE webhook 異常（疑似攻擊）",
   line_api_quota: "📵 LINE 推播配額用完",
+  external_monitor: "📡 外部監控 alert",
   manual: "ℹ️ 手動測試 alert",
 };
 
