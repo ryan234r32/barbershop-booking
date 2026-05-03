@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { getRedis } from "@/lib/redis";
 import { verifyCronSecret } from "@/lib/utils/cron-auth";
 import { triggerEmergencyAlert } from "@/lib/notifications/emergency-alert";
+import { pingHealthcheck } from "@/lib/notifications/healthcheck-ping";
 import { logger } from "@/lib/utils/logger";
 
 export async function GET(request: NextRequest) {
@@ -56,6 +57,12 @@ export async function GET(request: NextRequest) {
   }
 
   const allHealthy = Object.values(checks).every((c) => c.status === "ok");
+
+  // V3.8: dead-man's switch — tell healthchecks.io we ran (success or fail).
+  // Never await blocks the response — fire-and-forget so a slow ping can't
+  // delay the cron's HTTP reply, but await here keeps logs ordered in dev.
+  await pingHealthcheck(allHealthy);
+
   return Response.json(
     {
       status: allHealthy ? "ok" : "degraded",
