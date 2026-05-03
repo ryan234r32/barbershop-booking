@@ -5,6 +5,7 @@ import { AdminProvider, useAdmin } from "@/lib/admin/auth-context";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { AdminTabBar } from "@/components/admin/tab-bar";
 import { ToastProvider } from "@/components/ui/toast";
+import { ReportIssueButton } from "@/components/admin/report-issue-button";
 import { localStorageProvider } from "@/lib/swr/persistent-cache";
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
@@ -28,6 +29,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
           {children}
         </main>
         <AdminTabBar />
+        {/* V3.8 incident response — 老闆報告問題的浮動按鈕，所有 admin 頁可見 */}
+        <ReportIssueButton />
       </div>
     </ToastProvider>
   );
