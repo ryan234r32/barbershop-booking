@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import withSerwistInit from "@serwist/next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const withSerwist = withSerwistInit({
   swSrc: "src/app/sw.ts",
@@ -51,4 +52,12 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSerwist(nextConfig);
+// V3.8 incident monitoring: 包 withSentryConfig — sourcemap upload + 自動
+// instrumentation。SENTRY_DSN 沒設時 SDK no-op，build 不會失敗。
+const sentryWebpackPluginOptions = {
+  silent: true, // build log 不要被 Sentry CLI 噪音淹沒
+  // SENTRY_AUTH_TOKEN 沒設時跳過 sourcemap upload（dev 友善 + 不洩漏給 OSS）
+  disableSourceMapUpload: !process.env.SENTRY_AUTH_TOKEN,
+};
+
+export default withSentryConfig(withSerwist(nextConfig), sentryWebpackPluginOptions);

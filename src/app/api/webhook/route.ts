@@ -4,6 +4,31 @@ import { prisma } from "@/lib/prisma";
 import { getLineClient } from "@/lib/line/client";
 import { verifyLineSignature } from "@/lib/line/webhook";
 import { logger } from "@/lib/utils/logger";
+import { triggerEmergencyAlert } from "@/lib/notifications/emergency-alert";
+
+// V3.8: 偵測 webhook signature 連續失敗 → 推 LINE alert
+// (in-process state，serverless cold start 會清掉 — 這對 attack 偵測夠用，
+// 因為攻擊通常是 sustained 不是偶發)
+const sigFailWindow: number[] = [];
+const SIG_FAIL_THRESHOLD = 5;
+const SIG_FAIL_WINDOW_MS = 60_000;
+
+function trackSignatureFailure(request: NextRequest): void {
+  const now = Date.now();
+  // Drop entries older than window
+  while (sigFailWindow.length > 0 && sigFailWindow[0] < now - SIG_FAIL_WINDOW_MS) {
+    sigFailWindow.shift();
+  }
+  sigFailWindow.push(now);
+  if (sigFailWindow.length >= SIG_FAIL_THRESHOLD) {
+    void triggerEmergencyAlert({
+      kind: "line_webhook_attack",
+      summary: `webhook signature 1 分鐘內失敗 ${sigFailWindow.length} 次（threshold ${SIG_FAIL_THRESHOLD}）`,
+      url: request.url,
+    });
+    sigFailWindow.length = 0; // reset to avoid spam
+  }
+}
 import { persistInboundMessage, persistOutboundMessage } from "@/lib/messages/persist";
 import { nowTaipei } from "@/lib/utils/time";
 import { TIMEZONE } from "@/lib/utils/constants";
@@ -37,6 +62,8 @@ export async function POST(request: NextRequest) {
     const signature = request.headers.get("x-line-signature");
     const channelSecret = process.env.LINE_CHANNEL_SECRET!;
     if (!signature || !verifyLineSignature(body, signature, channelSecret)) {
+      // V3.8 incident monitoring: track signature fails. 5 in 1 minute → alert.
+      trackSignatureFailure(request);
       return Response.json({ error: "Invalid signature" }, { status: 403 });
     }
 
