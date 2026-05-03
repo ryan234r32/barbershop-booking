@@ -101,7 +101,13 @@ export function DailyCloseSheet(props: Props) {
     <Drawer.Root open={open} onOpenChange={onOpenChange} dismissible={false}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-[var(--color-text-body)]/50 z-50 backdrop-blur-sm" />
-        <Drawer.Content className="fixed inset-0 z-50 bg-[var(--color-bg)] outline-none flex flex-col h-[100dvh] focus:outline-none">
+        <Drawer.Content
+          className="fixed inset-0 z-50 bg-[var(--color-bg)] outline-none flex flex-col h-[100dvh] focus:outline-none"
+          style={{
+            touchAction: "pan-y",
+            overscrollBehavior: "none",
+          }}
+        >
           <div
             className="flex items-center justify-between px-4 flex-shrink-0 border-b border-[var(--color-surface)]"
             style={{ paddingTop: "max(env(safe-area-inset-top), 16px)", paddingBottom: 12 }}

@@ -15,21 +15,12 @@ import { prisma } from "@/lib/prisma";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
 import { errorResponse, UnauthorizedError } from "@/lib/utils/errors";
 
-const EXPENSE_CATEGORIES = [
-  "consumables",
-  "utilities",
-  "rent",
-  "equipment",
-  "cleaning",
-  "marketing",
-  "tax",
-  "other",
-] as const;
+import { ALL_CATEGORIES } from "@/lib/expenses/categories";
 
 const createSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
   amount: z.number().int().positive().max(10_000_000),
-  category: z.enum(EXPENSE_CATEGORIES),
+  category: z.enum(ALL_CATEGORIES),
   type: z.enum(["FIXED", "VARIABLE"]),
   paidMethod: z.enum(["CASH", "BANK_TRANSFER"]).default("CASH"),
   notes: z.string().max(500).optional(),
