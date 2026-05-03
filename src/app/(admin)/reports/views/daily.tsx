@@ -274,38 +274,29 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
         </p>
       )}
 
-      {/* Hero — 大字三段總覽（Pass 2 §4 字體放大） */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      {/* Hero — 應收 + 客數（V3.8: 拿掉 4 週中位 sub，老闆覺得多餘） */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <BigStatCard
           label="今日應收"
           value={formatRevenue(d.totalRevenue)}
-          sub={
-            d.comparisonDeltaPct !== null
-              ? `${d.comparisonDeltaPct >= 0 ? "↑" : "↓"} ${Math.abs(d.comparisonDeltaPct).toFixed(0)}% vs 同日 4 週中位`
-              : "尚無比較資料"
-          }
           tone="brand"
         />
         <BigStatCard
           label="服務客數"
           value={`${d.servedCount}`}
-          sub={`客單 ${d.avgTicket.toLocaleString()}`}
-        />
-        <BigStatCard
-          label="對帳進度"
-          value={`${settledCount}/${reconcileTotal}`}
-          sub={effectivePendingCount > 0 ? `${effectivePendingCount} 筆待確認` : "已對完"}
+          sub={d.servedCount > 0 ? `客單 ${d.avgTicket.toLocaleString()}` : ""}
         />
       </div>
 
-      {/* 漸變進度條（Pass 2 §3 紅→橘→綠） */}
-      {reconcileTotal > 0 && (
-        <ProgressGradient
-          pct={progressPct}
-          rightLabel={`${settledCount} / ${reconcileTotal}`}
-          settleAll={effectivePendingCount > 0 && !d.isClosed ? settleAll : undefined}
-        />
-      )}
+      {/* 對帳進度 — V3.8 升級為大字 hero card（pendingCount 是每日重點）。
+          Cash/bank-pending 加總 = 已服務但老闆還沒按確認的筆數，紅色警示提醒。 */}
+      <ReconcileHero
+        settled={settledCount}
+        total={reconcileTotal}
+        pct={progressPct}
+        pendingCompleted={d.cashPending + d.bankPending}
+        settleAll={effectivePendingCount > 0 && !d.isClosed ? settleAll : undefined}
+      />
 
       <div className="grid grid-cols-2 gap-3">
         <PaymentCard
@@ -533,7 +524,7 @@ function BigStatCard({
 }: {
   label: string;
   value: string;
-  sub: string;
+  sub?: string;
   tone?: "brand";
 }) {
   return (
@@ -546,52 +537,95 @@ function BigStatCard({
       >
         {value}
       </p>
-      <p
-        className="text-[11px] text-[var(--color-text-muted)] mt-1 leading-snug line-clamp-2 break-words"
-        title={sub}
-      >
-        {sub}
-      </p>
+      {sub && (
+        <p
+          className="text-[11px] text-[var(--color-text-muted)] mt-1 leading-snug line-clamp-2 break-words"
+          title={sub}
+        >
+          {sub}
+        </p>
+      )}
     </MCard>
   );
 }
 
-/** Pass 2 §3 — gradient progress bar (red → orange → green) for daily 對帳.
- * Color comes from the % itself: < 30% red, 30-70% orange, > 70% green. */
-function ProgressGradient({
+/**
+ * V3.8 — 對帳進度 hero card. 老闆每天最關注的指標 → 大字 X/Y + 漸變進度條 +
+ * 紅色警示（如果有「已服務但未對帳」筆數）。
+ *
+ * - `settled / total` 永遠顯示（包含 0/0），老闆可一眼看出當日狀態
+ * - `pendingCompleted` = 已 COMPLETED 但 settledAt 仍 null 的筆數，這是老闆
+ *   忘了按「確認收款」的訊號，紅底警示提醒
+ * - 漸變色：0% 紅 → 50% 橘 → 100% 綠
+ */
+function ReconcileHero({
+  settled,
+  total,
   pct,
-  rightLabel,
+  pendingCompleted,
   settleAll,
 }: {
+  settled: number;
+  total: number;
   pct: number;
-  rightLabel: string;
+  pendingCompleted: number;
   settleAll?: () => void;
 }) {
   const clamped = Math.min(100, Math.max(0, pct));
-  // Hue maps 0% → 0 (red), 50% → 30 (orange), 100% → 130 (green)
   const hue = Math.round((clamped / 100) * 130);
   const fillColor = `hsl(${hue} 75% 45%)`;
+  const isComplete = total > 0 && settled === total;
+  const hasPending = pendingCompleted > 0;
   return (
     <MCard padding="md">
-      <div className="flex items-center justify-between mb-2 gap-2">
-        <p className="text-xs font-semibold text-[var(--color-text-primary)]">
-          對帳進度 <span className="font-mono tabular-nums">{clamped}%</span>
-        </p>
-        <p className="text-[10px] text-[var(--color-text-muted)] tabular-nums">{rightLabel}</p>
+      <div className="flex items-end justify-between gap-3 mb-2">
+        <div>
+          <p className="text-xs text-[var(--color-text-muted)]">對帳進度</p>
+          <p className="text-3xl sm:text-4xl font-bold tabular-nums leading-none mt-1 text-[var(--color-text-primary)]">
+            {settled}
+            <span className="text-[var(--color-text-muted)] font-semibold">/{total}</span>
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs font-mono tabular-nums text-[var(--color-text-muted)]">
+            {clamped}%
+          </p>
+          <p
+            className={`text-xs font-semibold mt-0.5 ${
+              isComplete
+                ? "text-[var(--color-success)]"
+                : total === 0
+                  ? "text-[var(--color-text-muted)]"
+                  : "text-[var(--color-text-body)]"
+            }`}
+          >
+            {total === 0 ? "今日無預約" : isComplete ? "✓ 已對完" : `${total - settled} 筆待確認`}
+          </p>
+        </div>
       </div>
-      <div className="h-3 rounded-full overflow-hidden bg-[var(--color-surface)]">
-        <div
-          className="h-full rounded-full transition-all duration-300"
-          style={{
-            width: `${clamped}%`,
-            background: `linear-gradient(90deg, hsl(0 75% 50%) 0%, hsl(30 80% 50%) 50%, ${fillColor} 100%)`,
-          }}
-        />
-      </div>
+      {total > 0 && (
+        <div className="h-3 rounded-full overflow-hidden bg-[var(--color-surface)]">
+          <div
+            className="h-full rounded-full transition-all duration-300"
+            style={{
+              width: `${clamped}%`,
+              background: `linear-gradient(90deg, hsl(0 75% 50%) 0%, hsl(30 80% 50%) 50%, ${fillColor} 100%)`,
+            }}
+          />
+        </div>
+      )}
+      {hasPending && (
+        <div className="mt-3 flex items-start gap-2 px-3 py-2 rounded-md bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/30">
+          <span className="text-base leading-none mt-0.5">🔴</span>
+          <p className="text-xs text-[var(--color-danger)] font-semibold leading-snug">
+            {pendingCompleted} 筆已服務但未對帳 — 請確認是否已收到現金 / 轉帳
+          </p>
+        </div>
+      )}
       {settleAll && (
         <button
           onClick={settleAll}
-          className="w-full mt-3 text-xs px-3 py-2 rounded-md bg-[var(--color-brand)] text-[var(--color-bg)] font-semibold"
+          className="w-full mt-3 text-sm px-3 py-2.5 rounded-md bg-[var(--color-brand)] text-[var(--color-bg)] font-bold"
         >
           全部確認 →
         </button>
