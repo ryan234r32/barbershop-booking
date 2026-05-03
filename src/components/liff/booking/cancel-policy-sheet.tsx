@@ -1,7 +1,7 @@
 "use client";
 
 import { BottomSheet } from "@/components/liff/bottom-sheet";
-import { IconEventAvailable, IconPhone, IconWarning, IconInfo } from "@/components/liff/icons";
+import { IconEventAvailable, IconWarning } from "@/components/liff/icons";
 
 export function CancelPolicySheet({
   isOpen,
@@ -60,27 +60,7 @@ export function CancelPolicySheet({
             </div>
           </div>
 
-          {/* Block 3 — Late actions count as violation (amber) */}
-          <div className="rounded-2xl bg-[#FBF1E6] p-5">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-[#8A6A4D] rounded-full flex items-center justify-center shrink-0 overflow-hidden">
-                <IconPhone className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-[#003D2B] text-sm">2 小時內改期</span>
-                  <span className="bg-[#8A6A4D] text-white rounded-full text-xs px-3 py-1 font-medium">
-                    計違規一次
-                  </span>
-                </div>
-                <p className="text-sm text-[#404944] leading-relaxed">
-                  預約 2 小時內的線上改期視為違規一次，請盡量提前安排。
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Block 4 — No-show = violation (red) */}
+          {/* Block 3 — No-show = violation (red) */}
           <div className="rounded-2xl bg-[#FDEEEF] p-5">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 bg-[#A84A3B] rounded-full flex items-center justify-center shrink-0 overflow-hidden">
@@ -101,18 +81,10 @@ export function CancelPolicySheet({
           </div>
         </div>
 
-        {/* Footer warning */}
-        <div className="mt-8 flex items-center gap-3 p-4 bg-[#f4ede5] rounded-xl">
-          <IconInfo className="w-5 h-5 text-[#003D2B]/60 shrink-0" />
-          <p className="text-xs text-[#003D2B]/70 leading-relaxed">
-            累積 <span className="font-bold text-[#003D2B]">3 次</span>違規 → 系統將暫停線上預約權限 30 天
-          </p>
-        </div>
-
         {/* Close button */}
         <button
           onClick={onClose}
-          className="w-full bg-[#003D2B] text-[#FFF8F1] py-4 rounded-xl font-bold mt-6 transition-colors hover:bg-[#003D2B]/90"
+          className="w-full bg-[#003D2B] text-[#FFF8F1] py-4 rounded-xl font-bold mt-8 transition-colors hover:bg-[#003D2B]/90"
         >
           我知道了
         </button>
