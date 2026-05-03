@@ -8,21 +8,27 @@ import { ChevronLeft, Plus, Phone, Cake, Pencil, X } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { BasicProfileEditor } from "@/components/admin/customers/basic-profile-editor";
 
-/** V3.7 §E — payment history row from /api/customers/[id] response */
-interface PaymentRow {
+/** V3.x — 預約 + 付款整合到單一 timeline 的 payment shape (embedded in booking) */
+interface BookingPayment {
   id: string;
-  bookingId: string;
   amount: number;
   method: "CASH" | "BANK_TRANSFER" | "CREDIT_CARD" | string;
   status: "PENDING" | "VERIFYING" | "RECEIVED" | "WAIVED" | string;
   transferLastFive: string | null;
   verifiedAt: string | null;
   receivedAt: string | null;
-  notes: string | null;
   createdAt: string;
-  bookingDate: string | null;
-  bookingStartTime: string | null;
-  serviceName: string | null;
+  notes: string | null;
+}
+
+interface BookingWithPayment {
+  id: string;
+  date: string;
+  startTime: string;
+  status: string;
+  settledAt: string | null;
+  service: { name: string; price: number };
+  payment: BookingPayment | null;
 }
 
 interface CustomerDetail {
@@ -40,13 +46,7 @@ interface CustomerDetail {
   firstVisitAt: string | null;
   birthday: string | null;
   notes: string | null;
-  bookings: Array<{
-    id: string;
-    date: string;
-    startTime: string;
-    status: string;
-    service: { name: string; price: number };
-  }>;
+  bookings: BookingWithPayment[];
 }
 
 interface Stats {
@@ -73,6 +73,18 @@ function formatRelativeDate(dateStr: string | null): string {
   if (days < 30) return `${days} 天前`;
   if (days < 365) return `${Math.floor(days / 30)} 個月前`;
   return `${Math.floor(days / 365)} 年前`;
+}
+
+/** Asia/Taipei 下的 "YYYY/M/D"（如 "2024/5/3"）— 客戶歷史資料橫跨多年，必須含年份 */
+function formatYMD(dateStr: string): string {
+  // en-CA + numeric → "2024-5-3"，再轉成 "/"
+  const parts = new Date(dateStr).toLocaleDateString("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+  return parts.replace(/-/g, "/");
 }
 
 const SEGMENT_STYLE: Record<string, string> = {
@@ -108,7 +120,6 @@ export default function CustomerDetailPage({
   const { data, mutate } = useSWR(`/api/customers/${id}`, fetcher);
   const customer: CustomerDetail | null = data?.customer || null;
   const stats: Stats | null = data?.stats || null;
-  const payments: PaymentRow[] = data?.payments || [];
 
   // V3.7 §E — correction modal state. paymentId == null means closed.
   const [correctionPaymentId, setCorrectionPaymentId] = useState<string | null>(null);
@@ -344,32 +355,6 @@ export default function CustomerDetailPage({
         )}
       </div>
 
-      {/* V3.7 §E — Payment history. Last-5 transfer locked, "修正" appends to notes. */}
-      {payments.length > 0 && (
-        <div className="mb-4">
-          <p className="text-xs font-medium text-[var(--color-text-muted)] tracking-wider mb-2">
-            付款記錄（{payments.length}）
-          </p>
-          <div className="bg-[var(--color-surface)] rounded-xl divide-y divide-[var(--color-text-disabled)]/20">
-            {payments.slice(0, 12).map((p) => (
-              <PaymentRowItem
-                key={p.id}
-                payment={p}
-                onEdit={() => {
-                  setCorrectionPaymentId(p.id);
-                  setCorrectionReason("");
-                }}
-              />
-            ))}
-            {payments.length > 12 && (
-              <p className="text-[10px] text-[var(--color-text-muted)] text-center py-2">
-                共 {payments.length} 筆，僅顯示最新 12 筆
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Notes (Timeline) */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
@@ -423,26 +408,26 @@ export default function CustomerDetailPage({
         )}
       </div>
 
-      {/* Booking History */}
+      {/* 預約 & 付款記錄（整合 timeline）— V3.x 把舊「預約歷史」+「付款記錄」合併成一筆一卡 */}
       <div className="mb-4">
-        <p className="text-xs font-medium text-[var(--color-text-muted)] tracking-wider mb-2">預約歷史</p>
+        <p className="text-xs font-medium text-[var(--color-text-muted)] tracking-wider mb-2">
+          預約 & 付款記錄
+        </p>
         {customer.bookings.length > 0 ? (
-          <div className="space-y-1">
-            {customer.bookings.slice(0, 10).map((b) => (
-              <div key={b.id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[var(--color-surface)] transition-colors">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs">{STATUS_ICON[b.status] || "🔵"}</span>
-                  <span className="text-sm text-[var(--color-text-body)]">
-                    {new Date(b.date).toLocaleDateString("zh-TW", { month: "numeric", day: "numeric" })}
-                  </span>
-                  <span className="text-sm text-[var(--color-text-muted)]">{b.service.name}</span>
-                </div>
-                <span className="text-sm text-[var(--color-text-body)]">NT${b.service.price.toLocaleString()}</span>
-              </div>
+          <div className="bg-[var(--color-surface)] rounded-xl divide-y divide-[var(--color-text-disabled)]/20">
+            {customer.bookings.slice(0, 20).map((b) => (
+              <BookingPaymentRow
+                key={b.id}
+                booking={b}
+                onEditPayment={(paymentId) => {
+                  setCorrectionPaymentId(paymentId);
+                  setCorrectionReason("");
+                }}
+              />
             ))}
-            {customer.bookings.length > 10 && (
-              <p className="text-xs text-[var(--color-text-muted)] text-center py-2">
-                共 {customer.bookings.length} 筆
+            {customer.bookings.length > 20 && (
+              <p className="text-[10px] text-[var(--color-text-muted)] text-center py-2">
+                共 {customer.bookings.length} 筆，僅顯示最新 20 筆
               </p>
             )}
           </div>
@@ -536,63 +521,106 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
   CREDIT_CARD: "刷卡",
 };
 
-function PaymentRowItem({
-  payment,
-  onEdit,
+/**
+ * 一筆預約 + 對應付款的整合 row。
+ * 上半：預約資訊（日期、品項、金額、狀態 icon）
+ * 下半：付款資訊（付款日期、方式、末五碼、對帳狀態） — 沒付款就顯示 placeholder
+ */
+function BookingPaymentRow({
+  booking,
+  onEditPayment,
 }: {
-  payment: PaymentRow;
-  onEdit: () => void;
+  booking: BookingWithPayment;
+  onEditPayment: (paymentId: string) => void;
 }) {
-  const status = PAYMENT_STATUS_LABEL[payment.status] ?? {
-    label: payment.status,
-    tone: "text-[var(--color-text-muted)]",
-  };
-  const dateAnchor = payment.receivedAt ?? payment.verifiedAt ?? payment.createdAt;
-  const dateLabel = dateAnchor
-    ? new Date(dateAnchor).toLocaleDateString("zh-TW", {
-        timeZone: "Asia/Taipei",
-        month: "numeric",
-        day: "numeric",
-      })
-    : "—";
-  const correctionLines = (payment.notes ?? "")
+  // 顯示完整年份（2024/5/3 格式）— 因匯入歷史資料橫跨 2024/2025/2026，沒有年份會混淆
+  const bookingDateLabel = formatYMD(booking.date);
+  const statusIcon = STATUS_ICON[booking.status] ?? "🔵";
+  const isCancelledOrNoShow =
+    booking.status === "CANCELLED" ||
+    booking.status === "CANCELLED_BY_ADMIN" ||
+    booking.status === "NO_SHOW";
+
+  const payment = booking.payment;
+  const paymentStatus = payment
+    ? PAYMENT_STATUS_LABEL[payment.status] ?? {
+        label: payment.status,
+        tone: "text-[var(--color-text-muted)]",
+      }
+    : null;
+  const paymentDateAnchor = payment
+    ? payment.receivedAt ?? payment.verifiedAt ?? payment.createdAt
+    : null;
+  const paymentDateLabel = paymentDateAnchor ? formatYMD(paymentDateAnchor) : "—";
+  const correctionLines = (payment?.notes ?? "")
     .split("\n")
     .map((s) => s.trim())
     .filter(Boolean);
 
+  // 對帳狀態：booking.settledAt 為「老闆已對帳」的硬證據
+  const settled = booking.settledAt != null;
+
   return (
     <div className="px-4 py-3">
+      {/* 預約資訊 */}
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-[var(--color-text-muted)] tabular-nums shrink-0 w-12">
-          {dateLabel}
+        <span className="text-xs shrink-0">{statusIcon}</span>
+        <span className="text-[11px] text-[var(--color-text-muted)] tabular-nums shrink-0 w-[5.5rem]">
+          {bookingDateLabel}
         </span>
         <span className="text-sm text-[var(--color-text-primary)] flex-1 truncate">
-          {payment.serviceName ?? "—"}
+          {booking.service.name}
         </span>
         <span className="text-sm font-semibold tabular-nums text-[var(--color-text-primary)]">
-          NT${payment.amount.toLocaleString()}
+          NT${booking.service.price.toLocaleString()}
         </span>
       </div>
-      <div className="flex items-center gap-2 mt-1.5 text-[11px]">
-        <span className="text-[var(--color-text-muted)]">
-          {PAYMENT_METHOD_LABEL[payment.method] ?? payment.method}
-        </span>
-        {payment.transferLastFive && (
-          <span className="font-mono tabular-nums text-[var(--color-text-body)]">
-            末五·{payment.transferLastFive}
-          </span>
-        )}
-        <span className={`${status.tone} font-medium`}>{status.label}</span>
-        <button
-          onClick={onEdit}
-          className="ml-auto inline-flex items-center gap-0.5 text-[var(--color-brand)] hover:opacity-80"
-        >
-          <Pencil size={11} strokeWidth={1.5} />
-          修正
-        </button>
-      </div>
+
+      {/* 付款資訊（取消/未到 → 不顯示；其他 → 顯示 payment row 或 placeholder）*/}
+      {!isCancelledOrNoShow && (
+        <div className="mt-1.5 ml-6 flex items-center gap-2 text-[11px]">
+          {payment && paymentStatus ? (
+            <>
+              <span className="text-[var(--color-text-muted)] tabular-nums shrink-0 w-[5.5rem]">
+                {paymentDateLabel}
+              </span>
+              <span className="text-[var(--color-text-muted)]">
+                {PAYMENT_METHOD_LABEL[payment.method] ?? payment.method}
+              </span>
+              {payment.transferLastFive && (
+                <span className="font-mono tabular-nums text-[var(--color-text-body)]">
+                  末五·{payment.transferLastFive}
+                </span>
+              )}
+              <span className={`${paymentStatus.tone} font-medium`}>
+                {paymentStatus.label}
+              </span>
+              <span
+                className={
+                  settled
+                    ? "text-[var(--color-success)] font-medium"
+                    : "text-[var(--color-warning)] font-medium"
+                }
+              >
+                {settled ? "已對帳" : "未對帳"}
+              </span>
+              <button
+                onClick={() => onEditPayment(payment.id)}
+                className="ml-auto inline-flex items-center gap-0.5 text-[var(--color-brand)] hover:opacity-80"
+              >
+                <Pencil size={11} strokeWidth={1.5} />
+                修正
+              </button>
+            </>
+          ) : (
+            <span className="text-[var(--color-text-muted)]">尚無付款記錄</span>
+          )}
+        </div>
+      )}
+
+      {/* 付款修正記錄（從 payment.notes 解析）*/}
       {correctionLines.length > 0 && (
-        <div className="mt-2 pl-2 border-l-2 border-[var(--color-warning)]/40 space-y-0.5">
+        <div className="mt-2 ml-6 pl-2 border-l-2 border-[var(--color-warning)]/40 space-y-0.5">
           {correctionLines.map((line, i) => (
             <p
               key={i}

@@ -93,8 +93,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return Response.json({ error: "只能改期已確認的預約" }, { status: 400 });
     }
 
-    // Reschedule policy: line reschedule allowed any time before appointment;
-    // < 2h adds a violation to the user's record (same tier as no-show).
+    // Reschedule policy (老闆訪談 §3 / Roadmap F04):
+    // 改期完全開放 — 無時間限制，無違規（只有 No-show 算違規）。
+    // 唯一限制：appointment 已結束就不能改期。
     const bookingDateStr = booking.date.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
     const [bY, bM, bD] = bookingDateStr.split("-").map(Number);
     const [bH] = booking.startTime.split(":").map(Number);
@@ -108,8 +109,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         { status: 400 }
       );
     }
-
-    const isVeryLateReschedule = hoursUntil < 2;
 
     // Calculate new end time
     const newEndTime = addHours(input.startTime, booking.service.slotsNeeded);
@@ -147,39 +146,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const oldStartTime = booking.startTime;
       const oldEndTime = booking.endTime;
 
-      // Atomic update + (optional) violation increment (PRD-v3 E-3).
-      // Without a transaction, a partial failure would leave the booking
-      // moved but the violation un-recorded.
-      await prisma.$transaction([
-        prisma.booking.update({
-          where: { id },
-          data: {
-            date: newDateObj,
-            startTime: input.startTime,
-            endTime: newEndTime,
-            // Reset admin ack: the time/day moved, so the prior confirmation
-            // doesn't carry over to the new slot. Admin re-acks via the push notif.
-            adminAcknowledgedAt: null,
-          },
-        }),
-        ...(isVeryLateReschedule
-          ? [
-              prisma.user.update({
-                where: { id: booking.userId },
-                data: { violationCount: { increment: 1 } },
-              }),
-            ]
-          : []),
-      ]);
+      await prisma.booking.update({
+        where: { id },
+        data: {
+          date: newDateObj,
+          startTime: input.startTime,
+          endTime: newEndTime,
+          // Reset admin ack: the time/day moved, so the prior confirmation
+          // doesn't carry over to the new slot. Admin re-acks via the push notif.
+          adminAcknowledgedAt: null,
+        },
+      });
 
       // ─── Cache writes BEFORE notifications (codex P1 + P2 fix) ───
       // The 10s row-lock lease can expire if Vercel cold-starts the LINE
       // notification path. By writing idempotency + undo cache first, a retry
       // that arrives after lock expiry hits the idempotency cache instead of
-      // re-executing (which would double-increment violations + double-notify).
+      // re-executing (which would double-notify).
 
-      // Store undo snapshot, including wasLateReschedule so undo can roll back
-      // the violation (codex P2 fix #5).
+      // Store undo snapshot for the 30s undo toast (PRD-v3 E-5).
       const undoStored = await storeIdempotentResult(
         UNDO_SCOPE,
         id,
@@ -189,7 +174,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           oldEndTime,
           newDate: input.date,
           newStartTime: input.startTime,
-          wasLateReschedule: isVeryLateReschedule,
         },
         UNDO_TTL_SECONDS,
       );
