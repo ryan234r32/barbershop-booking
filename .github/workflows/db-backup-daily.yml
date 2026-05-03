@@ -1,0 +1,86 @@
+name: db-backup-daily
+# V3.8 P0 prevention (5/1 incident):
+# 每天 03:00 UTC (11:00 Taipei) 跑 pg_dump，存成 GitHub Actions artifact
+# 保留 90 天。下次資料災難可一鍵 restore。
+#
+# 救援指令：
+#   1. GitHub UI → Actions → db-backup-daily → 找日期 → 下載 artifact
+#   2. gunzip backup-YYYY-MM-DD.sql.gz
+#   3. psql $DIRECT_URL < backup-YYYY-MM-DD.sql
+#
+# 或用 scripts/restore-from-backup.sh（半自動）
+
+on:
+  schedule:
+    # 03:00 UTC = 11:00 Taipei，剛好錯開 cron jobs (1:00 reminders / 19:00 cleanup)
+    - cron: '0 3 * * *'
+  workflow_dispatch:  # 允許手動觸發（demo 前測試 / 災難時臨時 backup）
+    inputs:
+      reason:
+        description: 'why is this manual run? (audit trail)'
+        required: false
+        default: 'manual trigger'
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install postgresql-client matching Supabase server (PG 17)
+        run: |
+          # Ubuntu default postgresql-client is older than Supabase PG 17; install matching version
+          sudo apt-get update
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+          pg_dump --version
+
+      - name: Compute backup filename
+        id: filename
+        run: |
+          # 用 Taipei date (UTC+8) 命名，避開 UTC 23:XX 的 off-by-one
+          STAMP=$(TZ=Asia/Taipei date +%Y-%m-%d_%H%M)
+          echo "name=barbershop-backup-${STAMP}" >> $GITHUB_OUTPUT
+          echo "Computed: barbershop-backup-${STAMP}"
+
+      - name: pg_dump (uses DIRECT_URL, port 5432, no pgbouncer timeout)
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: |
+          if [ -z "$DIRECT_URL" ]; then
+            echo "✗ secrets.DIRECT_URL is not set."
+            echo "  → GitHub repo Settings → Secrets and variables → Actions → New repository secret"
+            echo "  → Name: DIRECT_URL"
+            echo "  → Value: postgresql://...:5432/postgres (Supabase 'Direct connection', NOT pooler 6543)"
+            exit 1
+          fi
+          # --no-owner / --no-acl: portable backup (works even if restore target has different roles)
+          # --clean / --if-exists: makes restore idempotent (drops then recreates, safe to run twice)
+          pg_dump "$DIRECT_URL" \
+            --no-owner --no-acl --clean --if-exists \
+            --format=plain \
+            > backup.sql
+          gzip -9 backup.sql
+          ls -lh backup.sql.gz
+
+      - name: Upload backup as artifact (90-day retention)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.filename.outputs.name }}
+          path: backup.sql.gz
+          retention-days: 90
+          compression-level: 0  # already gzipped
+
+      - name: Summary
+        run: |
+          SIZE=$(ls -lh backup.sql.gz | awk '{print $5}')
+          echo "## ✅ Backup complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- File: \`${{ steps.filename.outputs.name }}.sql.gz\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Size: ${SIZE}" >> $GITHUB_STEP_SUMMARY
+          echo "- Retention: 90 days" >> $GITHUB_STEP_SUMMARY
+          echo "- Restore: see \`scripts/restore-from-backup.sh\`" >> $GITHUB_STEP_SUMMARY

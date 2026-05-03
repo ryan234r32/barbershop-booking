@@ -850,3 +850,42 @@ model DailyCloseSnapshot {
   @@index([tenantId, closedAt])
   @@map("daily_close_snapshots")
 }
+
+/// V3.8 P0 prevention (5/1 incident): 攔截所有 destructive ops
+/// (deleteMany / updateMany / executeRaw / executeRawUnsafe) 寫進 audit log。
+/// 下次資料異常時可立刻查「誰幾點刪了什麼」。
+///
+/// Executor 來源：env var EXECUTED_BY，未設則記 'unknown'。
+/// 所有 admin script 跑前該 export EXECUTED_BY=ryan-2026-05-03-import 之類 ID。
+model AuditLog {
+  id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+
+  /// "Booking" / "User" / "Payment" / "$executeRaw" / etc
+  model String
+
+  /// "deleteMany" / "updateMany" / "$executeRaw" / "$executeRawUnsafe"
+  action String
+
+  /// rows affected (deleteMany.count / updateMany.count / executeRaw return)
+  count Int
+
+  /// process.env.EXECUTED_BY ?? 'unknown'（手動 script）
+  /// 對 web request 是 admin name + IP（之後可加）
+  executor String
+
+  /// JSON-stringified args (filter conditions, set values etc)
+  /// truncated to 4KB to avoid PG row size issues
+  args Json?
+
+  /// duration in ms (sanity check：3 秒砍 1614 筆 != 正常用法)
+  durationMs Int? @map("duration_ms")
+
+  /// 'success' / 'error: <message>'
+  status String @default("success")
+
+  @@index([timestamp])
+  @@index([model, action])
+  @@index([executor])
+  @@map("audit_logs")
+}
