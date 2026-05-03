@@ -64,8 +64,15 @@ export function errorResponse(error: unknown) {
     );
   }
   console.error("Unexpected error:", error);
+  // V3.8 incident response: 給用戶具體可行的 fallback 指示，不只是「系統錯誤」
+  // FALLBACK_PHONE 從 env 讀（不寫死於 code，部署時 Vercel env 設）
+  const fallbackPhone = process.env.NEXT_PUBLIC_FALLBACK_PHONE ?? "02-2396-2306";
   return Response.json(
-    { error: "系統錯誤，請稍後再試" },
+    {
+      error: "系統暫時無法處理此操作，請稍後再試",
+      hint: `若情況持續，請直接打 ${fallbackPhone}`,
+      code: "INTERNAL_ERROR",
+    },
     { status: 500 }
   );
 }

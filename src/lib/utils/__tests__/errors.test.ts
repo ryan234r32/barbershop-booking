@@ -103,13 +103,15 @@ describe("errorResponse", () => {
       errorResponse(new Error("unexpected"))
     );
     expect(status).toBe(500);
-    expect(body.error).toBe("系統錯誤，請稍後再試");
-    expect(body.code).toBeUndefined();
+    expect(body.error).toBe("系統暫時無法處理此操作，請稍後再試");
+    expect(body.code).toBe("INTERNAL_ERROR");
+    expect(body.hint).toContain("打");
   });
 
   it("handles non-Error objects as 500", async () => {
     const { status, body } = await parseResponse(errorResponse("string error"));
     expect(status).toBe(500);
-    expect(body.error).toBe("系統錯誤，請稍後再試");
+    expect(body.error).toBe("系統暫時無法處理此操作，請稍後再試");
+    expect(body.code).toBe("INTERNAL_ERROR");
   });
 });
