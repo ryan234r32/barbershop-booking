@@ -170,8 +170,18 @@ export function ExpenseEntrySheet({
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-[var(--color-text-body)]/50 z-50 backdrop-blur-sm" />
         <Drawer.Content
-          className="fixed inset-0 z-50 bg-[var(--color-bg)] outline-none flex flex-col h-[100dvh] focus:outline-none"
-          style={{ touchAction: "pan-y", overscrollBehavior: "none" }}
+          // V3.8 fix (5/3 user report)：vaul Drawer.Content 對 fullscreen 用
+          // inset-0 在 iOS PWA 跑版（content 整體往左偏 ~30px）。
+          // 改用 explicit top/left/right/bottom + width: 100vw + transform: none
+          // 強制覆蓋 vaul 預設的 inline style 避免 horizontal offset。
+          className="fixed top-0 left-0 right-0 bottom-0 z-50 bg-[var(--color-bg)] outline-none flex flex-col h-[100dvh] focus:outline-none"
+          style={{
+            touchAction: "pan-y",
+            overscrollBehavior: "none",
+            width: "100vw",
+            maxWidth: "100vw",
+            transform: "none",
+          }}
         >
           {/* Sticky header */}
           <div
