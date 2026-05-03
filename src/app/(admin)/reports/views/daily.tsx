@@ -6,7 +6,30 @@ import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { MCard } from "@/components/admin/reports/v3.6/m-card";
 import { DateStrip } from "@/components/admin/reports/v3.6/date-strip";
 import { NewBookingSheet } from "@/components/admin/new-booking-sheet";
+import { ExpenseEntrySheet } from "@/components/admin/expense-entry-sheet";
+import { DailyCloseSheet } from "@/components/admin/daily-close-sheet";
+import { CATEGORY_LABELS, type ExpenseCategory } from "@/lib/expenses/categories";
 import type { DailyView, DailyBookingRow } from "@/lib/reports/v3.6/aggregates";
+
+interface ExpenseRowData {
+  id: string;
+  date: string;
+  amount: number;
+  category: ExpenseCategory;
+  type: "FIXED" | "VARIABLE";
+  paidMethod: "CASH" | "BANK_TRANSFER";
+  notes: string | null;
+  createdAt: string;
+  recurringRule: { id: string; name: string } | null;
+}
+
+interface ExpensesResponse {
+  from: string;
+  to: string;
+  count: number;
+  totalAmount: number;
+  expenses: ExpenseRowData[];
+}
 
 interface DailyResponse {
   view: "daily";
@@ -33,6 +56,26 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
   );
   const [filter, setFilter] = useState<"all" | "pending" | "warning">("all");
   const [backfillOpen, setBackfillOpen] = useState(false);
+  const [expenseSheetOpen, setExpenseSheetOpen] = useState(false);
+  const [closeSheetOpen, setCloseSheetOpen] = useState(false);
+
+  // V3.7 §1 — today's expenses for the selected date.
+  const {
+    data: expensesData,
+    mutate: mutateExpenses,
+  } = useSWR<ExpensesResponse>(
+    `/api/expenses?from=${date}&to=${date}`,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+  const expenses = expensesData?.expenses ?? [];
+  const expenseTotal = expensesData?.totalAmount ?? 0;
+  const expenseCash = expenses
+    .filter((e) => e.paidMethod === "CASH")
+    .reduce((s, e) => s + e.amount, 0);
+  const expenseBank = expenses
+    .filter((e) => e.paidMethod === "BANK_TRANSFER")
+    .reduce((s, e) => s + e.amount, 0);
 
   // Optimistic settle: track ids the user just clicked. UI marks them as
   // settled instantly; we still hit the API and SWR refetches in the background.
@@ -172,22 +215,18 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
     mutate();
   };
 
-  const dayClose = async () => {
+  /**
+   * V3.7 — open the rich DailyCloseSheet instead of the legacy 1-click flow.
+   * Legacy POST is still available (the API supports both shapes); kept inline
+   * here only as the fallback for the "list still has pending bookings" case.
+   */
+  const openCloseSheet = () => {
     if (!data) return;
     if (data.data.pendingCount > 0) {
       alert(`還有 ${data.data.pendingCount} 筆未對帳，請先確認`);
       return;
     }
-    if (!confirm("確定結班？結束後當日資料鎖定，不能直接編輯（可從補登流程進入）")) return;
-    const res = await fetch("/api/admin/day-close", {
-      method: "POST",
-      headers: adminHeaders(),
-      body: JSON.stringify({ date }),
-    });
-    if (res.ok) {
-      window.print();
-      mutate();
-    }
+    setCloseSheetOpen(true);
   };
 
   const reopen = async () => {
@@ -284,6 +323,20 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
         />
       </div>
 
+      {/* V3.7 §1 — 支出 / 淨利 (cash + bank breakdown beneath payment row) */}
+      <div className="grid grid-cols-2 gap-3">
+        <ExpenseSummaryCard
+          total={expenseTotal}
+          count={expenses.length}
+          cash={expenseCash}
+          bank={expenseBank}
+        />
+        <NetProfitCard
+          revenue={d.totalRevenue}
+          expense={expenseTotal}
+        />
+      </div>
+
       <MCard padding="md">
         <div className="flex items-center justify-between mb-3 gap-2">
           <p className="text-sm font-semibold text-[var(--color-text-primary)]">今日預約對帳</p>
@@ -315,6 +368,44 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
         )}
       </MCard>
 
+      {/* V3.7 §1 — 今日支出列表 */}
+      <MCard padding="md">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+            今日支出
+            {expenses.length > 0 && (
+              <span className="ml-2 text-xs font-normal text-[var(--color-text-muted)]">
+                {expenses.length} 筆 · NT${expenseTotal.toLocaleString()}
+              </span>
+            )}
+          </p>
+          {!d.isClosed && (
+            <button
+              onClick={() => setExpenseSheetOpen(true)}
+              className="text-xs font-semibold text-[var(--color-brand)] hover:opacity-80"
+            >
+              + 新增支出
+            </button>
+          )}
+        </div>
+        {expenses.length === 0 ? (
+          <p className="text-center text-xs text-[var(--color-text-muted)] py-6">
+            無支出記錄
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {expenses.map((e) => (
+              <ExpenseRow
+                key={e.id}
+                expense={e}
+                isClosed={d.isClosed}
+                onDeleted={() => mutateExpenses()}
+              />
+            ))}
+          </div>
+        )}
+      </MCard>
+
       {!d.isClosed && (
         <button
           onClick={() => setBackfillOpen(true)}
@@ -329,7 +420,7 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
 
       {!d.isClosed ? (
         <button
-          onClick={dayClose}
+          onClick={openCloseSheet}
           disabled={d.pendingCount > 0}
           className={`w-full px-4 py-4 rounded-xl text-base font-bold transition-colors ${
             d.pendingCount > 0
@@ -338,8 +429,8 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
           }`}
         >
           {d.pendingCount > 0
-            ? `還有 ${d.pendingCount} 筆待確認 · 完成後可結班`
-            : "✓ 結束今天 · 產出對帳單 PDF"}
+            ? `還有 ${d.pendingCount} 筆待確認 · 完成後可結帳`
+            : "✓ 完成今日結帳"}
         </button>
       ) : (
         <div className="space-y-2">
@@ -379,6 +470,48 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
           mutate();
         }}
       />
+
+      {/* V3.7 §1 — Expense entry sheet */}
+      <ExpenseEntrySheet
+        open={expenseSheetOpen}
+        onOpenChange={setExpenseSheetOpen}
+        defaultDate={date}
+        onCreated={() => {
+          mutateExpenses();
+        }}
+      />
+
+      {/* V3.7 §3 — Daily close sheet (rich reconciliation) */}
+      <DailyCloseSheet
+        open={closeSheetOpen}
+        onOpenChange={setCloseSheetOpen}
+        date={date}
+        expectedCash={d.cashTotal - expenseCash}
+        expectedBank={d.bankTotal - expenseBank}
+        totalRevenue={d.totalRevenue}
+        totalExpense={expenseTotal}
+        bookingCount={d.rows.length}
+        expenseCount={expenses.length}
+        onClosed={() => {
+          mutate();
+          mutateExpenses();
+        }}
+      />
+
+      {/* V3.7 §1 — Floating Action Button. Sits above the bottom tab bar
+          (~64px tall) — 14 + 64 + 8 safe = bottom-20 on iOS PWA. */}
+      {!d.isClosed && (
+        <button
+          onClick={() => setExpenseSheetOpen(true)}
+          aria-label="新增支出"
+          className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-[var(--color-brand)] text-[var(--color-bg)] shadow-xl flex items-center justify-center hover:opacity-90 active:scale-95 transition-all"
+          style={{ boxShadow: "0 8px 24px rgba(0, 61, 43, 0.35)" }}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
@@ -467,6 +600,133 @@ function formatRevenue(rev: number): string {
   if (rev >= 100000) return `${Math.round(rev / 1000)}k`;
   if (rev >= 10000) return `${(rev / 10000).toFixed(1)}萬`;
   return rev.toLocaleString();
+}
+
+/** V3.7 §1 — today's expense total card with cash/bank breakdown. */
+function ExpenseSummaryCard({
+  total,
+  count,
+  cash,
+  bank,
+}: {
+  total: number;
+  count: number;
+  cash: number;
+  bank: number;
+}) {
+  return (
+    <MCard padding="md">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-lg">📋</span>
+        <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+          支出
+        </p>
+      </div>
+      <p className="text-2xl font-bold tabular-nums text-[var(--color-danger)]">
+        {total > 0 ? `-${total.toLocaleString()}` : "0"}
+      </p>
+      <p className="text-[10px] text-[var(--color-text-muted)] mt-1 tabular-nums">
+        {count > 0 ? `現金 ${cash} · 轉帳 ${bank}` : "尚無支出"}
+      </p>
+    </MCard>
+  );
+}
+
+/** V3.7 §1 — today's net profit (revenue − expense). */
+function NetProfitCard({
+  revenue,
+  expense,
+}: {
+  revenue: number;
+  expense: number;
+}) {
+  const net = revenue - expense;
+  const tone = net >= 0 ? "var(--color-brand)" : "var(--color-danger)";
+  return (
+    <MCard padding="md">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-lg">💰</span>
+        <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+          淨利
+        </p>
+      </div>
+      <p
+        className="text-2xl font-bold tabular-nums"
+        style={{ color: tone }}
+      >
+        {net.toLocaleString()}
+      </p>
+      <p className="text-[10px] text-[var(--color-text-muted)] mt-1 tabular-nums">
+        營收 {revenue.toLocaleString()} − 支出 {expense.toLocaleString()}
+      </p>
+    </MCard>
+  );
+}
+
+/** V3.7 §1 — single expense row. Long-press / chevron tap reveals delete. */
+function ExpenseRow({
+  expense,
+  isClosed,
+  onDeleted,
+}: {
+  expense: ExpenseRowData;
+  isClosed: boolean;
+  onDeleted: () => void;
+}) {
+  const handleDelete = async () => {
+    if (!confirm(`刪除這筆支出 NT$${expense.amount.toLocaleString()}？`)) return;
+    const res = await fetch(`/api/expenses/${expense.id}`, {
+      method: "DELETE",
+      headers: adminHeaders(),
+    });
+    if (res.ok) onDeleted();
+    else alert("刪除失敗");
+  };
+  return (
+    <div className="flex items-center gap-3 py-2 px-1 border-b border-[var(--color-surface)] last:border-b-0">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-medium text-[var(--color-text-primary)] truncate">
+            {CATEGORY_LABELS[expense.category]}
+          </span>
+          {expense.type === "FIXED" && (
+            <span className="text-[9px] px-1 rounded bg-[var(--color-surface)] text-[var(--color-text-muted)] flex-shrink-0">
+              固定
+            </span>
+          )}
+          {expense.recurringRule && (
+            <span className="text-[9px] px-1 rounded bg-[var(--color-brand)]/10 text-[var(--color-brand)] flex-shrink-0">
+              定期
+            </span>
+          )}
+        </div>
+        {expense.notes && (
+          <p className="text-[11px] text-[var(--color-text-muted)] truncate mt-0.5">
+            {expense.notes}
+          </p>
+        )}
+      </div>
+      <div className="text-right flex-shrink-0">
+        <p className="text-sm font-bold tabular-nums text-[var(--color-danger)]">
+          -{expense.amount.toLocaleString()}
+        </p>
+        <p className="text-[10px] text-[var(--color-text-muted)]">
+          {expense.paidMethod === "CASH" ? "💵" : "🏦"}
+        </p>
+      </div>
+      {!isClosed && !expense.recurringRule && (
+        <button
+          onClick={handleDelete}
+          aria-label="刪除"
+          className="w-6 h-6 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-danger)] flex-shrink-0"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
 }
 
 function PaymentCard({

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import useSWR from "swr";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { MCard } from "@/components/admin/reports/v3.6/m-card";
@@ -64,11 +65,52 @@ interface MonthlyViewProps {
   onPeriodChange: (next: string) => void;
 }
 
+interface MonthRangeMeta {
+  from: string;
+  to: string;
+  daysInMonth: number;
+}
+
+function monthRange(period: string): MonthRangeMeta {
+  const [y, m] = period.split("-").map((s) => parseInt(s, 10));
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    from: `${y}-${pad(m)}-01`,
+    to: `${y}-${pad(m)}-${pad(daysInMonth)}`,
+    daysInMonth,
+  };
+}
+
 export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
   const { data, error, isLoading } = useSWR<MonthlyResponse>(
     `/api/reports/v3.6?view=monthly&period=${period}`,
     fetcher,
     { revalidateOnFocus: false },
+  );
+
+  // V3.7 §E — fetch expenses + day-close snapshots in parallel.
+  const range = useMemo(() => monthRange(period), [period]);
+  const { data: expensesData } = useSWR<{ totalAmount: number; expenses: Array<{ amount: number; type: "FIXED" | "VARIABLE" }> }>(
+    `/api/expenses?from=${range.from}&to=${range.to}`,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+  const { data: closesData } = useSWR<{ snapshots: Array<{ date: string; netProfit: number; cashDiff: number; bankConfirmed: boolean }> }>(
+    `/api/admin/day-close?from=${range.from}&to=${range.to}`,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+  const expenseTotal = expensesData?.totalAmount ?? 0;
+  const expenseFixed = (expensesData?.expenses ?? [])
+    .filter((e) => e.type === "FIXED")
+    .reduce((s, e) => s + e.amount, 0);
+  const expenseVariable = (expensesData?.expenses ?? [])
+    .filter((e) => e.type === "VARIABLE")
+    .reduce((s, e) => s + e.amount, 0);
+  const closedDates = new Set(closesData?.snapshots.map((s) => s.date) ?? []);
+  const closesWithDiff = (closesData?.snapshots ?? []).filter(
+    (s) => s.cashDiff !== 0,
   );
 
   if (isLoading || !data) {
@@ -175,6 +217,62 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
               dangerouslySetInnerHTML={{ __html: renderMarkdownBold(data.summaryText) }}
             />
           </MCard>
+
+          {/* V3.7 §E — 支出 / 淨利 / 結帳天數 row */}
+          <div className="grid grid-cols-3 gap-3">
+            <MCard padding="md">
+              <p className="text-[10px] tracking-wider text-[var(--color-text-muted)] uppercase">
+                本月支出
+              </p>
+              <p className="text-xl font-bold tabular-nums text-[var(--color-danger)] mt-1">
+                -{expenseTotal.toLocaleString()}
+              </p>
+              <p className="text-[10px] text-[var(--color-text-muted)] mt-1 tabular-nums">
+                固定 {expenseFixed.toLocaleString()} · 變動 {expenseVariable.toLocaleString()}
+              </p>
+            </MCard>
+            <MCard padding="md">
+              <p className="text-[10px] tracking-wider text-[var(--color-text-muted)] uppercase">
+                本月淨利
+              </p>
+              <p
+                className="text-xl font-bold tabular-nums mt-1"
+                style={{
+                  color:
+                    revenue - expenseTotal >= 0
+                      ? "var(--color-brand)"
+                      : "var(--color-danger)",
+                }}
+              >
+                {(revenue - expenseTotal).toLocaleString()}
+              </p>
+              <p className="text-[10px] text-[var(--color-text-muted)] mt-1">
+                淨利率 {revenue > 0 ? (((revenue - expenseTotal) / revenue) * 100).toFixed(1) : "—"}%
+              </p>
+            </MCard>
+            <MCard padding="md">
+              <p className="text-[10px] tracking-wider text-[var(--color-text-muted)] uppercase">
+                結帳天數
+              </p>
+              <p className="text-xl font-bold tabular-nums text-[var(--color-text-primary)] mt-1">
+                {closedDates.size}
+                <span className="text-sm font-normal text-[var(--color-text-muted)]">
+                  /{range.daysInMonth}
+                </span>
+              </p>
+              <p className="text-[10px] text-[var(--color-text-muted)] mt-1">
+                {closesWithDiff.length > 0 ? `${closesWithDiff.length} 天有差異` : "全部準時對上"}
+              </p>
+            </MCard>
+          </div>
+
+          {/* V3.7 §E — Close-status month grid */}
+          <CloseStatusGrid
+            period={period}
+            daysInMonth={range.daysInMonth}
+            closedDates={closedDates}
+            diffDates={new Set(closesWithDiff.map((s) => s.date))}
+          />
 
           {/* ④ KPI 2×2 grid */}
           <div className="grid grid-cols-2 gap-3">
@@ -400,6 +498,90 @@ function SetTargetButton({
     >
       設定下月目標
     </button>
+  );
+}
+
+// ─── V3.7 §E — Close-status grid ────────────────────────────────────────
+
+function CloseStatusGrid({
+  period,
+  daysInMonth,
+  closedDates,
+  diffDates,
+}: {
+  period: string;
+  daysInMonth: number;
+  closedDates: Set<string>;
+  diffDates: Set<string>;
+}) {
+  const [year, month] = period.split("-").map((s) => parseInt(s, 10));
+  const todayStr = new Date().toLocaleDateString("en-CA", {
+    timeZone: "Asia/Taipei",
+  });
+  // Compute weekday of day-1 (Sun=0). Use Date.UTC + getUTCDay for TZ-safe.
+  const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+  const cells: Array<{ day: number; iso: string } | null> = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    cells.push({ day: d, iso });
+  }
+
+  return (
+    <MCard padding="md">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+          結帳狀態
+        </p>
+        <div className="flex items-center gap-3 text-[10px] text-[var(--color-text-muted)]">
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-[var(--color-success)]" />
+            已結帳
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-[var(--color-warning)]" />
+            有差異
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-[var(--color-text-disabled)]/40" />
+            未結
+          </span>
+        </div>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-[11px] tabular-nums">
+        {["日", "一", "二", "三", "四", "五", "六"].map((w) => (
+          <div
+            key={w}
+            className="text-center text-[10px] text-[var(--color-text-muted)] py-1"
+          >
+            {w}
+          </div>
+        ))}
+        {cells.map((c, i) => {
+          if (!c) return <div key={`b${i}`} />;
+          const isClosed = closedDates.has(c.iso);
+          const hasDiff = diffDates.has(c.iso);
+          const isFuture = c.iso > todayStr;
+          const isToday = c.iso === todayStr;
+          const bg = isFuture
+            ? "bg-transparent text-[var(--color-text-disabled)]"
+            : isClosed && hasDiff
+              ? "bg-[var(--color-warning)]/15 text-[var(--color-warning)] font-semibold"
+              : isClosed
+                ? "bg-[var(--color-success)]/15 text-[var(--color-success)] font-semibold"
+                : "bg-[var(--color-surface)] text-[var(--color-text-muted)]";
+          const ring = isToday ? "ring-2 ring-[var(--color-brand)]/40" : "";
+          return (
+            <div
+              key={c.iso}
+              className={`aspect-square rounded-md flex items-center justify-center ${bg} ${ring}`}
+            >
+              {c.day}
+            </div>
+          );
+        })}
+      </div>
+    </MCard>
   );
 }
 

@@ -28,21 +28,28 @@ export async function GET(request: NextRequest) {
     let totalSent = 0;
 
     for (const tenant of tenants) {
-      const bookings = await prisma.booking.findMany({
-        where: { tenantId: tenant.id, date: todayDate },
-        include: {
-          service: { select: { name: true, price: true } },
-          user: { select: { displayName: true } },
-        },
-        orderBy: { startTime: "asc" },
-      });
+      const [bookings, expenses] = await Promise.all([
+        prisma.booking.findMany({
+          where: { tenantId: tenant.id, date: todayDate },
+          include: {
+            service: { select: { name: true, price: true } },
+            user: { select: { displayName: true } },
+          },
+          orderBy: { startTime: "asc" },
+        }),
+        prisma.expense.findMany({
+          where: { tenantId: tenant.id, date: todayDate },
+          select: { amount: true },
+        }),
+      ]);
 
-      if (bookings.length === 0) continue;
+      if (bookings.length === 0 && expenses.length === 0) continue;
 
       const completed = bookings.filter((b) => b.status === "COMPLETED");
       const noShow = bookings.filter((b) => b.status === "NO_SHOW");
       const unresolved = bookings.filter((b) => b.status === "CONFIRMED");
       const revenue = completed.reduce((sum, b) => sum + b.service.price, 0);
+      const expenseTotal = expenses.reduce((s, e) => s + e.amount, 0);
 
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://barbershop-booking-swart.vercel.app";
 
@@ -61,8 +68,15 @@ export async function GET(request: NextRequest) {
           noShow: noShow.length,
           unresolved: unresolved.length,
           revenue,
+          // V3.7 §G — surface expenses + net profit in the daily LINE message.
+          expenseCount: expenses.length,
+          expenseTotal,
+          netProfit: revenue - expenseTotal,
         },
-        dashboardUrl: `${baseUrl}/dashboard`,
+        // V3.7 §G — deep-link to 財務/每日 (the new reconciliation hub) instead
+        // of the legacy /dashboard page. Uses ?view=daily&date= so a tap lands
+        // directly on today's reconciliation panel.
+        dashboardUrl: `${baseUrl}/reports?view=daily&date=${todayStr}`,
       });
 
       try {

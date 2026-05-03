@@ -34,16 +34,19 @@ model Tenant {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  users                User[]
-  services             Service[]
-  bookings             Booking[]
-  businessHours        BusinessHours[]
-  holidays             Holiday[]
-  adminUsers           AdminUser[]
-  notifications        Notification[]
-  messages             Message[]
-  consultationRequests ConsultationRequest[]
-  coupons              Coupon[]
+  users                 User[]
+  services              Service[]
+  bookings              Booking[]
+  businessHours         BusinessHours[]
+  holidays              Holiday[]
+  adminUsers            AdminUser[]
+  notifications         Notification[]
+  messages              Message[]
+  consultationRequests  ConsultationRequest[]
+  coupons               Coupon[]
+  expenses              Expense[]
+  expenseRecurringRules ExpenseRecurringRule[]
+  dailyCloseSnapshots   DailyCloseSnapshot[]
 
   quickReplies Json? @map("quick_replies")
 
@@ -733,4 +736,117 @@ enum PushStatus {
   SENT // 已送出
   SKIPPED // 因死忠客排除 / cooldown / 全店上限被跳過
   FAILED // LINE push API 失敗
+}
+
+// ============================================
+// V3.7 — EXPENSES (固定 / 變動支出)
+// ============================================
+
+/// V3.7 §1 — single-shop expense ledger. One row per actual paid expense.
+/// Recurring expenses materialise into rows via /api/cron/recurring-expenses.
+model Expense {
+  id       String   @id @default(uuid())
+  tenantId String   @map("tenant_id")
+  date     DateTime @db.Date
+
+  amount     Int // 整數 NTD（與 Booking/Payment.amount 一致）
+  category   String // 'consumables' | 'utilities' | 'rent' | 'equipment' | 'cleaning' | 'marketing' | 'tax' | 'other'
+  type       ExpenseType
+  paidMethod ExpensePaidMethod @default(CASH) @map("paid_method")
+  notes      String?
+  receiptUrl String?           @map("receipt_url") // Vercel Blob URL（V1 不上 OCR）
+
+  /// 若由定期規則產生，FK 至 ExpenseRecurringRule。一次性支出此欄為 null。
+  recurringRuleId String? @map("recurring_rule_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant        Tenant                @relation(fields: [tenantId], references: [id])
+  recurringRule ExpenseRecurringRule? @relation(fields: [recurringRuleId], references: [id])
+
+  @@index([tenantId, date])
+  @@index([tenantId, type, date])
+  @@map("expenses")
+}
+
+/// V3.7 §2 — recurring expense template. Cron walks this table daily and
+/// inserts an Expense row when today.day === dayOfMonth & active.
+model ExpenseRecurringRule {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+
+  name       String // "房租"、"水電費"
+  amount     Int
+  category   String
+  type       ExpenseType
+  paidMethod ExpensePaidMethod @default(BANK_TRANSFER) @map("paid_method")
+  notes      String?
+
+  dayOfMonth Int       @map("day_of_month") // 1-31; 月底特例 cron 內處理
+  startDate  DateTime  @map("start_date") @db.Date
+  endDate    DateTime? @map("end_date") @db.Date // null = forever
+  active     Boolean   @default(true)
+
+  /// 最近一次成功生成 Expense 的日期，用來防止 cron 重複建立
+  lastMaterialisedAt DateTime? @map("last_materialised_at") @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  expenses Expense[]
+
+  @@index([tenantId, active, dayOfMonth])
+  @@map("expense_recurring_rules")
+}
+
+enum ExpenseType {
+  FIXED // 房租、水電、保險（每月相對固定）
+  VARIABLE // 耗材、補貨、修理（金額不定）
+}
+
+enum ExpensePaidMethod {
+  CASH
+  BANK_TRANSFER
+}
+
+// ============================================
+// V3.7 — DAILY CLOSE SNAPSHOT (每日結帳對帳記錄)
+// ============================================
+
+/// V3.7 §3 — frozen snapshot per closed business day. Source of truth for
+/// "5/2 已結帳 23:14" UI + monthly view colour coding + 異常分析。
+model DailyCloseSnapshot {
+  id       String   @id @default(uuid())
+  tenantId String   @map("tenant_id")
+  date     DateTime @db.Date
+
+  /// 系統自動算的數字（rebuild safe, idempotent）
+  expectedCash Int @map("expected_cash") // 現金預約 - 現金支出
+  expectedBank Int @map("expected_bank") // 轉帳預約 - 轉帳支出
+
+  /// 老闆送出時親自確認的數字
+  actualCash    Int     @map("actual_cash")
+  cashDiff      Int     @map("cash_diff") // actual - expected
+  bankConfirmed Boolean @default(false) @map("bank_confirmed")
+
+  /// 結帳當下的明細數量（純展示用）
+  bookingCount Int @map("booking_count")
+  expenseCount Int @map("expense_count")
+  totalRevenue Int @map("total_revenue")
+  totalExpense Int @map("total_expense")
+  netProfit    Int @map("net_profit")
+
+  notes String? // 差異備註（差異 != 0 時必填）
+
+  closedAt  DateTime @default(now()) @map("closed_at")
+  closedBy  String?  @map("closed_by") // adminUserId
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, date])
+  @@index([tenantId, closedAt])
+  @@map("daily_close_snapshots")
 }
