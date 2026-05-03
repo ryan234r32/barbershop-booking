@@ -6,6 +6,7 @@ import { errorResponse, UnauthorizedError } from "@/lib/utils/errors";
 import { scheduleThankYou, scheduleFollowUp } from "@/lib/notifications/scheduler";
 import { issueCouponForCompletedBooking } from "@/lib/coupons/issue";
 import { logger } from "@/lib/utils/logger";
+import { invalidateReportsCache } from "@/lib/cache/invalidate";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -203,6 +204,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     } catch (err) {
       logger.error("issueCoupon failed", err, "bookings", { bookingId: id });
     }
+    invalidateReportsCache();
 
     return Response.json({
       ok: true,

@@ -22,6 +22,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
+import { invalidateReportsCache } from "@/lib/cache/invalidate";
 import { errorResponse, AppError, UnauthorizedError } from "@/lib/utils/errors";
 
 type RouteParams = { params: Promise<{ paymentId: string }> };
@@ -71,6 +72,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       data: { notes: nextNotes },
       select: { id: true, notes: true },
     });
+    invalidateReportsCache();
 
     return Response.json({ ok: true, payment: updated });
   } catch (err) {

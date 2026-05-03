@@ -16,6 +16,7 @@ import { getAdminFromCookie } from "@/lib/auth/jwt";
 import { errorResponse, UnauthorizedError } from "@/lib/utils/errors";
 
 import { ALL_CATEGORIES } from "@/lib/expenses/categories";
+import { invalidateReportsCache } from "@/lib/cache/invalidate";
 
 const createSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
@@ -105,6 +106,7 @@ export async function POST(request: NextRequest) {
         receiptUrl: body.receiptUrl,
       },
     });
+    invalidateReportsCache();
 
     return NextResponse.json(
       {

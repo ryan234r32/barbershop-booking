@@ -11,6 +11,7 @@ import { MAX_VIOLATIONS } from "@/lib/utils/constants";
 import { requireBookingAuth, requireBookingOwnership, requireAdmin } from "@/lib/auth/booking-auth";
 import { issueCouponForCompletedBooking } from "@/lib/coupons/issue";
 import { logger } from "@/lib/utils/logger";
+import { invalidateReportsCache } from "@/lib/cache/invalidate";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -182,6 +183,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       } catch (err) {
         console.error("Failed to notify admin (cancellation):", err);
       }
+    invalidateReportsCache();
 
       return Response.json({
         booking: result,
@@ -361,6 +363,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       } catch (err) {
         console.error("Failed to notify admin (admin cancel):", err);
       }
+    invalidateReportsCache();
 
       return Response.json({ booking: updated });
     }

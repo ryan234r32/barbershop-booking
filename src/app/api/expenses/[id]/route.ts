@@ -14,6 +14,7 @@ import { getAdminFromCookie } from "@/lib/auth/jwt";
 import { errorResponse, UnauthorizedError, AppError } from "@/lib/utils/errors";
 
 import { ALL_CATEGORIES } from "@/lib/expenses/categories";
+import { invalidateReportsCache } from "@/lib/cache/invalidate";
 
 const patchSchema = z.object({
   amount: z.number().int().positive().max(10_000_000).optional(),
@@ -47,6 +48,7 @@ export async function PATCH(
       where: { id },
       data: body,
     });
+    invalidateReportsCache();
 
     return NextResponse.json({
       id: updated.id,
@@ -81,6 +83,7 @@ export async function DELETE(
     }
 
     await prisma.expense.delete({ where: { id } });
+    invalidateReportsCache();
     return NextResponse.json({ success: true });
   } catch (e) {
     return errorResponse(e);

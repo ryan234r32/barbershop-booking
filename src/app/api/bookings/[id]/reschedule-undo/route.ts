@@ -27,6 +27,7 @@ import {
 import { getLineClient } from "@/lib/line/client";
 import { rescheduleConfirmationMessage } from "@/lib/line/messages";
 import { cancelBookingNotifications, scheduleReminders } from "@/lib/notifications/scheduler";
+import { invalidateReportsCache } from "@/lib/cache/invalidate";
 
 const UNDO_SCOPE = "reschedule-undo";
 
@@ -189,6 +190,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             "reschedule-undo",
           );
         }
+    invalidateReportsCache();
 
         return Response.json({
           booking: {

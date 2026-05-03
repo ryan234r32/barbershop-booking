@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isSlotAvailable } from "@/lib/booking/availability";
+import { invalidateReportsCache } from "@/lib/cache/invalidate";
 import { acquireBookingLock, releaseBookingLock } from "@/lib/booking/lock";
 import { scheduleReminders } from "@/lib/notifications/scheduler";
 import { getLineClient } from "@/lib/line/client";
@@ -320,6 +321,7 @@ export async function POST(request: NextRequest) {
       } catch (err) {
         logger.error("Failed to notify admin (new booking)", err, "bookings");
       }
+    invalidateReportsCache();
 
       return Response.json({ booking }, { status: 201 });
     } finally {

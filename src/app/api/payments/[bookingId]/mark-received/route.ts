@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { errorResponse, AppError, UnauthorizedError } from "@/lib/utils/errors";
+import { invalidateReportsCache } from "@/lib/cache/invalidate";
 import { requireBookingAuth, requireAdmin, requireBookingOwnership } from "@/lib/auth/booking-auth";
 import { getLineClient } from "@/lib/line/client";
 import { paymentReceivedMessage } from "@/lib/line/messages";
@@ -39,6 +40,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Idempotency: already RECEIVED → 200 no-op
     if (existing?.status === "RECEIVED") {
+    invalidateReportsCache();
       return Response.json({
         success: true,
         idempotent: true,
