@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import useSWR from "swr";
+import { BarChart3, Coins } from "lucide-react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { MCard } from "@/components/admin/reports/v3.6/m-card";
 import { MTag } from "@/components/admin/reports/v3.6/m-tag";
@@ -144,7 +145,9 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
 
       {empty && (
         <div className="bg-[var(--color-surface)] rounded-2xl p-12 text-center text-sm text-[var(--color-text-muted)] space-y-2">
-          <div className="text-3xl opacity-40">📊</div>
+          <div className="flex justify-center opacity-40">
+            <BarChart3 size={36} aria-hidden />
+          </div>
           <p>{data.range.label}沒有預約紀錄</p>
         </div>
       )}
@@ -454,8 +457,11 @@ function ServiceMixWidget({
 
       {gapPp > 0 && (
         <div className="mt-4 bg-[var(--color-danger)]/8 border-l-[3px] border-[var(--color-danger)] rounded-r-md px-3 py-2 text-xs">
-          <p className="font-semibold text-[var(--color-text-primary)]">
-            💰 染燙合計 {chemicalShare.toFixed(1)}%（{chemDelta >= 0 ? "+" : ""}{chemDelta.toFixed(1)}pp vs 上月），距業界目標 {targetShare}% 還差 {gapPp.toFixed(1)}pp
+          <p className="font-semibold text-[var(--color-text-primary)] inline-flex items-start gap-1.5">
+            <Coins size={14} aria-hidden className="mt-0.5 shrink-0" />
+            <span>
+              染燙合計 {chemicalShare.toFixed(1)}%（{chemDelta >= 0 ? "+" : ""}{chemDelta.toFixed(1)}pp vs 上月），距業界目標 {targetShare}% 還差 {gapPp.toFixed(1)}pp
+            </span>
           </p>
           <p className="text-[var(--color-text-body)] mt-1">
             本月染燙營收 {Math.round(monthlyChemRev).toLocaleString()}，達標可增加約 {Math.round(upliftRev).toLocaleString()}/月

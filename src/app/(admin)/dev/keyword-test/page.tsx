@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 
 interface PreviewResult {
@@ -121,8 +122,9 @@ export default function KeywordTestPage() {
           </div>
 
           {result.note && (
-            <div className="rounded bg-amber-50 p-3 text-sm text-amber-800">
-              ⚠️ {result.note}
+            <div className="rounded bg-amber-50 p-3 text-sm text-amber-800 inline-flex items-start gap-1.5">
+              <AlertTriangle size={14} aria-hidden className="mt-0.5 shrink-0" />
+              <span>{result.note}</span>
             </div>
           )}
 

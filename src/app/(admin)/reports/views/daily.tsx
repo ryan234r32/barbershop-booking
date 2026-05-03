@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import useSWR from "swr";
+import { Banknote, Landmark, Lock, Plus, ClipboardList, Coins, CheckCircle2, Trash2 } from "lucide-react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { MCard } from "@/components/admin/reports/v3.6/m-card";
 import { DateStrip } from "@/components/admin/reports/v3.6/date-strip";
@@ -268,8 +269,8 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
       <DateStrip kind="day" selected={date} onSelect={onDateChange} maxValue={maxNavDate} />
 
       {d.isClosed && (
-        <p className="text-[11px] text-center text-[var(--color-text-muted)]">
-          🔒 已結班 · {formatTime(d.closedAt)}
+        <p className="text-[11px] text-center text-[var(--color-text-muted)] inline-flex items-center justify-center gap-1 w-full">
+          <Lock size={12} aria-hidden /> 已結班 · {formatTime(d.closedAt)}
         </p>
       )}
 
@@ -293,7 +294,7 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
         <BigStatCard
           label="對帳進度"
           value={`${settledCount}/${reconcileTotal}`}
-          sub={effectivePendingCount > 0 ? `${effectivePendingCount} 筆待確認` : "✓ 已對完"}
+          sub={effectivePendingCount > 0 ? `${effectivePendingCount} 筆待確認` : "已對完"}
         />
       </div>
 
@@ -308,14 +309,14 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
 
       <div className="grid grid-cols-2 gap-3">
         <PaymentCard
-          icon="💵"
+          icon={<Banknote size={18} aria-hidden />}
           label="現金"
           total={d.cashTotal}
           confirmed={d.cashConfirmed}
           pending={d.cashPending}
         />
         <PaymentCard
-          icon="🏦"
+          icon={<Landmark size={18} aria-hidden />}
           label="轉帳"
           total={d.bankTotal}
           confirmed={d.bankConfirmed}
@@ -411,7 +412,7 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
           onClick={() => setBackfillOpen(true)}
           className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[var(--color-surface)] hover:bg-[var(--color-text-muted)]/10 transition-colors text-sm font-semibold text-[var(--color-text-body)]"
         >
-          <span className="text-lg">➕</span>
+          <Plus size={18} aria-hidden />
           <span>新增預約 / 補登訂單</span>
         </button>
       )}
@@ -428,15 +429,19 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
               : "bg-[var(--color-brand)] text-[var(--color-bg)] hover:opacity-90"
           }`}
         >
-          {d.pendingCount > 0
-            ? `還有 ${d.pendingCount} 筆待確認 · 完成後可結帳`
-            : "✓ 完成今日結帳"}
+          {d.pendingCount > 0 ? (
+            `還有 ${d.pendingCount} 筆待確認 · 完成後可結帳`
+          ) : (
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <CheckCircle2 size={18} aria-hidden /> 完成今日結帳
+            </span>
+          )}
         </button>
       ) : (
         <div className="space-y-2">
           <div className="bg-[var(--color-success)]/10 rounded-xl p-4 text-center">
-            <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-              🔒 今日已結班
+            <p className="text-sm font-semibold text-[var(--color-text-primary)] inline-flex items-center justify-center gap-1.5">
+              <Lock size={14} aria-hidden /> 今日已結班
             </p>
             <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
               {formatTime(d.closedAt)} 結班 · 補登可從「補登訂單」進入
@@ -617,7 +622,7 @@ function ExpenseSummaryCard({
   return (
     <MCard padding="md">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-lg">📋</span>
+        <ClipboardList size={18} aria-hidden className="text-[var(--color-text-body)]" />
         <p className="text-sm font-semibold text-[var(--color-text-primary)]">
           支出
         </p>
@@ -645,7 +650,7 @@ function NetProfitCard({
   return (
     <MCard padding="md">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-lg">💰</span>
+        <Coins size={18} aria-hidden className="text-[var(--color-text-body)]" />
         <p className="text-sm font-semibold text-[var(--color-text-primary)]">
           淨利
         </p>
@@ -720,8 +725,16 @@ function ExpenseRow({
         <p className="text-sm font-bold tabular-nums text-[var(--color-danger)]">
           -{expense.amount.toLocaleString()}
         </p>
-        <p className="text-[10px] text-[var(--color-text-muted)]">
-          {expense.paidMethod === "CASH" ? "💵" : "🏦"}
+        <p className="text-[10px] text-[var(--color-text-muted)] inline-flex items-center justify-end gap-1">
+          {expense.paidMethod === "CASH" ? (
+            <>
+              <Banknote size={12} aria-hidden /> 現金
+            </>
+          ) : (
+            <>
+              <Landmark size={12} aria-hidden /> 轉帳
+            </>
+          )}
         </p>
       </div>
       {!isClosed && !expense.recurringRule && (
@@ -730,9 +743,7 @@ function ExpenseRow({
           aria-label="刪除"
           className="w-6 h-6 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-danger)] flex-shrink-0"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
-          </svg>
+          <Trash2 size={14} aria-hidden />
         </button>
       )}
     </div>
@@ -746,7 +757,7 @@ function PaymentCard({
   confirmed,
   pending,
 }: {
-  icon: string;
+  icon: ReactNode;
   label: string;
   total: number;
   confirmed: number;
@@ -755,7 +766,7 @@ function PaymentCard({
   return (
     <MCard padding="md">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-lg">{icon}</span>
+        <span className="text-[var(--color-text-body)] inline-flex items-center">{icon}</span>
         <p className="text-sm font-semibold text-[var(--color-text-primary)]">{label}</p>
       </div>
       <p className="text-2xl font-bold tabular-nums text-[var(--color-text-primary)]">
@@ -903,7 +914,9 @@ function BookingRow({
             title="點擊撤回對帳"
             className="inline-flex items-center justify-center gap-0.5 px-3 py-1.5 rounded-md bg-[var(--color-success)]/15 text-[var(--color-success)] text-xs font-bold hover:bg-[var(--color-warning)]/15 hover:text-[var(--color-warning)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[var(--color-success)]/15 disabled:hover:text-[var(--color-success)] group-hover:[&_.unsettle-icon]:inline group-active:[&_.settled-label]:hidden group-active:[&_.unsettle-icon]:inline whitespace-nowrap"
           >
-            <span className="settled-label group-hover:hidden">✓ 已對</span>
+            <span className="settled-label group-hover:hidden inline-flex items-center gap-0.5">
+              <CheckCircle2 size={12} aria-hidden /> 已對
+            </span>
             <span className="unsettle-icon hidden group-hover:inline">↶ 撤回</span>
           </button>
         ) : variant === "warning" ? (

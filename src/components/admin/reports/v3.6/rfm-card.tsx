@@ -1,33 +1,36 @@
+import type { ComponentType } from "react";
+import type { LucideProps } from "lucide-react";
+import { Trophy, Gem, Sprout, AlertTriangle, DoorOpen, Lightbulb } from "lucide-react";
 import type { RfmGrid, RfmSegment } from "@/lib/reports/v3.6/aggregates";
 import { MCard } from "./m-card";
 
-const META: Record<RfmSegment, { emoji: string; label: string; color: string; description: string }> = {
+const META: Record<RfmSegment, { Icon: ComponentType<LucideProps>; label: string; color: string; description: string }> = {
   champion: {
-    emoji: "🏆",
+    Icon: Trophy,
     label: "冠軍",
     color: "var(--color-success)",
     description: "30 天內 + 年訪 5+ + 年消費 6000+",
   },
   loyal: {
-    emoji: "💎",
+    Icon: Gem,
     label: "忠實老客",
     color: "var(--color-brand)",
     description: "60 天內 + 年訪 4+ + 年消費 3000+",
   },
   newCustomer: {
-    emoji: "🌱",
+    Icon: Sprout,
     label: "新客觀察期",
     color: "var(--color-warning)",
     description: "90 天內 + 年訪 1-3",
   },
   atRisk: {
-    emoji: "⚠️",
+    Icon: AlertTriangle,
     label: "流失中",
     color: "var(--color-service-perm)",
     description: "60-180 天 + 年訪 2+",
   },
   lost: {
-    emoji: "🚪",
+    Icon: DoorOpen,
     label: "已流失",
     color: "var(--color-danger)",
     description: "180+ 天未到訪",
@@ -51,7 +54,7 @@ export function RfmCards({ grid }: RfmCardsProps) {
             padding="sm"
           >
             <div className="flex items-center gap-1 mb-0.5">
-              <span className="text-base leading-none">{meta.emoji}</span>
+              <meta.Icon size={14} aria-hidden style={{ color: meta.color }} />
               <span className="text-xs font-semibold text-[var(--color-text-primary)]">
                 {meta.label}
               </span>
@@ -77,11 +80,14 @@ export function RfmSummary({ grid }: { grid: RfmGrid }) {
   const lostPct = grid.pct.lost;
   if (grid.total === 0) return null;
   return (
-    <p className="text-xs text-[var(--color-text-muted)] mt-2">
-      💡 冠軍 + 忠實 = {(grid.pct.champion + grid.pct.loyal).toFixed(1)}%（共 {grid.champion + grid.loyal} 位）撐起主要營收；
-      流失中 + 已流失 = {(grid.pct.atRisk + grid.pct.lost).toFixed(1)}%（共 {grid.atRisk + grid.lost} 位）是最大喚回池
-      {champPct > 30 && "；冠軍密度健康"}
-      {lostPct > 20 && "；已流失偏高，建議召回券優先發送"}
+    <p className="text-xs text-[var(--color-text-muted)] mt-2 inline-flex items-start gap-1">
+      <Lightbulb size={12} aria-hidden className="mt-0.5 shrink-0" />
+      <span>
+        冠軍 + 忠實 = {(grid.pct.champion + grid.pct.loyal).toFixed(1)}%（共 {grid.champion + grid.loyal} 位）撐起主要營收；
+        流失中 + 已流失 = {(grid.pct.atRisk + grid.pct.lost).toFixed(1)}%（共 {grid.atRisk + grid.lost} 位）是最大喚回池
+        {champPct > 30 && "；冠軍密度健康"}
+        {lostPct > 20 && "；已流失偏高，建議召回券優先發送"}
+      </span>
     </p>
   );
 }

@@ -27,6 +27,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Drawer } from "vaul";
+import { Banknote, Landmark } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import {
@@ -320,13 +321,21 @@ export function ExpenseEntrySheet({
                       key={m}
                       type="button"
                       onClick={() => setPaidMethod(m)}
-                      className={`flex-1 py-3 rounded-lg text-sm font-medium transition-colors ${
+                      className={`flex-1 py-3 rounded-lg text-sm font-medium transition-colors inline-flex items-center justify-center gap-1.5 ${
                         paidMethod === m
                           ? "bg-[var(--color-brand)] text-[var(--color-bg)]"
                           : "bg-[var(--color-surface)] text-[var(--color-text-body)]"
                       }`}
                     >
-                      {m === "CASH" ? "💵 現金" : "🏦 轉帳"}
+                      {m === "CASH" ? (
+                        <>
+                          <Banknote size={16} aria-hidden /> 現金
+                        </>
+                      ) : (
+                        <>
+                          <Landmark size={16} aria-hidden /> 轉帳
+                        </>
+                      )}
                     </button>
                   ))}
                 </div>

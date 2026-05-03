@@ -19,7 +19,7 @@
 
 import { useEffect, useState } from "react";
 import { Drawer } from "vaul";
-import { Plus, X } from "lucide-react";
+import { Plus, X, User, Calendar, Clock } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 
@@ -223,19 +223,25 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
                 {/* Customer + service */}
                 <div className="rounded-lg border border-[var(--color-surface)] divide-y divide-[var(--color-surface)] mb-4">
                   <div className="flex items-center justify-between px-4 py-3">
-                    <span className="text-sm text-[var(--color-text-muted)]">👤 客戶</span>
+                    <span className="text-sm text-[var(--color-text-muted)] inline-flex items-center gap-1.5">
+                      <User size={14} aria-hidden /> 客戶
+                    </span>
                     <span className="text-sm font-medium text-[var(--color-text-primary)]">
                       {booking.user.displayName || "未登記姓名"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between px-4 py-3">
-                    <span className="text-sm text-[var(--color-text-muted)]">📅 帳單日期</span>
+                    <span className="text-sm text-[var(--color-text-muted)] inline-flex items-center gap-1.5">
+                      <Calendar size={14} aria-hidden /> 帳單日期
+                    </span>
                     <span className="text-sm font-medium text-[var(--color-text-primary)]">
                       {billingDateLabel}
                     </span>
                   </div>
                   <div className="flex items-center justify-between px-4 py-3">
-                    <span className="text-sm text-[var(--color-text-muted)]">⏰ 服務時間</span>
+                    <span className="text-sm text-[var(--color-text-muted)] inline-flex items-center gap-1.5">
+                      <Clock size={14} aria-hidden /> 服務時間
+                    </span>
                     <span className="text-sm font-medium text-[var(--color-text-primary)]">
                       {booking.startTime} – {booking.endTime}
                     </span>

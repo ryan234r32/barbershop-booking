@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { ChevronLeft, Gift, BellRing, Check } from "lucide-react";
+import { ChevronLeft, Gift, BellRing, Check, ClipboardList, AlertTriangle } from "lucide-react";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { useToast } from "@/components/ui/toast";
 
@@ -228,13 +228,21 @@ export default function LotteryPage() {
                           </span>
                         )}
                         <span
-                          className={`text-[10px] ${
+                          className={`text-[10px] inline-flex items-center gap-0.5 ${
                             w.notified
                               ? "text-[var(--color-success)]"
                               : "text-[var(--color-warning)]"
                           }`}
                         >
-                          {w.notified ? "✓ 已通知" : "⚠ 未通知"}
+                          {w.notified ? (
+                            <>
+                              <Check size={10} aria-hidden /> 已通知
+                            </>
+                          ) : (
+                            <>
+                              <AlertTriangle size={10} aria-hidden /> 未通知
+                            </>
+                          )}
                         </span>
                       </div>
                     </div>
@@ -256,7 +264,9 @@ export default function LotteryPage() {
           </div>
 
           <div className="bg-[var(--color-brand)]/5 border border-[var(--color-brand)]/15 rounded-xl p-3 text-xs text-[var(--color-text-muted)] leading-relaxed">
-            <p className="mb-1">📋 流程</p>
+            <p className="mb-1 inline-flex items-center gap-1">
+              <ClipboardList size={12} aria-hidden /> 流程
+            </p>
             <p>1. 群發上線通知（執行 broadcast-launch 腳本）</p>
             <p>2. 客人填表 → 自動進入候選池</p>
             <p>3. 截止後點「立即抽獎」抽出中獎人</p>

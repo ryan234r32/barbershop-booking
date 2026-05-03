@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import { Lightbulb, Trophy } from "lucide-react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { MCard } from "@/components/admin/reports/v3.6/m-card";
 import { MTag } from "@/components/admin/reports/v3.6/m-tag";
@@ -204,16 +205,16 @@ export function AnnualView({ period, onPeriodChange }: AnnualViewProps) {
             <MCard padding="md">
               <CohortStackedBar
                 segments={[
-                  { key: "champion", label: `🏆 冠軍 (${data.rfm.champion})`, pct: data.rfm.pct.champion, color: "#0F6E56", count: data.rfm.champion },
-                  { key: "loyal",    label: `💎 忠實 (${data.rfm.loyal})`,    pct: data.rfm.pct.loyal,    color: "#1D9E75", count: data.rfm.loyal    },
-                  { key: "newC",     label: `🌱 新客 (${data.rfm.newCustomer})`, pct: data.rfm.pct.newCustomer, color: "#7E22CE", count: data.rfm.newCustomer },
-                  { key: "atRisk",   label: `⚠️ 流失中 (${data.rfm.atRisk})`,  pct: data.rfm.pct.atRisk,  color: "#BA7517", count: data.rfm.atRisk   },
-                  { key: "lost",     label: `🚪 已失 (${data.rfm.lost})`,     pct: data.rfm.pct.lost,     color: "#A32D2D", count: data.rfm.lost     },
+                  { key: "champion", label: `冠軍 (${data.rfm.champion})`,    pct: data.rfm.pct.champion,    color: "#0F6E56", count: data.rfm.champion },
+                  { key: "loyal",    label: `忠實 (${data.rfm.loyal})`,       pct: data.rfm.pct.loyal,       color: "#1D9E75", count: data.rfm.loyal    },
+                  { key: "newC",     label: `新客 (${data.rfm.newCustomer})`, pct: data.rfm.pct.newCustomer, color: "#7E22CE", count: data.rfm.newCustomer },
+                  { key: "atRisk",   label: `流失中 (${data.rfm.atRisk})`,    pct: data.rfm.pct.atRisk,      color: "#BA7517", count: data.rfm.atRisk   },
+                  { key: "lost",     label: `已失 (${data.rfm.lost})`,        pct: data.rfm.pct.lost,        color: "#A32D2D", count: data.rfm.lost     },
                 ]}
               />
               <div className="mt-3 bg-[var(--color-brand)]/8 border-l-[3px] border-[var(--color-brand)] rounded-r-md px-3 py-2 text-xs">
-                <p className="font-semibold text-[var(--color-text-primary)]">
-                  💡 VIP 集中度（冠軍 + 忠實）：{(data.rfm.pct.champion + data.rfm.pct.loyal).toFixed(1)}%
+                <p className="font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5">
+                  <Lightbulb size={14} aria-hidden /> VIP 集中度（冠軍 + 忠實）：{(data.rfm.pct.champion + data.rfm.pct.loyal).toFixed(1)}%
                 </p>
                 <p className="text-[var(--color-text-body)] mt-1">
                   喚回池 = 流失中 + 已流失 = {data.rfm.atRisk + data.rfm.lost} 位，是行銷重點目標
@@ -574,16 +575,18 @@ function SeasonalityChart({ sparkline }: { sparkline: MonthSpark[] }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 text-xs">
         <div className="bg-[var(--color-success)]/10 rounded-md p-2.5">
-          <p className="font-semibold text-[var(--color-text-primary)]">
-            🟢 旺季：{peakMonths.length > 0 ? peakMonths.join("、") : "—"}
+          <p className="font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[var(--color-success)]" aria-hidden />
+            旺季：{peakMonths.length > 0 ? peakMonths.join("、") : "—"}
           </p>
           <p className="text-[var(--color-text-body)] mt-0.5 leading-snug">
             高峰月份排班可考慮加開、客戶提前預約綁定
           </p>
         </div>
         <div className="bg-[var(--color-danger)]/10 rounded-md p-2.5">
-          <p className="font-semibold text-[var(--color-text-primary)]">
-            🔴 淡季：{troughMonths.length > 0 ? troughMonths.join("、") : "—"}
+          <p className="font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[var(--color-danger)]" aria-hidden />
+            淡季：{troughMonths.length > 0 ? troughMonths.join("、") : "—"}
           </p>
           <p className="text-[var(--color-text-body)] mt-0.5 leading-snug">
             可預約老客電話通知 + 折扣推促銷組合，提前填滿空檔
@@ -592,7 +595,9 @@ function SeasonalityChart({ sparkline }: { sparkline: MonthSpark[] }) {
       </div>
 
       <div className="mt-3 bg-[var(--color-brand)]/8 border-l-[3px] border-[var(--color-brand)] rounded-r-md px-3 py-2 text-xs">
-        <p className="font-semibold">💡 {recent12[0]?.label.replace("月", "")} 年行動建議</p>
+        <p className="font-semibold inline-flex items-center gap-1.5">
+          <Lightbulb size={14} aria-hidden /> {recent12[0]?.label.replace("月", "")} 年行動建議
+        </p>
         <p className="text-[var(--color-text-body)] mt-1">
           順著季節節奏，把行銷資源集中在淡季月（提前 2 週通知）+ 旺季月（提早 1 個月開放預約）
         </p>
@@ -624,8 +629,8 @@ function Highlights({
       </div>
 
       <MCard padding="md">
-        <p className="text-xs font-semibold text-[var(--color-text-primary)] mb-3">
-          🥇 Top 5 客戶（按年度消費）
+        <p className="text-xs font-semibold text-[var(--color-text-primary)] mb-3 inline-flex items-center gap-1.5">
+          <Trophy size={14} aria-hidden className="text-[var(--color-warning)]" /> Top 5 客戶（按年度消費）
         </p>
         <div className="space-y-2">
           {topCustomers.map((c, i) => (
