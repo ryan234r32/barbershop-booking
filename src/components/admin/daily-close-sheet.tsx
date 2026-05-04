@@ -12,9 +12,9 @@
  */
 
 import { useEffect, useState } from "react";
-import { Drawer } from "vaul";
 import { useToast } from "@/components/ui/toast";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
+import { FullscreenModal } from "@/components/admin/fullscreen-modal";
 
 interface Props {
   open: boolean;
@@ -97,23 +97,9 @@ export function DailyCloseSheet(props: Props) {
     }
   };
 
+  if (!open) return null;
   return (
-    <Drawer.Root open={open} onOpenChange={onOpenChange} dismissible={false}>
-      <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 bg-[var(--color-text-body)]/50 z-50 backdrop-blur-sm" />
-        <Drawer.Content
-          // V3.8 fix (5/3 user report)：vaul Drawer.Content 對 fullscreen 用
-          // inset-0 在 iOS PWA 會跑版。改用 explicit positioning + width 100vw
-          // + transform: none 強制覆蓋 vaul inline style。
-          className="fixed top-0 left-0 right-0 bottom-0 z-50 bg-[var(--color-bg)] outline-none flex flex-col h-[100dvh] focus:outline-none"
-          style={{
-            touchAction: "pan-y",
-            overscrollBehavior: "none",
-            width: "100vw",
-            maxWidth: "100vw",
-            transform: "none",
-          }}
-        >
+    <FullscreenModal onClose={() => onOpenChange(false)} preventDismiss>
           <div
             className="flex items-center justify-between px-4 flex-shrink-0 border-b border-[var(--color-surface)]"
             style={{ paddingTop: "max(env(safe-area-inset-top), 16px)", paddingBottom: 12 }}
@@ -127,9 +113,9 @@ export function DailyCloseSheet(props: Props) {
                 <path d="M6 6l12 12M6 18L18 6" />
               </svg>
             </button>
-            <Drawer.Title className="text-base font-semibold text-[var(--color-text-primary)]">
+            <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
               完成 {date.slice(5)} 結帳
-            </Drawer.Title>
+            </h2>
             <div className="w-10" />
           </div>
 
@@ -228,9 +214,7 @@ export function DailyCloseSheet(props: Props) {
               {submitting ? "結帳中…" : "送出結帳"}
             </button>
           </div>
-        </Drawer.Content>
-      </Drawer.Portal>
-    </Drawer.Root>
+    </FullscreenModal>
   );
 }
 
