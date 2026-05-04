@@ -1,0 +1,866 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Roadmap" />
+<meta name="theme-color" content="#0f1115" />
+<title>理髮廳 — 顧客痛點 Roadmap 互動表</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161922;
+    --panel-2: #1c2030;
+    --line: #262b3a;
+    --text: #e8eaf2;
+    --muted: #8b91a5;
+    --accent: #5e8bff;
+    --accent-2: #7dd3fc;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --good: #34d399;
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f7f7fb; --panel: #ffffff; --panel-2: #f1f3f9;
+      --line: #e3e6ef; --text: #16181f; --muted: #5d6478;
+      --accent: #2950c2; --accent-2: #0284c7;
+      --shadow: 0 4px 18px rgba(20,30,60,.08);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans CJK TC", sans-serif;
+    font-size: 14px; line-height: 1.55;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom); }
+  header {
+    padding: 18px 20px; border-bottom: 1px solid var(--line); background: var(--panel);
+    position: sticky; top: 0; z-index: 5;
+  }
+  header h1 { margin: 0 0 4px; font-size: 18px; }
+  header .meta { color: var(--muted); font-size: 12px; }
+  .layout { display: grid; grid-template-columns: minmax(0,1fr) 360px;
+    gap: 16px; padding: 16px; max-width: 1600px; margin: 0 auto; }
+  @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+  .principles, .habits, .log {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px 16px; margin-bottom: 12px;
+  }
+  .principles h2, .habits h2, .log h2, .col h2 { font-size: 13px; margin: 0 0 8px;
+    letter-spacing: .03em; color: var(--muted); text-transform: uppercase; }
+  .principles ul, .habits ul { padding-left: 18px; margin: 6px 0; }
+  .principles li, .habits li { margin: 4px 0; }
+  .columns { display: grid; grid-template-columns: repeat(5, minmax(0,1fr));
+    gap: 12px; }
+  @media (max-width: 1280px) { .columns { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .columns { grid-template-columns: 1fr; } }
+  .col {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 12px; min-height: 180px;
+    display: flex; flex-direction: column;
+  }
+  .col[data-stage="NOW"] { border-color: rgba(94,139,255,.55); box-shadow: var(--shadow); }
+  .col[data-stage="DONE"] { opacity: .85; }
+  .col-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+  .col-head .count { color: var(--muted); font-size: 11px; }
+  .col-list { flex: 1; min-height: 60px; display: flex; flex-direction: column; gap: 8px; }
+  .card {
+    background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; cursor: grab;
+    transition: transform .12s, border-color .12s, box-shadow .12s;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card.dragging { opacity: .4; transform: scale(.98); }
+  .card .id { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+  .card .title { margin-top: 2px; font-weight: 500; }
+  .card .meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; font-size: 11px; }
+  .tag {
+    padding: 2px 8px; border-radius: 999px; background: var(--line); color: var(--muted);
+  }
+  .tag.now { background: rgba(94,139,255,.18); color: var(--accent-2); }
+  .tag.done { background: rgba(52,211,153,.16); color: var(--good); }
+  .tag.wait { background: rgba(251,191,36,.18); color: var(--warn); }
+  .tag.danger { background: rgba(248,113,113,.18); color: var(--danger); }
+  .col-list.dragover { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 12px; }
+  .panel { background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 16px; position: sticky; top: 90px; max-height: calc(100vh - 110px); overflow: auto; }
+  .panel h3 { margin-top: 0; font-size: 14px; }
+  .panel label { display: block; font-size: 11px; color: var(--muted);
+    margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .04em; }
+  .panel input, .panel select, .panel textarea {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 8px; color: var(--text); padding: 8px 10px; font: inherit; resize: vertical;
+  }
+  .panel textarea { min-height: 64px; }
+  .panel .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .btn {
+    display: inline-block; cursor: pointer; padding: 8px 14px; margin-top: 12px;
+    background: var(--accent); color: white; border: none; border-radius: 8px;
+    font-weight: 600; font: inherit;
+  }
+  .btn.secondary { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .btn.danger { background: var(--danger); }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+  .empty { color: var(--muted); font-size: 12px; padding: 8px; text-align: center; }
+  .log .entry { background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .log .entry h4 { margin: 0 0 4px; font-size: 13px; }
+  .log .entry .when { color: var(--muted); font-size: 11px; }
+  .resume {
+    background: linear-gradient(180deg, rgba(94,139,255,.1), transparent);
+    border: 1px solid rgba(94,139,255,.4);
+    border-radius: 12px; padding: 14px 16px; margin-bottom: 12px;
+  }
+  .resume h2 { color: var(--accent-2); margin: 0 0 6px; font-size: 13px; letter-spacing: .04em; }
+  .resume .next-step { font-size: 15px; font-weight: 500; }
+  .stats {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px 16px; margin-bottom: 12px;
+  }
+  .stats-grid {
+    display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr; gap: 12px;
+  }
+  @media (max-width: 800px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
+  .stat {
+    background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px;
+  }
+  .stat .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  .stat .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+  .stat .sub { color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .stat .bar {
+    height: 4px; background: var(--line); border-radius: 4px; margin-top: 8px; overflow: hidden;
+  }
+  .stat .bar > span { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+  .stat.score .value { font-size: 32px; }
+  .stat.score .bar > span { background: linear-gradient(90deg, var(--good), var(--accent-2)); }
+  .stat .grade {
+    display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 4px;
+    background: var(--line); color: var(--text); margin-left: 6px; vertical-align: middle;
+  }
+  .stat .grade.A { background: rgba(52,211,153,.2); color: var(--good); }
+  .stat .grade.B { background: rgba(125,211,252,.2); color: var(--accent-2); }
+  .stat .grade.C { background: rgba(251,191,36,.2); color: var(--warn); }
+  .stat .grade.D { background: rgba(248,113,113,.2); color: var(--danger); }
+  .coach {
+    margin-top: 10px; padding: 10px 12px;
+    background: rgba(94,139,255,.08); border: 1px solid rgba(94,139,255,.3);
+    border-radius: 10px; font-size: 13px;
+  }
+  .coach b { color: var(--accent-2); }
+  /* Guide overlay */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6);
+    display: none; z-index: 100; align-items: flex-start; justify-content: center;
+    padding: 40px 20px; overflow-y: auto;
+  }
+  .overlay.open { display: flex; }
+  .overlay-panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 24px 28px;
+    max-width: 820px; width: 100%; box-shadow: var(--shadow);
+  }
+  .overlay-panel h2 { margin-top: 0; font-size: 20px; }
+  .overlay-panel h3 { font-size: 15px; margin: 20px 0 6px; color: var(--accent-2); }
+  .overlay-panel h4 { font-size: 13px; margin: 14px 0 4px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .overlay-panel table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+  .overlay-panel th, .overlay-panel td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  .overlay-panel th { color: var(--muted); font-weight: 600; }
+  .overlay-panel ul { padding-left: 20px; }
+  .overlay-panel li { margin: 4px 0; }
+  .overlay-panel code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .overlay-panel .close { float: right; background: transparent; color: var(--muted); border: 1px solid var(--line);
+    border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  @media (max-width: 600px) { .overlay { padding: 12px; } .overlay-panel { padding: 16px 18px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>理髮廳 — 顧客痛點 Roadmap</h1>
+  <div class="meta">5 欄看板：現在處理 / 下一個 / 等老闆 / 延後 / 已完成。卡片可拖曳跨欄/上下移動。點卡片可在右側編輯。</div>
+</header>
+
+<main class="layout">
+  <div>
+    <section class="resume" id="resume">
+      <h2>明天從這裡接續 · LATEST</h2>
+      <div id="resume-body"></div>
+    </section>
+
+    <section class="stats">
+      <div class="stats-grid">
+        <div class="stat score">
+          <div class="label">創業者分數 / Founder Score</div>
+          <div class="value" id="s-total">—<span class="grade" id="s-total-grade"></span></div>
+          <div class="sub">4 軸客觀指標，過去 30 天</div>
+          <div class="bar"><span id="s-total-bar"></span></div>
+        </div>
+        <div class="stat">
+          <div class="label">WIP 自律</div>
+          <div class="value" id="s-wip">—</div>
+          <div class="sub" id="s-wip-sub">NOW ≤ 3 件</div>
+          <div class="bar"><span id="s-wip-bar"></span></div>
+        </div>
+        <div class="stat">
+          <div class="label">出貨速度</div>
+          <div class="value" id="s-velocity">—</div>
+          <div class="sub" id="s-velocity-sub">每週完成卡片</div>
+          <div class="bar"><span id="s-velocity-bar"></span></div>
+        </div>
+        <div class="stat">
+          <div class="label">週期時間</div>
+          <div class="value" id="s-cycle">—</div>
+          <div class="sub" id="s-cycle-sub">NOW → DONE 平均天數</div>
+          <div class="bar"><span id="s-cycle-bar"></span></div>
+        </div>
+        <div class="stat">
+          <div class="label">學習節奏</div>
+          <div class="value" id="s-learn">—</div>
+          <div class="sub" id="s-learn-sub">日記連續天數</div>
+          <div class="bar"><span id="s-learn-bar"></span></div>
+        </div>
+      </div>
+      <div class="coach" id="coach"></div>
+    </section>
+
+    <section class="principles">
+      <h2>PM 工作原則 (Now / Next / Later)</h2>
+      <ul>
+        <li><strong>Now 最多 3 件</strong> — 限制 WIP，避免什麼都想做。</li>
+        <li><strong>先問為什麼</strong> — 每張卡要有痛點、證據、下一步。</li>
+        <li><strong>先 Shape 再 Build</strong> — 模糊的東西先放 Next / Waiting，問清楚再進 Now。</li>
+        <li><strong>可靠性是產品力</strong> — 試用前先有 timeout、fallback、checkpoint、救援步驟。</li>
+        <li><strong>指標刪除機制</strong> — 月/年報每個指標問：老闆看到後能做什麼決策？答不出來就降級。</li>
+      </ul>
+    </section>
+
+    <section class="columns">
+      <div class="col" data-stage="NOW">
+        <div class="col-head"><h2>現在處理</h2><span class="count" data-count="NOW">0</span></div>
+        <div class="col-list" data-list="NOW"></div>
+      </div>
+      <div class="col" data-stage="NEXT">
+        <div class="col-head"><h2>下一個</h2><span class="count" data-count="NEXT">0</span></div>
+        <div class="col-list" data-list="NEXT"></div>
+      </div>
+      <div class="col" data-stage="WAIT">
+        <div class="col-head"><h2>等老闆 / 卡住</h2><span class="count" data-count="WAIT">0</span></div>
+        <div class="col-list" data-list="WAIT"></div>
+      </div>
+      <div class="col" data-stage="LATER">
+        <div class="col-head"><h2>延後處理</h2><span class="count" data-count="LATER">0</span></div>
+        <div class="col-list" data-list="LATER"></div>
+      </div>
+      <div class="col" data-stage="DONE">
+        <div class="col-head"><h2>已完成</h2><span class="count" data-count="DONE">0</span></div>
+        <div class="col-list" data-list="DONE"></div>
+      </div>
+    </section>
+
+    <section class="habits">
+      <h2>定期習慣 (Solo founder 節奏)</h2>
+      <ul>
+        <li><strong>每日 10 分鐘</strong> — 更新 Now、推進 1 件、commit 前 <code>npm run preflight</code>。</li>
+        <li><strong>每週 60-90 分鐘</strong> — 跑 G-stack <code>/codex</code> + <code>/review</code>，檢查 Now 是否超過 3 件，整理 lessons-inbox。</li>
+        <li><strong>每月一次</strong> — 重看月/年報，盤點救援手冊，挑一個商業實驗。</li>
+        <li><strong>試用期間每週</strong> — 記錄老闆省了多少時間、顧客是否願意用 LIFF、哪些流程又回到人工 LINE。</li>
+      </ul>
+    </section>
+  </div>
+
+  <aside>
+    <div class="panel">
+      <div class="toolbar">
+        <button class="btn" id="btn-add">＋ 新卡片</button>
+        <button class="btn secondary" id="btn-log">＋ 今日進度</button>
+        <button class="btn secondary" id="btn-guide">📖 說明</button>
+        <button class="btn secondary" id="btn-export">匯出 JSON</button>
+        <button class="btn secondary" id="btn-import">匯入 JSON</button>
+        <button class="btn secondary" id="btn-reset">重設</button>
+        <input type="file" id="file-import" accept="application/json" style="display:none" />
+      </div>
+      <div id="editor">
+        <h3>點卡片以編輯</h3>
+        <p class="empty">在左側點任何一張卡片，這裡會出現詳細欄位。</p>
+      </div>
+      <section class="log">
+        <h2>每日進度日誌</h2>
+        <div id="log-list"></div>
+      </section>
+    </div>
+  </aside>
+</main>
+
+<div class="overlay" id="guide-overlay">
+  <div class="overlay-panel">
+    <button class="close" id="btn-guide-close">關閉 ✕</button>
+    <h2>📖 操作手冊 / Guide</h2>
+    <p style="color:var(--muted);font-size:13px;">所有 reference 都在這。不用打開 README.md。</p>
+
+    <h3>📊 Founder Score 怎麼算？</h3>
+    <p>4 軸 × 25 分 = 100。<b>Coach 不是 judge</b> — 永遠針對最弱軸給 1 句具體下一步。</p>
+    <table>
+      <tr><th>軸</th><th>滿分條件</th><th>0 分情境</th></tr>
+      <tr><td>WIP 自律</td><td>NOW ≤ 3 件</td><td>NOW ≥ 8 件（每超過 1 件扣 5 分）</td></tr>
+      <tr><td>出貨速度</td><td>每週完成 ≥ 1.5 張卡片</td><td>30 天 0 件</td></tr>
+      <tr><td>週期時間</td><td>NOW → DONE 平均 ≤ 7 天</td><td>平均 ≥ 30 天線性扣到 0</td></tr>
+      <tr><td>學習節奏</td><td>連續 14 天有日記 entry</td><td>連續 0 天</td></tr>
+    </table>
+    <p>等級：<b>85+ A</b> / 70+ B / 50+ C / &lt;50 D。卡片移到 NOW 自動記 startedAt，移到 DONE 自動記 doneAt。</p>
+    <h4>不要做的事</h4>
+    <ul>
+      <li>不要追求滿分 — 100 意味著太緊繃，留 15-20 分緩衝給意外</li>
+      <li>不要為了刷分把卡片拆很碎 — 那是 gaming</li>
+      <li>不要在月底壓力大時看分 — 退一步看趨勢</li>
+    </ul>
+
+    <h3>🛠️ GStack 節奏（Solo founder）</h3>
+    <p>一句話：<b>每天靠 preflight，每週靠 retro+health，每月靠 cso+learn，shipping 靠 review→ship→canary。</b></p>
+
+    <h4>每日 ≤ 10 分</h4>
+    <ul>
+      <li>開始：讀昨天日記最後一筆 <code>Tomorrow</code>（30 秒進入狀況）</li>
+      <li>commit 前：<code>npm run preflight</code>（typecheck+lint+test）</li>
+      <li>收尾：跟 Claude 講「收工」會自動寫日記</li>
+    </ul>
+
+    <h4>每週日（30-60 分）</h4>
+    <ol>
+      <li><code>/retro</code> — 看本週 commits / 產出 / 趨勢</li>
+      <li><code>/health</code> — 程式碼健康分</li>
+      <li><code>/triage</code> — 升格 lessons-inbox</li>
+      <li><code>/gstack-upgrade</code></li>
+      <li>寫 4 行 Weekly Retro：Shipped / Learned / Energy drain / Next week's bet</li>
+    </ol>
+
+    <h4>每月底（1-2 小時）</h4>
+    <ol>
+      <li><code>/cso comprehensive</code> — 深度安全稽核</li>
+      <li><code>/document-release</code> — 同步文件</li>
+      <li><code>/learn</code> — 整理累積的 lessons</li>
+      <li>重看月報，回應 P17：是否回答「哪裡偏掉？下個月調什麼？」</li>
+    </ol>
+
+    <h4>新功能 pipeline</h4>
+    <p><code>/plan-eng-review</code> → (高風險加 <code>/codex</code>) → 實作 → <code>npm run preflight</code> → <code>/review</code> → <code>/ship</code> → <code>/land-and-deploy</code> → <code>/canary</code></p>
+
+    <h4>修 bug pipeline</h4>
+    <p><code>/investigate</code>（先找根因，不直接修）→ fix → <code>/review</code> → <code>/ship</code></p>
+
+    <h3>📔 開發日記 5 行格式</h3>
+    <p>每天 ≤ 5 分鐘，超過就不會持續。</p>
+    <table>
+      <tr><th>欄位</th><th>內容</th></tr>
+      <tr><td>Done</td><td>1-2 件具體完成事，含檔案路徑/PR 號</td></tr>
+      <tr><td>Stuck/Decision</td><td>卡點或決定，含 why</td></tr>
+      <tr><td>TIL</td><td>今天學到的一件事 — 技術或商業都行</td></tr>
+      <tr><td>Tomorrow</td><td>明天打開電腦的第一個動作（先讀 X，找 Y，目標 Z）</td></tr>
+      <tr><td>Mood</td><td>一個字：順 / 卡 / 累 / 嗨 / 焦 / 平</td></tr>
+    </table>
+    <p>儲存在 <code>docs/開發日記/2026-MM.md</code>（Claude 收尾時自動寫）。</p>
+
+    <h3>📐 PM 工作原則</h3>
+    <ul>
+      <li><b>Now 最多 3 件</b> — 限制 WIP</li>
+      <li><b>先問為什麼</b> — 每張卡要有痛點 / 證據 / 下一步</li>
+      <li><b>先 Shape 再 Build</b> — 模糊的東西先放 Next/Waiting，問清楚再進 Now</li>
+      <li><b>可靠性是產品力</b> — 試用前先有 timeout / fallback / checkpoint / 救援步驟</li>
+      <li><b>指標刪除機制</b> — 月/年報每個指標問：老闆看到後能做什麼決策？答不出來就降級</li>
+    </ul>
+
+    <h3>🔄 跨裝置使用</h3>
+    <ul>
+      <li>線上版：<code>https://barbershop-booking-swart.vercel.app/roadmap.html</code></li>
+      <li>手機 Safari → 分享 → 加入主畫面，變成像 app 一樣</li>
+      <li>iOS 拖拉不支援（觸控限制）→ 點卡片用編輯器的下拉選單換欄位</li>
+      <li>跨裝置同步：用「匯出 JSON」存 iCloud Drive，另一台「匯入 JSON」讀回來</li>
+    </ul>
+
+    <p style="color:var(--muted);font-size:12px;margin-top:24px;">完整版（git tracked）：<code>docs/開發日記/README.md</code> + <code>docs/顧客痛點功能Roadmap.md</code></p>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = "barbershop-pain-roadmap-v1";
+const LOG_KEY = "barbershop-pain-roadmap-log-v1";
+
+// ---- Default seed data (P01-P20). Built from interview transcripts + current work.
+const DEFAULT_CARDS = [
+  // ===== NOW (currently working on) =====
+  { id: "P20", stage: "NOW", title: "日曆「新增預約」流程改版",
+    why: "目前 admin 從日曆建單流程不順，老闆會回頭用 LINE 手動處理。",
+    next: "盤點 new-booking-sheet 與 calendar 的整合 → 收斂欄位 → 縮短建單步數 → 與已報到/結帳串起來。",
+    source: "Ryan 2026-05-04",
+    note: "src/components/admin/new-booking-sheet.tsx (331 行) + src/components/admin/calendar/*。",
+    startedAt: "2026-05-04T00:00:00Z" },
+  { id: "P16", stage: "NOW", title: "預防機制 / 救援手冊",
+    why: "資料遺失、錯誤、連線超時、第三方掛掉時要能救援，是給老闆試用前的可靠性基礎。",
+    next: "列高風險情境 → 偵測方式 → 預防方案 → 救援步驟 → 驗證測試。",
+    source: "Ryan 2026-05-03 + V3.8 P0 prevention",
+    note: "已有：health-check、Sentry、daily backup、audit log、ECPay timeout、Redis lock、recurring guard。",
+    startedAt: "2026-05-01T00:00:00Z" },
+  { id: "P11", stage: "NOW", title: "支出 / 淨利頁深化",
+    why: "讓產品從『預約工具』升級成『經營工具』。已有 expenses API、ExpenseEntrySheet、daily close、月報/年報損益分解，重點在 UX 順暢度。",
+    next: "ExpenseEntrySheet UX 收斂 → daily close 整合 → 月報每月支出歸納 → 年報結構驗證。",
+    source: "Ryan 2026-05-03 + V3.7 finance tab",
+    note: "/api/expenses, ExpenseEntrySheet, day-close 都已就位。",
+    startedAt: "2026-04-30T00:00:00Z" },
+  { id: "P17", stage: "NOW", title: "月報 / 年報該呈現什麼",
+    why: "不要再堆指標。月報回答『這個月哪裡偏掉？下個月要調什麼？』；年報回答『全年健康？明年策略？』",
+    next: "為每個指標問：老闆看到後能做什麼決策？答不出來就降級或刪掉。",
+    source: "Ryan 2026-05-03",
+    note: "V3.6 已有營收、支出、淨利、客戶健康、服務結構框架，缺的是『行動性』。",
+    startedAt: "2026-05-02T00:00:00Z" },
+
+  // ===== NEXT =====
+  { id: "P03", stage: "NEXT", title: "諮詢分流：漂髮、燙染、45 天外預約",
+    why: "顧客自選漂髮容易出錯，45 天外服務變動大，需要先收資料再讓老闆看。",
+    next: "等 I0/I1 服務確認表 → 設計『先收資料、不直接建單』流程。",
+    source: "第二次訪談 §9 + 待問 I0" },
+  { id: "P07", stage: "NEXT", title: "LINE keyword 自動回覆 + 燙染漂 Flex 卡",
+    why: "老闆重複打字回答前置問題很耗時。",
+    next: "等 I0 回覆 → 自動問答只收資料、漂髮直接進諮詢隊列。",
+    source: "第二次訪談 §9" },
+  { id: "P15", stage: "NEXT", title: "顧客完成後回饋 / 評價",
+    why: "目前沒有正式回饋管道，產品改進無資料來源。",
+    next: "決定方式：LINE 簡訊 / LIFF 短表單；先做最小可行版本。",
+    source: "PRD V3.0 規劃" },
+  { id: "P18", stage: "NEXT", title: "試用觀察 / 回饋迴圈 (45 天)",
+    why: "缺正式 learning loop，容易做很多但不知道是否真的變好。",
+    next: "每週記錄 3 個訊號：老闆省時、顧客採用率、人工介入點。",
+    source: "PM review 2026-05-03",
+    note: "也要追蹤 P06 採用習慣：老闆是否主動點已報到→結帳。" },
+  { id: "P19", stage: "NEXT", title: "資料備份 / 還原演練",
+    why: "預防機制不能只寫『有備份』；正式試用前至少演練一次『資料錯了怎麼回復』。",
+    next: "模擬資料錯誤 → 找備份 → 還原到安全環境 → 驗證資料正確。",
+    source: "PM review 2026-05-03" },
+  { id: "P09", stage: "NEXT", title: "行銷 / 回購 / 優惠券",
+    why: "報表收斂後才有判斷依據（推給誰、推什麼、怎麼看成效）。",
+    next: "等 P11 + P17 完成；先做最小召回券 A/B。",
+    source: "PRD V2.2 + V3.6 §14" },
+
+  // ===== WAIT =====
+  { id: "P12", stage: "WAIT", title: "服務項目重構（價格 + 時間 + 自動/人工分流）",
+    why: "服務組合、自動 vs 人工的邊界要老闆親口確認，不能猜。",
+    next: "等老闆填『服務項目確認表-給老闆-2026-04-24.xlsx』後，重構 services。",
+    source: "Ryan 2026-05-03 訊息草稿",
+    note: "問題涵蓋：價格、時間、組合（染+護髮）、不能單獨預約的項目、漂髮/45 天外是否強制諮詢。" },
+  { id: "P02", stage: "WAIT", title: "老闆是否要主動推播召回 / 回購券",
+    why: "推播時機、折扣金額、文案語氣需要老闆決定品牌調性。",
+    next: "等 V3.6 §14.8 B1-B6 答覆 → 啟用 retention-push cron。",
+    source: "V3.6 Phase H plan" },
+
+  // ===== LATER =====
+  { id: "P10", stage: "LATER", title: "月報指標 → 行銷 A/B 完整化",
+    why: "等 P17 月報收斂 + P09 最小召回券有資料後再做。",
+    next: "暫不擴充。",
+    source: "Ryan 2026-05-03" },
+  { id: "P13", stage: "LATER", title: "Admin 諮詢隊列 UI 整併",
+    why: "目前用 messages-inbox + LINE 雙軌，未來才需整併到單一面板。",
+    next: "在試用觀察期看老闆是否真的需要。",
+    source: "messages-inbox-plan" },
+  { id: "P14", stage: "LATER", title: "拖拉行事曆 / Calendar 進階操作",
+    why: "1145 行 calendar 重構是高風險，demo 後才動。",
+    next: "等試用穩定後重構。",
+    source: "v3_session_2_2026-04-26" },
+  { id: "P01", stage: "LATER", title: "LIFF 加 LINE 流程優化",
+    why: "已能用，沒有阻塞。",
+    next: "等試用觀察 → 看是否真的卡住。",
+    source: "第一次訪談" },
+  { id: "P04", stage: "LATER", title: "Admin app 整併（消息、報告、設定）",
+    why: "V3.8 已做主要整併，剩餘為 nice-to-have。",
+    next: "試用後依老闆習慣決定。",
+    source: "v3.8-app-consolidation-plan" },
+
+  // ===== DONE (回填 doneAt 讓 stats 立刻有資料；timestamps 是估計) =====
+  { id: "P05", stage: "DONE", title: "對帳：現金/轉帳分類",
+    why: "原本紅黑字混淆，已收斂為付款方式 pill。",
+    next: "已完成；source badge 已收斂。",
+    source: "第二次訪談 §6",
+    note: "V3.7 finance tab 已上線。",
+    startedAt: "2026-04-25T00:00:00Z", doneAt: "2026-04-30T00:00:00Z" },
+  { id: "P06", stage: "DONE", title: "結帳金額快速記錄（決策：不做主動提醒）",
+    why: "原想結束前 20 分跳卡。決策改為：老闆主動打開 App → 點日曆顧客 → 點已報到 → 進結帳頁。",
+    next: "P18 試用觀察會追蹤老闆是否養成習慣；若沒養成，再考慮入口設計。",
+    source: "第二次訪談 §6 + Ryan 決策收斂",
+    note: "重點：系統不主動跳資訊，由老闆培養 App 操作習慣。",
+    startedAt: "2026-04-26T00:00:00Z", doneAt: "2026-05-03T00:00:00Z" },
+  { id: "P08", stage: "DONE", title: "顧客分群（新/熟/VIP/流失）",
+    why: "新客定義改為『店內首次』而非 LINE 註冊；用 1169 筆 Excel 真實資料 spot-check 過。",
+    next: "已上線 V3.5 customers composition。",
+    source: "第二次訪談 §7",
+    startedAt: "2026-04-26T00:00:00Z", doneAt: "2026-04-28T00:00:00Z" }
+];
+
+// ---- State ----
+let cards = [];
+let log = [];
+let editingId = null;
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    cards = raw ? JSON.parse(raw) : structuredClone(DEFAULT_CARDS);
+  } catch { cards = structuredClone(DEFAULT_CARDS); }
+  try {
+    const raw = localStorage.getItem(LOG_KEY);
+    log = raw ? JSON.parse(raw) : DEFAULT_LOG.slice();
+  } catch { log = DEFAULT_LOG.slice(); }
+}
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+  localStorage.setItem(LOG_KEY, JSON.stringify(log));
+}
+
+const DEFAULT_LOG = [
+  { date: "2026-05-04",
+    summary: "建立新版 Roadmap 互動表（HTML + MD），整合 P01-P20。",
+    next: "明天接續：① 日曆新增預約 (P20) 拆任務 ② P16 預防機制 → 列高風險情境表 ③ P11 支出頁 UX 收斂。" }
+];
+
+// ---- Render ----
+function render() {
+  document.querySelectorAll(".col-list").forEach(el => el.innerHTML = "");
+  const stages = ["NOW","NEXT","WAIT","LATER","DONE"];
+  const counts = Object.fromEntries(stages.map(s => [s, 0]));
+  for (const c of cards) {
+    counts[c.stage] = (counts[c.stage] || 0) + 1;
+    const list = document.querySelector(`.col-list[data-list="${c.stage}"]`);
+    if (!list) continue;
+    list.appendChild(renderCard(c));
+  }
+  for (const s of stages) {
+    const cnt = document.querySelector(`[data-count="${s}"]`);
+    if (cnt) cnt.textContent = counts[s] || 0;
+  }
+  renderEditor();
+  renderLog();
+  renderResume();
+}
+
+function renderCard(c) {
+  const el = document.createElement("div");
+  el.className = "card";
+  el.draggable = true;
+  el.dataset.id = c.id;
+  const stageTag = { NOW: "now", NEXT: "", WAIT: "wait", LATER: "", DONE: "done" }[c.stage] || "";
+  el.innerHTML = `
+    <div class="id">${c.id}</div>
+    <div class="title">${escapeHtml(c.title)}</div>
+    <div class="meta">
+      <span class="tag ${stageTag}">${stageLabel(c.stage)}</span>
+      ${c.source ? `<span class="tag">${escapeHtml(c.source)}</span>` : ""}
+    </div>`;
+  el.addEventListener("click", () => { editingId = c.id; renderEditor(); });
+  el.addEventListener("dragstart", e => {
+    el.classList.add("dragging");
+    e.dataTransfer.setData("text/plain", c.id);
+    e.dataTransfer.effectAllowed = "move";
+  });
+  el.addEventListener("dragend", () => el.classList.remove("dragging"));
+  return el;
+}
+
+function stageLabel(s) {
+  return ({ NOW:"現在",NEXT:"下一個",WAIT:"等老闆",LATER:"延後",DONE:"已完成" })[s] || s;
+}
+
+function renderEditor() {
+  const wrap = document.getElementById("editor");
+  const c = cards.find(x => x.id === editingId);
+  if (!c) {
+    wrap.innerHTML = `<h3>點卡片以編輯</h3><p class="empty">在左側點任何一張卡片，這裡會出現詳細欄位。</p>`;
+    return;
+  }
+  wrap.innerHTML = `
+    <h3>${c.id} · 編輯</h3>
+    <label>標題</label>
+    <input id="f-title" value="${escapeHtml(c.title)}" />
+    <div class="row">
+      <div>
+        <label>欄位</label>
+        <select id="f-stage">
+          ${["NOW","NEXT","WAIT","LATER","DONE"].map(s =>
+            `<option value="${s}" ${s===c.stage?"selected":""}>${stageLabel(s)}</option>`).join("")}
+        </select>
+      </div>
+      <div>
+        <label>來源</label>
+        <input id="f-source" value="${escapeHtml(c.source||"")}" />
+      </div>
+    </div>
+    <label>為什麼 / 痛點</label>
+    <textarea id="f-why">${escapeHtml(c.why||"")}</textarea>
+    <label>下一步</label>
+    <textarea id="f-next">${escapeHtml(c.next||"")}</textarea>
+    <label>備註 / 決策脈絡</label>
+    <textarea id="f-note">${escapeHtml(c.note||"")}</textarea>
+    <div class="toolbar">
+      <button class="btn" id="btn-save">儲存</button>
+      <button class="btn secondary" id="btn-close">關閉</button>
+      <button class="btn danger" id="btn-delete">刪除</button>
+    </div>
+  `;
+  document.getElementById("btn-save").onclick = () => {
+    const prevStage = c.stage;
+    c.title = document.getElementById("f-title").value;
+    c.stage = document.getElementById("f-stage").value;
+    c.source = document.getElementById("f-source").value;
+    c.why = document.getElementById("f-why").value;
+    c.next = document.getElementById("f-next").value;
+    c.note = document.getElementById("f-note").value;
+    const now = new Date().toISOString();
+    if (c.stage === "NOW" && !c.startedAt) c.startedAt = now;
+    if (c.stage === "DONE" && !c.doneAt) c.doneAt = now;
+    if (prevStage === "DONE" && c.stage !== "DONE") delete c.doneAt;
+    save(); render();
+  };
+  document.getElementById("btn-close").onclick = () => { editingId = null; renderEditor(); };
+  document.getElementById("btn-delete").onclick = () => {
+    if (!confirm(`刪除 ${c.id}?`)) return;
+    cards = cards.filter(x => x.id !== c.id);
+    editingId = null; save(); render();
+  };
+}
+
+function renderLog() {
+  const el = document.getElementById("log-list");
+  if (!log.length) { el.innerHTML = `<p class="empty">尚無進度日誌</p>`; return; }
+  el.innerHTML = log.slice().reverse().map(e => `
+    <div class="entry">
+      <div class="when">${escapeHtml(e.date)}</div>
+      <h4>${escapeHtml(e.summary)}</h4>
+      ${e.next ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;">下次接續：${escapeHtml(e.next)}</div>` : ""}
+    </div>`).join("");
+}
+
+function renderResume() {
+  const wrap = document.getElementById("resume-body");
+  const latest = log[log.length-1];
+  const nows = cards.filter(c => c.stage === "NOW");
+  wrap.innerHTML = `
+    <div class="next-step">${latest ? escapeHtml(latest.next || latest.summary) : "尚無紀錄"}</div>
+    <div style="margin-top:8px;color:var(--muted);font-size:12px;">
+      最後更新：${latest ? escapeHtml(latest.date) : "—"} · 現在處理 ${nows.length} 件
+    </div>
+  `;
+  renderStats();
+}
+
+// ---- Founder Score (4 axes × 25 pts = 100) ----
+function renderStats() {
+  const now = new Date();
+  const dayMs = 86400000;
+  const last30 = new Date(now - 30 * dayMs);
+
+  // ---- WIP discipline (25pts) ----
+  // Penalize 5pts per current Now card over 3
+  const nowCount = cards.filter(c => c.stage === "NOW").length;
+  const wipScore = Math.max(0, 25 - Math.max(0, nowCount - 3) * 5);
+  const wipPct = Math.round((wipScore / 25) * 100);
+
+  // ---- Shipping velocity (25pts) ----
+  // Cards done in last 30 days; target = 6 cards / 30d (~1.5/week)
+  const recentDone = cards.filter(c => c.stage === "DONE" && c.doneAt && new Date(c.doneAt) > last30);
+  const cardsPerWeek = (recentDone.length / 30) * 7;
+  const velocityScore = Math.min(25, (cardsPerWeek / 1.5) * 25);
+  const velocityPct = Math.min(100, Math.round((cardsPerWeek / 1.5) * 100));
+
+  // ---- Cycle time (25pts) ----
+  // Avg days NOW→DONE in last 30d; target ≤ 7 days = full pts; ≥ 30 days = 0
+  const cycleTimes = recentDone
+    .filter(c => c.startedAt && c.doneAt)
+    .map(c => (new Date(c.doneAt) - new Date(c.startedAt)) / dayMs);
+  const avgCycle = cycleTimes.length ? cycleTimes.reduce((a,b)=>a+b,0) / cycleTimes.length : null;
+  const cycleScore = avgCycle == null ? 12.5 : Math.max(0, 25 - Math.max(0, avgCycle - 7) * (25/23));
+  const cyclePct = avgCycle == null ? 50 : Math.round((cycleScore / 25) * 100);
+
+  // ---- Learning rhythm (25pts) ----
+  // Streak of consecutive days with log entry, capped at 14
+  const logDates = new Set(log.map(e => e.date));
+  let streak = 0;
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(now - i * dayMs).toISOString().slice(0,10);
+    if (logDates.has(d)) streak++;
+    else if (i > 0) break; // Allow today to be empty
+  }
+  const learnScore = Math.min(25, (streak / 14) * 25);
+  const learnPct = Math.round((streak / 14) * 100);
+
+  const total = Math.round(wipScore + velocityScore + cycleScore + learnScore);
+  const grade = total >= 85 ? "A" : total >= 70 ? "B" : total >= 50 ? "C" : "D";
+
+  // ---- Render ----
+  const set = (id, val) => document.getElementById(id).textContent = val;
+  const setBar = (id, pct) => document.getElementById(id).style.width = Math.min(100, pct) + "%";
+
+  set("s-total", total + "");
+  document.getElementById("s-total-grade").textContent = grade;
+  document.getElementById("s-total-grade").className = "grade " + grade;
+  setBar("s-total-bar", total);
+
+  set("s-wip", nowCount + " / 3");
+  set("s-wip-sub", `${Math.round(wipScore)} / 25 分`);
+  setBar("s-wip-bar", wipPct);
+
+  set("s-velocity", cardsPerWeek.toFixed(1));
+  set("s-velocity-sub", `${recentDone.length} 件 / 30 天 · ${Math.round(velocityScore)} / 25 分`);
+  setBar("s-velocity-bar", velocityPct);
+
+  set("s-cycle", avgCycle == null ? "—" : avgCycle.toFixed(1) + " 天");
+  set("s-cycle-sub", avgCycle == null ? "資料不足 · 12.5 / 25 分" : `${Math.round(cycleScore)} / 25 分 (target ≤ 7)`);
+  setBar("s-cycle-bar", cyclePct);
+
+  set("s-learn", streak + " 天");
+  set("s-learn-sub", `${Math.round(learnScore)} / 25 分 (target 14 天)`);
+  setBar("s-learn-bar", learnPct);
+
+  // ---- Coach insight: pick the lowest, give 1 actionable line ----
+  const axes = [
+    { name: "WIP 自律", score: wipScore, max: 25,
+      tip: nowCount > 3
+        ? `現在 NOW 有 ${nowCount} 件 (>3)。把優先級最低的 1-2 張拖到 NEXT，先把最重要的做完。`
+        : null },
+    { name: "出貨速度", score: velocityScore, max: 25,
+      tip: cardsPerWeek < 1.5
+        ? `過去 30 天只完成 ${recentDone.length} 件，每週 ${cardsPerWeek.toFixed(1)} 件。考慮把大卡片拆細，或刪除 NEXT 裡不會做的。`
+        : null },
+    { name: "週期時間", score: cycleScore, max: 25,
+      tip: avgCycle != null && avgCycle > 7
+        ? `卡片平均花 ${avgCycle.toFixed(1)} 天從 NOW → DONE。看看哪張卡 stuck 太久 — 是 scope 太大還是真的卡？` : null },
+    { name: "學習節奏", score: learnScore, max: 25,
+      tip: streak < 7
+        ? `日記連續 ${streak} 天，少於 7 天。今晚收工時寫一行 TIL — 一年後你會感謝自己。`
+        : null }
+  ];
+  const lowest = axes.filter(a => a.tip).sort((a,b) => a.score - b.score)[0];
+  const coach = document.getElementById("coach");
+  if (lowest) {
+    coach.innerHTML = `<b>Coach 提醒（${lowest.name} 最弱）：</b> ${lowest.tip}`;
+  } else if (total >= 85) {
+    coach.innerHTML = `<b>Coach：</b> 4 軸都健康。下週試試把『現在處理』降到 2 件，把多出來的精力放在 1 個品質實驗上。`;
+  } else {
+    coach.innerHTML = `<b>Coach：</b> 全面均衡，繼續維持。每週日跑 <code>/retro</code> + <code>/health</code> 加速複利。`;
+  }
+}
+
+// ---- Drag & drop between columns + reorder ----
+document.querySelectorAll(".col-list").forEach(list => {
+  list.addEventListener("dragover", e => {
+    e.preventDefault();
+    list.classList.add("dragover");
+    const after = getDragAfter(list, e.clientY);
+    const dragging = document.querySelector(".card.dragging");
+    if (!dragging) return;
+    if (after == null) list.appendChild(dragging);
+    else list.insertBefore(dragging, after);
+  });
+  list.addEventListener("dragleave", () => list.classList.remove("dragover"));
+  list.addEventListener("drop", e => {
+    e.preventDefault();
+    list.classList.remove("dragover");
+    const id = e.dataTransfer.getData("text/plain");
+    const stage = list.dataset.list;
+    const order = [...list.querySelectorAll(".card")].map(el => el.dataset.id);
+    // Move dragged item to that stage
+    const c = cards.find(x => x.id === id);
+    if (c) {
+      const prevStage = c.stage;
+      c.stage = stage;
+      // Auto-timestamp for cycle time tracking
+      const now = new Date().toISOString();
+      if (stage === "NOW" && !c.startedAt) c.startedAt = now;
+      if (stage === "DONE" && !c.doneAt) c.doneAt = now;
+      // If un-done (DONE → other), clear doneAt so cycle time stays accurate
+      if (prevStage === "DONE" && stage !== "DONE") delete c.doneAt;
+    }
+    // Reorder cards array per visible order across all columns
+    const allOrder = [...document.querySelectorAll(".col-list .card")].map(el => el.dataset.id);
+    cards.sort((a,b) => allOrder.indexOf(a.id) - allOrder.indexOf(b.id));
+    save(); render();
+  });
+});
+function getDragAfter(list, y) {
+  const els = [...list.querySelectorAll(".card:not(.dragging)")];
+  let closest = null, closestDist = -Infinity;
+  for (const el of els) {
+    const box = el.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closestDist) { closestDist = offset; closest = el; }
+  }
+  return closest;
+}
+
+// ---- Toolbar actions ----
+document.getElementById("btn-reset").onclick = () => {
+  if (!confirm("把卡片重設為內建預設？(日誌會保留)")) return;
+  cards = structuredClone(DEFAULT_CARDS);
+  save(); render();
+};
+document.getElementById("btn-export").onclick = () => {
+  const data = JSON.stringify({ cards, log, exportedAt: new Date().toISOString() }, null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "roadmap-" + new Date().toISOString().slice(0,10) + ".json";
+  a.click();
+};
+document.getElementById("btn-import").onclick = () => document.getElementById("file-import").click();
+document.getElementById("file-import").onchange = e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.cards) throw new Error("invalid file");
+      if (!confirm(`匯入 ${data.cards.length} 張卡片 + ${(data.log||[]).length} 條日誌？(會覆蓋目前資料)`)) return;
+      cards = data.cards;
+      if (Array.isArray(data.log)) log = data.log;
+      save(); render();
+      alert("匯入完成 ✓");
+    } catch (err) {
+      alert("匯入失敗：" + err.message);
+    }
+  };
+  reader.readAsText(f);
+};
+document.getElementById("btn-add").onclick = () => {
+  const nextId = "P" + String(cards.length + 1).padStart(2, "0");
+  const id = prompt("卡片 ID（例如 P21）", nextId);
+  if (!id) return;
+  if (cards.find(c => c.id === id)) { alert("ID 已存在"); return; }
+  cards.unshift({ id, stage: "NOW", title: "新卡片 - 點此編輯", why:"", next:"", source:"", note:"" });
+  editingId = id; save(); render();
+};
+document.getElementById("btn-guide").onclick = () => {
+  document.getElementById("guide-overlay").classList.add("open");
+};
+document.getElementById("btn-guide-close").onclick = () => {
+  document.getElementById("guide-overlay").classList.remove("open");
+};
+document.getElementById("guide-overlay").onclick = (e) => {
+  if (e.target.id === "guide-overlay") e.target.classList.remove("open");
+};
+document.getElementById("btn-log").onclick = () => {
+  const today = new Date().toISOString().slice(0,10);
+  const summary = prompt(`今日 (${today}) 做了什麼？(1-2 句)`);
+  if (!summary) return;
+  const next = prompt("明天接續做什麼？(具體：先讀 X，找 Y，目標 Z)") || "";
+  log.push({ date: today, summary, next });
+  save(); render();
+};
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+load(); render();
+</script>
+</body>
+</html>
