@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { IconEventAvailable, IconPhone, IconWarning } from "@/components/liff/icons";
+import { IconCheckCircle, IconPhone, IconCalendar, IconWarning, IconChevronRight } from "@/components/liff/icons";
 
 export function ConfirmStep({
   notes,
@@ -76,95 +76,70 @@ export function ConfirmStep({
       {/* Cancel policy — inline */}
       <div className="mt-8">
         <button
+          type="button"
           onClick={() => setPolicyExpanded(!policyExpanded)}
           className="flex items-center justify-between w-full text-left"
         >
-          <h3 className="font-bold text-base text-[#003D2B]">取消政策</h3>
-          <span className={`text-[#003D2B]/40 text-sm transition-transform ${policyExpanded ? 'rotate-0' : '-rotate-90'}`}>
-            ▼
-          </span>
+          <h3 className="font-bold text-base text-[#003D2B] tracking-tight">取消政策</h3>
+          <IconChevronRight
+            className={`w-4 h-4 text-[#003D2B]/40 transition-transform duration-200 ${policyExpanded ? 'rotate-90' : 'rotate-0'}`}
+          />
         </button>
 
         {policyExpanded && (
-          <div className="mt-4 space-y-3 animate-fadeIn">
-            {/* Block 1 — Cancel ≥ 24h free */}
-            <div className="rounded-xl bg-[#E8F1EC] p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-[#003D2B] rounded-full flex items-center justify-center shrink-0">
-                  <IconEventAvailable className="w-4 h-4 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="font-bold text-[#003D2B] text-sm">24 小時前取消</span>
-                    <span className="bg-[#003D2B] text-white rounded-full text-[10px] px-2 py-0.5 font-medium">
-                      免費
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#404944] leading-relaxed">
-                    預約 24 小時前可線上免費取消。
-                  </p>
-                </div>
+          <div className="mt-4 rounded-2xl bg-white border border-[#003D2B]/[0.08] overflow-hidden animate-fadeIn shadow-[0_1px_3px_rgba(0,61,43,0.04)]">
+            {/* Row 1 — 24h 前免費取消 */}
+            <div className="flex items-center gap-3.5 px-4 py-3.5">
+              <div className="w-9 h-9 rounded-full bg-[#003D2B]/[0.06] flex items-center justify-center shrink-0">
+                <IconCheckCircle className="w-[18px] h-[18px] text-[#003D2B]" />
               </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-[#003D2B] text-[14px] leading-tight">24 小時前取消</div>
+                <p className="text-[12px] text-[#003D2B]/55 leading-relaxed mt-0.5">可線上免費取消</p>
+              </div>
+              <span className="text-[11px] font-semibold text-[#003D2B]/55 tracking-[0.08em] shrink-0">免費</span>
             </div>
 
-            {/* Block 2 — Cancel < 24h must call */}
-            <div className="rounded-xl bg-[#FBF1E6] p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-[#8A6A4D] rounded-full flex items-center justify-center shrink-0">
-                  <IconPhone className="w-4 h-4 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="font-bold text-[#5C4633] text-sm">24 小時內取消</span>
-                    <span className="bg-[#8A6A4D] text-white rounded-full text-[10px] px-2 py-0.5 font-medium">
-                      電話聯繫
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#404944] leading-relaxed">
-                    請於營業時間致電店家。
-                  </p>
-                </div>
+            <div className="h-px bg-[#003D2B]/[0.06] ml-[60px] mr-4" />
+
+            {/* Row 2 — 24h 內致電 */}
+            <div className="flex items-center gap-3.5 px-4 py-3.5">
+              <div className="w-9 h-9 rounded-full bg-[#003D2B]/[0.06] flex items-center justify-center shrink-0">
+                <IconPhone className="w-[16px] h-[16px] text-[#003D2B]" />
               </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-[#003D2B] text-[14px] leading-tight">24 小時內取消</div>
+                <p className="text-[12px] text-[#003D2B]/55 leading-relaxed mt-0.5">請於營業時間致電店家</p>
+              </div>
+              <span className="text-[11px] font-semibold text-[#003D2B]/55 tracking-[0.08em] shrink-0">致電</span>
             </div>
 
-            {/* Block 3 — Reschedule anytime online */}
-            <div className="rounded-xl bg-[#E8F1EC] p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-[#003D2B] rounded-full flex items-center justify-center shrink-0">
-                  <IconEventAvailable className="w-4 h-4 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="font-bold text-[#003D2B] text-sm">改期</span>
-                    <span className="bg-[#003D2B] text-white rounded-full text-[10px] px-2 py-0.5 font-medium">
-                      隨時可線上改
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#404944] leading-relaxed">
-                    想換時間優先選改期，不用取消重訂。
-                  </p>
-                </div>
+            <div className="h-px bg-[#003D2B]/[0.06] ml-[60px] mr-4" />
+
+            {/* Row 3 — 改期隨時 */}
+            <div className="flex items-center gap-3.5 px-4 py-3.5">
+              <div className="w-9 h-9 rounded-full bg-[#003D2B]/[0.06] flex items-center justify-center shrink-0">
+                <IconCalendar className="w-[16px] h-[16px] text-[#003D2B]" />
               </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-[#003D2B] text-[14px] leading-tight">改期</div>
+                <p className="text-[12px] text-[#003D2B]/55 leading-relaxed mt-0.5">隨時可線上更改，建議優先選擇</p>
+              </div>
+              <span className="text-[11px] font-semibold text-[#003D2B]/55 tracking-[0.08em] shrink-0">隨時</span>
             </div>
 
-            {/* Block 4 — No-show = violation */}
-            <div className="rounded-xl bg-[#FDEEEF] p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-[#A84A3B] rounded-full flex items-center justify-center shrink-0">
-                  <IconWarning className="w-4 h-4 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="font-bold text-[#93000A] text-sm">未到店 (No-show)</span>
-                    <span className="bg-[#A84A3B] text-white rounded-full text-[10px] px-2 py-0.5 font-medium">
-                      記違規一次
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#404944] leading-relaxed">
-                    未到店且未事先通知取消，將記錄為違規一次。
-                  </p>
-                </div>
+            <div className="h-px bg-[#003D2B]/[0.06] ml-[60px] mr-4" />
+
+            {/* Row 4 — No-show（紅色 accent，克制使用） */}
+            <div className="flex items-center gap-3.5 px-4 py-3.5">
+              <div className="w-9 h-9 rounded-full bg-[#A84A3B]/[0.08] flex items-center justify-center shrink-0">
+                <IconWarning className="w-[16px] h-[16px] text-[#A84A3B]" />
               </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-[#003D2B] text-[14px] leading-tight">未到店 (No-show)</div>
+                <p className="text-[12px] text-[#003D2B]/55 leading-relaxed mt-0.5">未事先通知，記違規一次</p>
+              </div>
+              <span className="text-[11px] font-semibold text-[#A84A3B] tracking-[0.08em] shrink-0">違規</span>
             </div>
           </div>
         )}
