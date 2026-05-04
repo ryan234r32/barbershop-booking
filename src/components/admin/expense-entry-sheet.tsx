@@ -3,21 +3,16 @@
 /**
  * V3.7 §1 — Progressive expense entry sheet (full-page modal, iOS-native feel).
  *
- * Design (iter 3, 2026-05-04):
- *   1. **No vaul** — full-page modal uses our own FullscreenModal (plain
- *      portal + fixed div). Vaul kept introducing horizontal-shift + post-
- *      keyboard "一半白掉" bugs on iOS PWA because of its slide-up transform
- *      not cleanly clearing.
- *   2. **Progressive disclosure** — fields appear top-to-bottom as the user
- *      commits earlier choices: date → type (變動/固定) → category → amount
- *      → optional payment + note.
+ * Design (iter 4, 2026-05-05):
+ *   1. **No vaul** — full-page modal uses our own FullscreenModal.
+ *   2. **Progressive disclosure** — fields appear top-to-bottom: date → type
+ *      (變動/固定) → category → amount → optional payment + note.
  *   3. **「其他」 inline expansion** — tapping the 其他 chip reveals a
- *      custom-label input below the chip grid, autoFocuses it. Saved into
- *      Expense.notes as the de-facto label when category=other.
- *   4. **Bottom safe-area + always-visible submit** — submit button sits at
- *      the end of the scroll content with safe-area-inset-bottom padding.
- *   5. **No close-on-backdrop** — preventDismiss=true forces the X button
- *      so users don't lose form data by accidental tap.
+ *      custom-label input below the chip grid, autoFocuses it.
+ *   4. **No scrollIntoView** — iOS PWA was triggering window-level horizontal
+ *      jump when scrollIntoView fired (老闆 5/5 報告：點 chip 後整頁向左偏).
+ *      Replaced with manual container.scrollTo() that stays vertical-only.
+ *   5. **No close-on-backdrop** — preventDismiss=true.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -58,6 +53,7 @@ export function ExpenseEntrySheet({
 
   const amountRef = useRef<HTMLInputElement | null>(null);
   const customItemRef = useRef<HTMLInputElement | null>(null);
+  const scrollBodyRef = useRef<HTMLDivElement | null>(null);
 
   // Reset state on close.
   useEffect(() => {
@@ -96,15 +92,26 @@ export function ExpenseEntrySheet({
     Number.isFinite(amtNum) &&
     amtNum > 0;
 
-  // When amount section appears, scroll into view.
+  // When amount section appears, scroll the modal body (vertical-only) so
+  // the new section is visible. We do NOT use Element.scrollIntoView() because
+  // on iOS PWA it triggers a window-level horizontal jump when the parent has
+  // ANY ancestor with overflow set (老闆 5/5 報告：點 chip 後整頁向左偏 ~80px).
   useEffect(() => {
-    if (showAmountRow && amountRef.current) {
+    if (!showAmountRow) return;
+    const t = setTimeout(() => {
       const el = amountRef.current;
-      const t = setTimeout(() => {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 120);
-      return () => clearTimeout(t);
-    }
+      const container = scrollBodyRef.current;
+      if (!el || !container) return;
+      const containerRect = container.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const offset =
+        elRect.top - containerRect.top - containerRect.height / 2 + elRect.height / 2;
+      container.scrollTo({
+        top: container.scrollTop + offset,
+        behavior: "smooth",
+      });
+    }, 120);
+    return () => clearTimeout(t);
   }, [showAmountRow]);
 
   // When 「其他」 input appears, focus it.
@@ -195,8 +202,13 @@ export function ExpenseEntrySheet({
 
       {/* Scrollable body */}
       <div
+        ref={scrollBodyRef}
         className="flex-1 overflow-y-auto px-5 pt-5"
-        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 32px)" }}
+        style={{
+          paddingBottom: "max(env(safe-area-inset-bottom), 32px)",
+          // Defensive: lock horizontal scroll on the body too.
+          overflowX: "hidden",
+        }}
       >
         {/* (a) 日期 */}
         <Section label="日期" complete>
