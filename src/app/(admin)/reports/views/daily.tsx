@@ -281,11 +281,7 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
           value={formatRevenue(d.totalRevenue)}
           tone="brand"
         />
-        <BigStatCard
-          label="服務客數"
-          value={`${d.servedCount}`}
-          sub={d.servedCount > 0 ? `客單 ${d.avgTicket.toLocaleString()}` : ""}
-        />
+        <BigStatCard label="服務客數" value={`${d.servedCount}`} />
       </div>
 
       {/* 對帳進度 — V3.8 升級為大字 hero card（pendingCount 是每日重點）。

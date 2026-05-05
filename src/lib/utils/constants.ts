@@ -7,6 +7,13 @@ export const DEFAULT_BUSINESS_HOURS = {
   endTime: "20:00",
 };
 
+/**
+ * 客戶端 LIFF 日曆最遠可預約天數。
+ * Single source of truth — LIFF calendar、`/api/bookings` 後端驗證、`/api/business-config`
+ * 都從這裡取值，避免 30 / 45 / 60 在不同檔案 drift。
+ */
+export const MAX_ADVANCE_DAYS = 45;
+
 // Generates all possible slot start times: ["11:00", "12:00", ..., "19:00"]
 export function generateAllSlots(startTime: string, endTime: string): string[] {
   const slots: string[] = [];

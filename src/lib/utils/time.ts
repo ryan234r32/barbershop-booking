@@ -33,6 +33,19 @@ export function todayInTaipei(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: TIMEZONE });
 }
 
+/**
+ * 把 "YYYY-MM-DD" 加上 n 天，回傳 "YYYY-MM-DD"。
+ * Used by 45-day window check. 純字串日期運算，不碰時區。
+ */
+export function addDaysToISO(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d + days);
+  const yy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
 /** Format a Date to "HH:mm" string */
 export function formatTime(date: Date): string {
   const h = date.getHours().toString().padStart(2, "0");
