@@ -53,3 +53,45 @@ describe("JWT token signing and verification", () => {
     expect(decoded!.role).toBe("STAFF");
   });
 });
+
+describe("JWT lazy secret resolution (Vercel build-time fix)", () => {
+  it("does not throw on module import when JWT_SECRET is unset", async () => {
+    // The whole point of the lazy refactor: before this change, importing
+    // the module crashed `next build` page-data-collection if JWT_SECRET
+    // wasn't set in the build env (broke preview deploys for PRs #91-98).
+    // Meta-test: if this file can `import { signAdminToken } from ...`
+    // without throwing, the lazy refactor is intact (the import at the top
+    // of this very file would have crashed the suite under the old code if
+    // JWT_SECRET were unset at vitest startup).
+    const mod = await import("@/lib/auth/jwt");
+    expect(typeof mod.signAdminToken).toBe("function");
+    expect(typeof mod.verifyAdminToken).toBe("function");
+  });
+
+  it("throws at sign-call site if JWT_SECRET is unset (fail-fast preserved)", () => {
+    const original = process.env.JWT_SECRET;
+    delete process.env.JWT_SECRET;
+    try {
+      expect(() =>
+        signAdminToken({ adminId: "a", tenantId: "t", role: "OWNER" }),
+      ).toThrow(/JWT_SECRET environment variable is required/);
+    } finally {
+      // Restore so subsequent tests in the same file still work.
+      if (original !== undefined) process.env.JWT_SECRET = original;
+    }
+  });
+
+  it("returns null (not throws) at verify-call site if JWT_SECRET is unset", () => {
+    // verifyAdminToken catches all errors (existing contract — used in
+    // request paths where missing token == unauthenticated, not 500). So
+    // a missing secret manifests as "auth fails" not "server crashes" on
+    // verify path. This locks that behavior in.
+    const original = process.env.JWT_SECRET;
+    delete process.env.JWT_SECRET;
+    try {
+      expect(verifyAdminToken("any.token.value")).toBeNull();
+    } finally {
+      if (original !== undefined) process.env.JWT_SECRET = original;
+    }
+  });
+});
