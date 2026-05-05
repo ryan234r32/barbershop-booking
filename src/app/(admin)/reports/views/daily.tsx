@@ -279,18 +279,9 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
         <BigStatCard
           label="今日應收"
           value={formatRevenue(d.totalRevenue)}
-          sub={
-            d.comparisonDeltaPct !== null
-              ? `${d.comparisonDeltaPct >= 0 ? "↑" : "↓"} ${Math.abs(d.comparisonDeltaPct).toFixed(0)}% vs 同日 4 週中位`
-              : "尚無比較資料"
-          }
           tone="brand"
         />
-        <BigStatCard
-          label="服務客數"
-          value={`${d.servedCount}`}
-          sub={`客單 ${d.avgTicket.toLocaleString()}`}
-        />
+        <BigStatCard label="服務客數" value={`${d.servedCount}`} />
         <BigStatCard
           label="對帳進度"
           value={`${settledCount}/${reconcileTotal}`}
@@ -533,7 +524,7 @@ function BigStatCard({
 }: {
   label: string;
   value: string;
-  sub: string;
+  sub?: string;
   tone?: "brand";
 }) {
   return (
@@ -546,12 +537,14 @@ function BigStatCard({
       >
         {value}
       </p>
-      <p
-        className="text-[11px] text-[var(--color-text-muted)] mt-1 leading-snug line-clamp-2 break-words"
-        title={sub}
-      >
-        {sub}
-      </p>
+      {sub && (
+        <p
+          className="text-[11px] text-[var(--color-text-muted)] mt-1 leading-snug line-clamp-2 break-words"
+          title={sub}
+        >
+          {sub}
+        </p>
+      )}
     </MCard>
   );
 }
