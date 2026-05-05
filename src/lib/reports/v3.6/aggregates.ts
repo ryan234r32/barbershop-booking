@@ -92,18 +92,28 @@ export async function computePrebookRate(
     select: { userId: true, date: true, createdAt: true },
   });
 
+  // V3.8 perf (Wave 3 / B3): O(N×M) → O(N+M).
+  // Old code did followups.some() inside the for-loop, scanning the full
+  // followups array once per completed booking. At 1169 prod bookings that's
+  // ~300×1000 = 300K comparisons (still <30ms in V8 but quadratic in data
+  // growth — at 10x scale it's 30M ops and noticeable). Pre-grouping by
+  // userId makes the inner loop scan only that user's followups.
+  const followupsByUser = new Map<string, Array<{ date: Date; createdAt: Date }>>();
+  for (const f of followups) {
+    let bucket = followupsByUser.get(f.userId);
+    if (!bucket) {
+      bucket = [];
+      followupsByUser.set(f.userId, bucket);
+    }
+    bucket.push({ date: f.date, createdAt: f.createdAt });
+  }
+
   let prebookCount = 0;
   for (const c of completed) {
     const anchor = c.checkedInAt ?? c.updatedAt;
-    const anchorMs = anchor.getTime();
-    const hit = followups.some(
-      (f) =>
-        f.userId === c.userId &&
-        f.date.getTime() > anchorMs &&
-        f.createdAt.getTime() >= anchorMs &&
-        f.createdAt.getTime() <= anchorMs + 2 * 3600 * 1000,
-    );
-    if (hit) prebookCount++;
+    const userFollowups = followupsByUser.get(c.userId);
+    if (!userFollowups) continue;
+    if (hasPrebookHit(anchor.getTime(), userFollowups)) prebookCount++;
   }
 
   return {
@@ -111,6 +121,25 @@ export async function computePrebookRate(
     prebookCount,
     completedCount: completed.length,
   };
+}
+
+/**
+ * Pure-function version of the prebook hit-detection inner loop. Exported so
+ * the V3.8 B3 refactor (Map preprocessing) has a regression-testable boundary.
+ *
+ * Returns true if `userFollowups` contains a future booking whose createdAt
+ * falls within the post-checkout 2-hour window anchored at `anchorMs`.
+ */
+export function hasPrebookHit(
+  anchorMs: number,
+  userFollowups: ReadonlyArray<{ date: Date; createdAt: Date }>,
+): boolean {
+  return userFollowups.some(
+    (f) =>
+      f.date.getTime() > anchorMs &&
+      f.createdAt.getTime() >= anchorMs &&
+      f.createdAt.getTime() <= anchorMs + 2 * 3600 * 1000,
+  );
 }
 
 // ─── RFM Segments (V3.6 §4.4) ────────────────────────────────────────────

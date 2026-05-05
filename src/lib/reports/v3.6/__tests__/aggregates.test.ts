@@ -14,6 +14,7 @@ import {
   renderSummary,
   generateScenarios,
   pastWeeklyRanges,
+  hasPrebookHit,
   type AlertContext,
   type NarrativeContext,
 } from "../aggregates";
@@ -254,5 +255,82 @@ describe("pastWeeklyRanges", () => {
       { idx: 2, day: "2026-04-08" }, // -21d
       { idx: 3, day: "2026-04-01" }, // -28d
     ]);
+  });
+});
+
+// ─── hasPrebookHit (V3.8 perf — B3 regression test) ─────────────────────
+//
+// Extracted from computePrebookRate's inner loop when the O(N×M) → O(N+M)
+// refactor introduced Map-grouping. Locks in the 2-hour post-checkout window
+// semantics so future callers (or accidental edits) don't drift the rule.
+
+describe("hasPrebookHit", () => {
+  const anchor = new Date("2026-04-30T12:00:00.000Z").getTime(); // checkout 12:00 UTC
+
+  const future = (date: string, created: string) => ({
+    date: new Date(date),
+    createdAt: new Date(created),
+  });
+
+  it("hits when followup is future-dated AND created within 2h after anchor", () => {
+    expect(
+      hasPrebookHit(anchor, [
+        future("2026-05-15T00:00:00Z", "2026-04-30T12:30:00Z"), // +30min after checkout
+      ]),
+    ).toBe(true);
+  });
+
+  it("misses when followup createdAt is before anchor (= booked before checkout, not a re-book)", () => {
+    expect(
+      hasPrebookHit(anchor, [
+        future("2026-05-15T00:00:00Z", "2026-04-30T11:00:00Z"), // -1h before checkout
+      ]),
+    ).toBe(false);
+  });
+
+  it("misses when followup createdAt is more than 2h after anchor", () => {
+    expect(
+      hasPrebookHit(anchor, [
+        future("2026-05-15T00:00:00Z", "2026-04-30T14:30:00Z"), // +2.5h after checkout
+      ]),
+    ).toBe(false);
+  });
+
+  it("misses when followup date is not in the future of anchor", () => {
+    expect(
+      hasPrebookHit(anchor, [
+        future("2026-04-30T00:00:00Z", "2026-04-30T12:30:00Z"), // same day, not future
+      ]),
+    ).toBe(false);
+  });
+
+  it("hits at exact 2h boundary (≤ 2*3600*1000 inclusive per original loop)", () => {
+    expect(
+      hasPrebookHit(anchor, [
+        future("2026-05-15T00:00:00Z", "2026-04-30T14:00:00Z"), // exactly +2h
+      ]),
+    ).toBe(true);
+  });
+
+  it("hits at exact anchor boundary (createdAt === anchor)", () => {
+    expect(
+      hasPrebookHit(anchor, [
+        future("2026-05-15T00:00:00Z", "2026-04-30T12:00:00Z"), // exactly = anchor
+      ]),
+    ).toBe(true);
+  });
+
+  it("scans all entries and returns true on any hit (not just first)", () => {
+    expect(
+      hasPrebookHit(anchor, [
+        future("2026-04-30T00:00:00Z", "2026-04-30T11:00:00Z"), // miss (past)
+        future("2026-04-29T00:00:00Z", "2026-04-30T15:00:00Z"), // miss (>2h)
+        future("2026-05-15T00:00:00Z", "2026-04-30T13:00:00Z"), // hit (3rd entry)
+      ]),
+    ).toBe(true);
+  });
+
+  it("returns false on empty array", () => {
+    expect(hasPrebookHit(anchor, [])).toBe(false);
   });
 });
