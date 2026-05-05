@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { IconChevronLeft, IconChevronRight } from "@/components/liff/icons";
+import { MAX_ADVANCE_DAYS } from "@/lib/utils/constants";
 
 // Monday-first weekday labels
 const WEEKDAY_NAMES = ["一", "二", "三", "四", "五", "六", "日"];
@@ -21,6 +22,11 @@ export function CalendarStep({
   serviceSlotsNeeded,
   onDateSelect,
   onTimeSelect,
+  // V3.9 公休日 / 預約窗口都從 /api/business-config 拿，前端不再寫死。
+  // 沒給就 fallback：45 天上限、無公休（讓畫面仍能顯示，後端再擋）。
+  closedWeekdays = [],
+  holidays = [],
+  maxAdvanceDays = MAX_ADVANCE_DAYS,
 }: {
   selectedDate: string;
   selectedTime: string;
@@ -30,6 +36,12 @@ export function CalendarStep({
   serviceSlotsNeeded: number;
   onDateSelect: (date: string) => void;
   onTimeSelect: (time: string) => void;
+  /** 每週固定公休的星期數（0=Sun..6=Sat），來自 BusinessHours.isOpen=false。 */
+  closedWeekdays?: number[];
+  /** 個別公休日（國定假日 / 臨時請假），YYYY-MM-DD 陣列。 */
+  holidays?: string[];
+  /** 最遠可預約天數，預設 45。 */
+  maxAdvanceDays?: number;
 }) {
   const today = useMemo(() => new Date(), []);
   const todayStart = useMemo(
@@ -59,18 +71,24 @@ export function CalendarStep({
 
   const maxDate = useMemo(() => {
     const d = new Date(todayStart);
-    d.setDate(d.getDate() + 30);
+    d.setDate(d.getDate() + maxAdvanceDays);
     return d;
-  }, [todayStart]);
+  }, [todayStart, maxAdvanceDays]);
+
+  // O(1) lookup for ad-hoc holidays + weekly closures
+  const holidaySet = useMemo(() => new Set(holidays), [holidays]);
+  const closedSet = useMemo(() => new Set(closedWeekdays), [closedWeekdays]);
 
   const getDayInfo = useCallback(
     (day: number | null) => {
-      if (day === null) return { selectable: false, isToday: false, isPast: false, isMonday: false };
+      if (day === null) return { selectable: false, isToday: false, isPast: false, isClosed: false };
       const date = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), day);
       // 2026-04-30 fix: was `<=` 把今天也當過去 → 不能預約當天
       // 改 `<` 讓今天可選；老闆需求是「隨時都能預約」，不設最早預約時間限制
       const isPast = date < todayStart;
-      const isMonday = date.getDay() === 1; // Monday = closed
+      // V3.9 公休判定改成讀資料庫設定（每週固定公休 + 個別假日），不再寫死週一。
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      const isClosed = closedSet.has(date.getDay()) || holidaySet.has(dateStr);
       const isBeyondMax = date > maxDate;
       const isToday =
         day === today.getDate() &&
@@ -78,13 +96,13 @@ export function CalendarStep({
         viewMonth.getFullYear() === today.getFullYear();
 
       return {
-        selectable: !isPast && !isMonday && !isBeyondMax,
+        selectable: !isPast && !isClosed && !isBeyondMax,
         isToday,
         isPast: isPast || isBeyondMax,
-        isMonday,
+        isClosed,
       };
     },
-    [viewMonth, today, todayStart, maxDate]
+    [viewMonth, today, todayStart, maxDate, closedSet, holidaySet]
   );
 
   const formatDateStr = useCallback(
@@ -200,9 +218,9 @@ export function CalendarStep({
             return <div key={`empty-${i}`} />;
           }
 
-          const { selectable, isToday, isPast, isMonday } = getDayInfo(day);
+          const { selectable, isToday, isPast, isClosed } = getDayInfo(day);
           const selected = isSelectedDay(day);
-          const dimmed = isPast || isMonday;
+          const dimmed = isPast || isClosed;
 
           return (
             <button
