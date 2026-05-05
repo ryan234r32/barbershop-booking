@@ -13,6 +13,7 @@ import {
   pickAction,
   renderSummary,
   generateScenarios,
+  pastWeeklyRanges,
   type AlertContext,
   type NarrativeContext,
 } from "../aggregates";
@@ -176,5 +177,82 @@ describe("generateScenarios", () => {
     const a = ss.find((s) => s.key === "aggressive")!;
     // each month had equal 100k/1.2M = 8.33% share → target 1.32M × 8.33% = 110000
     expect(a.monthlyTargets["2026-01"]).toBe(110000);
+  });
+});
+
+// ─── pastWeeklyRanges (V3.8 perf — B2 regression test) ──────────────────
+//
+// computeDailyView's 4-week median used to be a serial for-loop. The Promise.all
+// refactor extracted the date-range builder into pastWeeklyRanges() so the math
+// is testable in isolation. These tests lock in the *exact same* range output
+// the serial loop produced, so a future refactor that drifts the offset (e.g.
+// off-by-one on i, weekday mismatch, TZ regression) fails immediately.
+
+describe("pastWeeklyRanges", () => {
+  it("returns N entries in chronological-recent-first order (i=1 → 7 days ago)", () => {
+    // 2026-04-30 (Thursday) — index 0 should be 2026-04-23, index 3 should be 2026-04-02
+    const ranges = pastWeeklyRanges(2026, 4, 30, 4);
+    expect(ranges).toHaveLength(4);
+
+    // Each pStart is Taipei 00:00 (UTC -8h of that day). pEnd is Taipei 23:59:59.999.
+    // 2026-04-23 Taipei midnight = 2026-04-22T16:00:00Z
+    expect(ranges[0].pStart.toISOString()).toBe("2026-04-22T16:00:00.000Z");
+    expect(ranges[0].pEnd.toISOString()).toBe("2026-04-23T15:59:59.999Z");
+
+    // 2026-04-16 Taipei midnight = 2026-04-15T16:00:00Z
+    expect(ranges[1].pStart.toISOString()).toBe("2026-04-15T16:00:00.000Z");
+
+    // 2026-04-09
+    expect(ranges[2].pStart.toISOString()).toBe("2026-04-08T16:00:00.000Z");
+
+    // 2026-04-02
+    expect(ranges[3].pStart.toISOString()).toBe("2026-04-01T16:00:00.000Z");
+  });
+
+  it("crosses month boundary correctly (April 5 → previous weeks land in March)", () => {
+    const ranges = pastWeeklyRanges(2026, 4, 5, 4);
+    // 2026-04-05 - 7 = 2026-03-29
+    expect(ranges[0].pStart.toISOString()).toBe("2026-03-28T16:00:00.000Z");
+    // 2026-04-05 - 28 = 2026-03-08
+    expect(ranges[3].pStart.toISOString()).toBe("2026-03-07T16:00:00.000Z");
+  });
+
+  it("crosses year boundary (Jan 7 → previous weeks land in December previous year)", () => {
+    const ranges = pastWeeklyRanges(2026, 1, 7, 4);
+    // 2026-01-07 - 7 = 2025-12-31
+    expect(ranges[0].pStart.toISOString()).toBe("2025-12-30T16:00:00.000Z");
+    // 2026-01-07 - 28 = 2025-12-10
+    expect(ranges[3].pStart.toISOString()).toBe("2025-12-09T16:00:00.000Z");
+  });
+
+  it("preserves weekday across all returned ranges", () => {
+    // 2026-04-30 is a Thursday (UTC). All 4 prior ranges should also be Thursdays.
+    const ranges = pastWeeklyRanges(2026, 4, 30, 4);
+    for (const { pEnd } of ranges) {
+      // pEnd is 23:59:59.999 UTC of the target day → getUTCDay() returns weekday (Thursday=4)
+      expect(pEnd.getUTCDay()).toBe(4);
+    }
+  });
+
+  it("respects requested count (N=1, N=8 work the same way)", () => {
+    expect(pastWeeklyRanges(2026, 4, 30, 1)).toHaveLength(1);
+    expect(pastWeeklyRanges(2026, 4, 30, 8)).toHaveLength(8);
+  });
+
+  it("parallel mapping preserves order — ranges[i] is always 7×(i+1) days ago", () => {
+    // This is the key invariant the parallelized Promise.all relies on:
+    // sameWeekdayRev[i] must correspond to weeklyRanges[i].
+    const ranges = pastWeeklyRanges(2026, 4, 30, 4);
+    const fakeQuery = ranges.map(({ pStart }, idx) => ({
+      idx,
+      day: pStart.toISOString().slice(0, 10),
+    }));
+    // After "parallel" map, indexes 0..3 must map to days 7,14,21,28 ago.
+    expect(fakeQuery).toEqual([
+      { idx: 0, day: "2026-04-22" }, // -7d (Taipei 00:00 UTC)
+      { idx: 1, day: "2026-04-15" }, // -14d
+      { idx: 2, day: "2026-04-08" }, // -21d
+      { idx: 3, day: "2026-04-01" }, // -28d
+    ]);
   });
 });
