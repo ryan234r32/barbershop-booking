@@ -22,12 +22,12 @@
  */
 
 import { useEffect, useState } from "react";
-import { Drawer } from "vaul";
 import { Coins, Check } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { CheckoutFullPage } from "./checkout-full-page";
 import type { PaymentMethod } from "./checkout-full-page";
+import { FullscreenModal } from "./fullscreen-modal";
 
 interface BookingUser {
   id: string;
@@ -357,28 +357,21 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
     onAction();
   };
 
+  const handleClose = () => {
+    setSubState("detail");
+    setNoteText("");
+    setCheckoutOpen(false);
+    onOpenChange(false);
+  };
+
   return (
     <>
-      <Drawer.Root
-        open={open}
-        onOpenChange={(o) => {
-          if (!o) {
-            setSubState("detail");
-            setNoteText("");
-            setCheckoutOpen(false);
-          }
-          onOpenChange(o);
-        }}
-      >
-        <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 bg-[var(--color-text-body)]/50 z-50 backdrop-blur-sm" />
-          {/* iOS bottom sheet feel — sits at ~92dvh so the calendar peeks behind.
-              `dvh` (not `vh`) so the drawer shrinks when the iOS keyboard opens
-              during 改期 date-picker / 筆記 textarea — otherwise the content
-              scrolls above the visible viewport. */}
-          <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--color-bg)] rounded-t-2xl h-[92dvh] outline-none flex flex-col">
-            <div className="mx-auto w-10 h-1 rounded-full bg-[var(--color-surface)] mt-3 mb-2 flex-shrink-0" />
-
+      {open && (
+        // FullscreenModal (跟 ExpenseEntrySheet / new-booking-sheet 同 pattern)。
+        // preventDismiss：背景 / ESC 不關閉，唯一出口是左上 X 按鈕，避免老闆
+        // 在編輯時不小心滑掉整張預約詳情。
+        <FullscreenModal onClose={handleClose} preventDismiss>
+          <div className="flex flex-col h-full">
             {/* Header bar with X close */}
             <div className="flex items-center justify-between px-5 pb-2 flex-shrink-0">
               <button
@@ -435,9 +428,9 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
                 />
               )}
             </div>
-          </Drawer.Content>
-        </Drawer.Portal>
-      </Drawer.Root>
+          </div>
+        </FullscreenModal>
+      )}
 
       {/* Checkout flow — opens as a nested full-page sheet on top of detail. */}
       <CheckoutFullPage

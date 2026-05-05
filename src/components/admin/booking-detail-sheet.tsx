@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Drawer } from "vaul";
 import { useToast } from "@/components/ui/toast";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
+import { FullscreenModal } from "./fullscreen-modal";
 
 interface BookingUser {
   id: string;
@@ -182,12 +182,15 @@ export function BookingDetailSheet({ booking, open, onOpenChange, onAction }: Pr
   };
 
   return (
-    <Drawer.Root open={open} onOpenChange={(o) => { if (!o) { setState("detail"); setNoteText(""); } onOpenChange(o); }}>
-      <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 bg-[var(--color-text-body)]/50 z-50" />
-        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--color-bg)] rounded-t-2xl max-h-[85vh] outline-none">
-          <div className="mx-auto w-10 h-1 rounded-full bg-[var(--color-surface)] mt-3 mb-4" />
-          <div className="px-5 pb-8 overflow-y-auto">
+    open ? (
+      // Legacy fallback (feature flag) — 跟新版 BookingDetailFullPage 同 pattern：
+      // FullscreenModal + preventDismiss，唯一出口是內部關閉按鈕。
+      <FullscreenModal
+        onClose={() => { setState("detail"); setNoteText(""); onOpenChange(false); }}
+        preventDismiss
+      >
+        <div className="flex flex-col h-full">
+          <div className="px-5 pt-3 pb-8 overflow-y-auto flex-1">
             {state === "detail" && (
               <>
                 {/* Header */}
@@ -430,8 +433,8 @@ export function BookingDetailSheet({ booking, open, onOpenChange, onAction }: Pr
               </>
             )}
           </div>
-        </Drawer.Content>
-      </Drawer.Portal>
-    </Drawer.Root>
+        </div>
+      </FullscreenModal>
+    ) : null
   );
 }
