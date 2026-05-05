@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import useSWR from "swr";
 import { Banknote, Landmark, Lock, Plus, ClipboardList, Coins, CheckCircle2, Trash2 } from "lucide-react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
@@ -81,6 +81,15 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
   // Optimistic settle: track ids the user just clicked. UI marks them as
   // settled instantly; we still hit the API and SWR refetches in the background.
   const [optimisticSettled, setOptimisticSettled] = useState<Set<string>>(new Set());
+
+  // V3.8 perf review fix: keepPreviousData makes optimisticSettled leak across
+  // date-strip switches — the Set was reconciled by `mutate()` returning the
+  // current day's settled rows, but if the user switches date before mutate
+  // resolves, the Set keeps stale ids. Result: `effectivePendingCount` miscount
+  // for ~500ms while the new date renders. Reset whenever date changes.
+  useEffect(() => {
+    setOptimisticSettled(new Set());
+  }, [date]);
 
   const decoratedRows = useMemo(() => {
     const rows = data?.data.rows ?? [];

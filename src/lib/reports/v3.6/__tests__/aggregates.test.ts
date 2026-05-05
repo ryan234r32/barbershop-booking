@@ -304,6 +304,18 @@ describe("hasPrebookHit", () => {
     ).toBe(false);
   });
 
+  it("misses when followup date EQUALS anchor exactly (`>` is strict, not `>=`)", () => {
+    // Caught by /review adversarial pass — original test only covered >2h
+    // upper bound and createdAt boundaries, never the `f.date > anchorMs`
+    // strict-greater lower bound. This locks in the rule.
+    const sameInstant = "2026-04-30T12:00:00.000Z";
+    expect(
+      hasPrebookHit(anchor, [
+        future(sameInstant, "2026-04-30T12:30:00Z"), // date === anchor exactly
+      ]),
+    ).toBe(false);
+  });
+
   it("hits at exact 2h boundary (≤ 2*3600*1000 inclusive per original loop)", () => {
     expect(
       hasPrebookHit(anchor, [
