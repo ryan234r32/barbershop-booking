@@ -27,6 +27,12 @@ const nextConfig: NextConfig = {
   // ecpay_aio_nodejs reads ECpayPayment.xml via __dirname at runtime — webpack/turbopack
   // can't trace that. Keep it external so file resolution works from node_modules.
   serverExternalPackages: ["ecpay_aio_nodejs"],
+  // V3.8 perf (Wave 2): tree-shake icon barrel imports. lucide-react ships ~1500
+  // icons; admin uses ~30. Without this, every dev rebuild re-evaluates the entire
+  // barrel and prod bundle drags in unused icons. date-fns has the same problem.
+  experimental: {
+    optimizePackageImports: ["lucide-react", "date-fns"],
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "profile.line-scdn.net" },

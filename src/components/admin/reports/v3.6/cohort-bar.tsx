@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 interface CohortSegment {
   key: string;
   label: string;
@@ -17,7 +19,8 @@ interface CohortStackedBarProps {
  * 7-color horizontal stacked bar (V3.6 §7.1 ②). Used in annual view to show
  * customer cohort revenue contribution. Must add to ~100% to look right.
  */
-export function CohortStackedBar({ segments }: CohortStackedBarProps) {
+// V3.8 perf (Wave 2): memo'd — segments.map × 2 (bar + legend)，annual view 重渲時免費省。
+function CohortStackedBarImpl({ segments }: CohortStackedBarProps) {
   const total = segments.reduce((s, x) => s + x.pct, 0) || 1;
   return (
     <div>
@@ -53,3 +56,5 @@ export function CohortStackedBar({ segments }: CohortStackedBarProps) {
     </div>
   );
 }
+
+export const CohortStackedBar = memo(CohortStackedBarImpl);

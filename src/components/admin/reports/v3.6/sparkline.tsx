@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 interface SparklinePoint {
   label: string;
   value: number;
@@ -12,7 +14,9 @@ interface SparklineProps {
   showAxis?: boolean;
 }
 
-export function Sparkline({ points, height = 56, showAxis = true }: SparklineProps) {
+// V3.8 perf (Wave 2): memo'd — render N 個 SVG <rect> + N 個 axis label。
+// `points` reference 只在父層 fetch 變更時換。
+function SparklineImpl({ points, height = 56, showAxis = true }: SparklineProps) {
   if (points.length === 0) return null;
   const max = Math.max(...points.map((p) => p.value), 1);
   const w = 100 / points.length;
@@ -66,3 +70,5 @@ export function Sparkline({ points, height = 56, showAxis = true }: SparklinePro
     </div>
   );
 }
+
+export const Sparkline = memo(SparklineImpl);

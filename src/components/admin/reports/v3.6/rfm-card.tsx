@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import { memo, type ComponentType } from "react";
 import type { LucideProps } from "lucide-react";
 import { Trophy, Gem, Sprout, AlertTriangle, DoorOpen, Lightbulb } from "lucide-react";
 import type { RfmGrid, RfmSegment } from "@/lib/reports/v3.6/aggregates";
@@ -41,7 +41,9 @@ interface RfmCardsProps {
   grid: RfmGrid;
 }
 
-export function RfmCards({ grid }: RfmCardsProps) {
+// V3.8 perf (Wave 2): memo'd — 5 段 grid 卡片，父層 SWR 多重 fetch 觸發 re-render
+// 時不該重新走 segments.map。`grid` reference 只在 SWR refetch 時改變。
+function RfmCardsImpl({ grid }: RfmCardsProps) {
   const segments: RfmSegment[] = ["champion", "loyal", "newCustomer", "atRisk", "lost"];
   return (
     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -75,7 +77,9 @@ export function RfmCards({ grid }: RfmCardsProps) {
   );
 }
 
-export function RfmSummary({ grid }: { grid: RfmGrid }) {
+export const RfmCards = memo(RfmCardsImpl);
+
+function RfmSummaryImpl({ grid }: { grid: RfmGrid }) {
   const champPct = grid.pct.champion;
   const lostPct = grid.pct.lost;
   if (grid.total === 0) return null;
@@ -91,3 +95,5 @@ export function RfmSummary({ grid }: { grid: RfmGrid }) {
     </p>
   );
 }
+
+export const RfmSummary = memo(RfmSummaryImpl);
