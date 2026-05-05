@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import useSWR from "swr";
 import { BarChart3, Coins } from "lucide-react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
@@ -84,10 +84,10 @@ function monthRange(period: string): MonthRangeMeta {
 }
 
 export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
-  const { data, error, isLoading } = useSWR<MonthlyResponse>(
+  const { data, error, isLoading, isValidating } = useSWR<MonthlyResponse>(
     `/api/reports/v3.6?view=monthly&period=${period}`,
     fetcher,
-    { revalidateOnFocus: false },
+    { revalidateOnFocus: false, keepPreviousData: true, dedupingInterval: 3000 },
   );
 
   // V3.7 §E — fetch expenses + day-close snapshots in parallel.
@@ -95,12 +95,12 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
   const { data: expensesData } = useSWR<{ totalAmount: number; expenses: Array<{ amount: number; type: "FIXED" | "VARIABLE" }> }>(
     `/api/expenses?from=${range.from}&to=${range.to}`,
     fetcher,
-    { revalidateOnFocus: false },
+    { revalidateOnFocus: false, keepPreviousData: true, dedupingInterval: 3000 },
   );
   const { data: closesData } = useSWR<{ snapshots: Array<{ date: string; netProfit: number; cashDiff: number; bankConfirmed: boolean }> }>(
     `/api/admin/day-close?from=${range.from}&to=${range.to}`,
     fetcher,
-    { revalidateOnFocus: false },
+    { revalidateOnFocus: false, keepPreviousData: true, dedupingInterval: 3000 },
   );
   const expenseTotal = expensesData?.totalAmount ?? 0;
   const expenseFixed = (expensesData?.expenses ?? [])
@@ -139,7 +139,10 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
   const revenue = t.revenue;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 relative">
+      {isValidating && (
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-[var(--color-brand)] animate-pulse z-10" />
+      )}
       {/* ① Header — 月份切換器（左右滑動） */}
       <DateStrip kind="month" selected={period} onSelect={onPeriodChange} />
 
@@ -408,7 +411,7 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
 
 // ─── Sub-widgets ─────────────────────────────────────────────────────────
 
-function ServiceMixWidget({
+const ServiceMixWidget = memo(function ServiceMixWidget({
   pie,
   chemicalShare,
   chemicalShareLast,
@@ -419,14 +422,25 @@ function ServiceMixWidget({
   chemicalShareLast: number;
   totalRevenue: number;
 }) {
-  const total = pie.reduce((s, p) => s + p.revenue, 0) || 1;
-  const sorted = [...pie].sort((a, b) => b.revenue - a.revenue);
-  const chemDelta = chemicalShare - chemicalShareLast;
-  const targetShare = 35;
-  const gapPp = targetShare - chemicalShare;
-  const monthlyChemRev = (chemicalShare / 100) * totalRevenue;
-  const targetRev = (targetShare / 100) * totalRevenue;
-  const upliftRev = Math.max(0, targetRev - monthlyChemRev);
+  // V3.8 perf: useMemo so unrelated re-renders (expenses/closes useSWR
+  // resolving at different ms) don't re-sort/re-reduce. Recomputes only
+  // when the SWR fetch returns a fresh `pie` reference or share changes.
+  const { sorted, total, chemDelta, gapPp, monthlyChemRev, upliftRev, targetShare } = useMemo(() => {
+    const tShare = 35;
+    const t = pie.reduce((s, p) => s + p.revenue, 0) || 1;
+    const s = [...pie].sort((a, b) => b.revenue - a.revenue);
+    const monthlyChem = (chemicalShare / 100) * totalRevenue;
+    const targetRev = (tShare / 100) * totalRevenue;
+    return {
+      sorted: s,
+      total: t,
+      chemDelta: chemicalShare - chemicalShareLast,
+      gapPp: tShare - chemicalShare,
+      monthlyChemRev: monthlyChem,
+      upliftRev: Math.max(0, targetRev - monthlyChem),
+      targetShare: tShare,
+    };
+  }, [pie, chemicalShare, chemicalShareLast, totalRevenue]);
 
   return (
     <MCard padding="md">
@@ -470,7 +484,7 @@ function ServiceMixWidget({
       )}
     </MCard>
   );
-}
+});
 
 function SetTargetButton({
   period,

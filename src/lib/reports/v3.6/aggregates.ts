@@ -20,6 +20,36 @@ function isoDate(d: Date): string {
   return d.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
 }
 
+/**
+ * Build N past weekly date ranges (UTC, Taipei-aligned) for the same weekday
+ * as (y, m, d). Each range is `[pStart, pEnd]` where pStart is the previous
+ * day at 16:00 UTC (= Taipei 00:00) and pEnd is the same day at 15:59:59.999
+ * UTC (= Taipei 23:59:59.999). Index 0 = 7 days ago, index N-1 = 7N days ago.
+ *
+ * Extracted from `computeDailyView` so the parallel-await refactor (V3.8 perf)
+ * has a regression-testable boundary — the date math used to live inline in
+ * a serial for-loop and any drift here would silently corrupt the 4-week
+ * comparison median on the daily view.
+ */
+export function pastWeeklyRanges(
+  y: number,
+  m: number,
+  d: number,
+  weeks: number,
+): Array<{ pStart: Date; pEnd: Date }> {
+  return Array.from({ length: weeks }, (_, idx) => {
+    const i = idx + 1;
+    const past = new Date(Date.UTC(y, m - 1, d - 7 * i));
+    const pY = past.getUTCFullYear();
+    const pM = past.getUTCMonth() + 1;
+    const pD = past.getUTCDate();
+    return {
+      pStart: new Date(Date.UTC(pY, pM - 1, pD, -8, 0, 0)),
+      pEnd: new Date(Date.UTC(pY, pM - 1, pD, 15, 59, 59, 999)),
+    };
+  });
+}
+
 // ─── Pre-book Rate ───────────────────────────────────────────────────────
 //
 // Definition (V3.6 §4.1): % of COMPLETED bookings whose customer also has a
@@ -62,18 +92,28 @@ export async function computePrebookRate(
     select: { userId: true, date: true, createdAt: true },
   });
 
+  // V3.8 perf (Wave 3 / B3): O(N×M) → O(N+M).
+  // Old code did followups.some() inside the for-loop, scanning the full
+  // followups array once per completed booking. At 1169 prod bookings that's
+  // ~300×1000 = 300K comparisons (still <30ms in V8 but quadratic in data
+  // growth — at 10x scale it's 30M ops and noticeable). Pre-grouping by
+  // userId makes the inner loop scan only that user's followups.
+  const followupsByUser = new Map<string, Array<{ date: Date; createdAt: Date }>>();
+  for (const f of followups) {
+    let bucket = followupsByUser.get(f.userId);
+    if (!bucket) {
+      bucket = [];
+      followupsByUser.set(f.userId, bucket);
+    }
+    bucket.push({ date: f.date, createdAt: f.createdAt });
+  }
+
   let prebookCount = 0;
   for (const c of completed) {
     const anchor = c.checkedInAt ?? c.updatedAt;
-    const anchorMs = anchor.getTime();
-    const hit = followups.some(
-      (f) =>
-        f.userId === c.userId &&
-        f.date.getTime() > anchorMs &&
-        f.createdAt.getTime() >= anchorMs &&
-        f.createdAt.getTime() <= anchorMs + 2 * 3600 * 1000,
-    );
-    if (hit) prebookCount++;
+    const userFollowups = followupsByUser.get(c.userId);
+    if (!userFollowups) continue;
+    if (hasPrebookHit(anchor.getTime(), userFollowups)) prebookCount++;
   }
 
   return {
@@ -81,6 +121,25 @@ export async function computePrebookRate(
     prebookCount,
     completedCount: completed.length,
   };
+}
+
+/**
+ * Pure-function version of the prebook hit-detection inner loop. Exported so
+ * the V3.8 B3 refactor (Map preprocessing) has a regression-testable boundary.
+ *
+ * Returns true if `userFollowups` contains a future booking whose createdAt
+ * falls within the post-checkout 2-hour window anchored at `anchorMs`.
+ */
+export function hasPrebookHit(
+  anchorMs: number,
+  userFollowups: ReadonlyArray<{ date: Date; createdAt: Date }>,
+): boolean {
+  return userFollowups.some(
+    (f) =>
+      f.date.getTime() > anchorMs &&
+      f.createdAt.getTime() >= anchorMs &&
+      f.createdAt.getTime() <= anchorMs + 2 * 3600 * 1000,
+  );
 }
 
 // ─── RFM Segments (V3.6 §4.4) ────────────────────────────────────────────
@@ -928,20 +987,16 @@ export async function computeDailyView(
     },
   });
 
-  // Comparison: 4-week median revenue same weekday
+  // Comparison: 4-week median revenue same weekday.
+  // V3.8 perf: was a 4-iteration serial await loop (~800ms RTT-bound).
+  // Promise.all drops it to ~1 RTT (~200ms) — 4 independent queries on the
+  // same Booking table, no inter-dependency. Order preserved by index → push.
   const dayObj = new Date(Date.UTC(y, m - 1, d));
   const dow = dayObj.getUTCDay();
-  const sameWeekdayRev: number[] = [];
-  for (let i = 1; i <= 4; i++) {
-    const past = new Date(Date.UTC(y, m - 1, d - 7 * i));
-    const pY = past.getUTCFullYear();
-    const pM = past.getUTCMonth() + 1;
-    const pD = past.getUTCDate();
-    const pStart = new Date(Date.UTC(pY, pM - 1, pD, -8, 0, 0));
-    const pEnd = new Date(Date.UTC(pY, pM - 1, pD, 15, 59, 59, 999));
-    const r = await sumRevenue(tenantId, pStart, pEnd);
-    sameWeekdayRev.push(r);
-  }
+  const weeklyRanges = pastWeeklyRanges(y, m, d, 4);
+  const sameWeekdayRev = await Promise.all(
+    weeklyRanges.map(({ pStart, pEnd }) => sumRevenue(tenantId, pStart, pEnd)),
+  );
   const median4w = (() => {
     const sorted = [...sameWeekdayRev].sort((a, b) => a - b);
     return sorted[Math.floor(sorted.length / 2)] ?? 0;

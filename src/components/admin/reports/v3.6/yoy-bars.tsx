@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { BarChart3, Lightbulb } from "lucide-react";
 import type { YoYResult } from "@/lib/reports/v3.6/aggregates";
 
@@ -21,7 +21,10 @@ interface YoYBarsProps {
  * - Hover tooltip showing both values + delta
  * - Subtitle showing accumulated YoY%
  */
-export function YoYBars({ data, hasLastYearData, anchorYear }: YoYBarsProps) {
+// V3.8 perf (Wave 2): memo'd — YoYBars 內計算 SVG viewBox + 12 個月 bar 座標
+// 並渲染 24 個 SVG <rect>。父層 monthly view 切換 expenses/closes useSWR 時不
+// 該重算。`data` 只在 SWR refetch 才換 reference。
+function YoYBarsImpl({ data, hasLastYearData, anchorYear }: YoYBarsProps) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   if (!hasLastYearData) {
@@ -216,6 +219,8 @@ export function YoYBars({ data, hasLastYearData, anchorYear }: YoYBarsProps) {
     </div>
   );
 }
+
+export const YoYBars = memo(YoYBarsImpl);
 
 function Legend({ color, label }: { color: string; label: string }) {
   return (

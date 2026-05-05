@@ -57,10 +57,10 @@ interface AnnualViewProps {
 }
 
 export function AnnualView({ period, onPeriodChange }: AnnualViewProps) {
-  const { data, error, isLoading } = useSWR<AnnualResponse>(
+  const { data, error, isLoading, isValidating } = useSWR<AnnualResponse>(
     `/api/reports/v3.6?view=annual&period=${period}`,
     fetcher,
-    { revalidateOnFocus: false },
+    { revalidateOnFocus: false, keepPreviousData: true, dedupingInterval: 3000 },
   );
   const [chosenScenario, setChosenScenario] = useState<ScenarioKey>("aggressive");
 
@@ -71,7 +71,7 @@ export function AnnualView({ period, onPeriodChange }: AnnualViewProps) {
   }>(
     `/api/expenses?from=${period}-01-01&to=${period}-12-31`,
     fetcher,
-    { revalidateOnFocus: false },
+    { revalidateOnFocus: false, keepPreviousData: true, dedupingInterval: 3000 },
   );
   const expFixed = (yearExpenses?.expenses ?? [])
     .filter((e) => e.type === "FIXED")
@@ -101,7 +101,10 @@ export function AnnualView({ period, onPeriodChange }: AnnualViewProps) {
   const yearNum = data.year;
 
   return (
-    <div className="space-y-5 print:bg-white">
+    <div className="space-y-5 print:bg-white relative">
+      {isValidating && (
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-[var(--color-brand)] animate-pulse z-10 print:hidden" />
+      )}
       {/* Year navigator — 左右滑動選年份 */}
       <div className="print:hidden">
         <DateStrip kind="year" selected={String(yearNum)} onSelect={onPeriodChange} />

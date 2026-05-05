@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import useSWR from "swr";
 import { Banknote, Landmark, Lock, Plus, ClipboardList, Coins, CheckCircle2, Trash2 } from "lucide-react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
@@ -50,10 +50,10 @@ interface DailyViewProps {
 }
 
 export function DailyView({ date, onDateChange }: DailyViewProps) {
-  const { data, error, isLoading, mutate } = useSWR<DailyResponse>(
+  const { data, error, isLoading, isValidating, mutate } = useSWR<DailyResponse>(
     `/api/reports/v3.6?view=daily&date=${date}`,
     fetcher,
-    { revalidateOnFocus: false },
+    { revalidateOnFocus: false, keepPreviousData: true, dedupingInterval: 3000 },
   );
   const [filter, setFilter] = useState<"all" | "pending" | "warning">("all");
   const [backfillOpen, setBackfillOpen] = useState(false);
@@ -67,7 +67,7 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
   } = useSWR<ExpensesResponse>(
     `/api/expenses?from=${date}&to=${date}`,
     fetcher,
-    { revalidateOnFocus: false },
+    { revalidateOnFocus: false, keepPreviousData: true, dedupingInterval: 3000 },
   );
   const expenses = expensesData?.expenses ?? [];
   const expenseTotal = expensesData?.totalAmount ?? 0;
@@ -81,6 +81,15 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
   // Optimistic settle: track ids the user just clicked. UI marks them as
   // settled instantly; we still hit the API and SWR refetches in the background.
   const [optimisticSettled, setOptimisticSettled] = useState<Set<string>>(new Set());
+
+  // V3.8 perf review fix: keepPreviousData makes optimisticSettled leak across
+  // date-strip switches — the Set was reconciled by `mutate()` returning the
+  // current day's settled rows, but if the user switches date before mutate
+  // resolves, the Set keeps stale ids. Result: `effectivePendingCount` miscount
+  // for ~500ms while the new date renders. Reset whenever date changes.
+  useEffect(() => {
+    setOptimisticSettled(new Set());
+  }, [date]);
 
   const decoratedRows = useMemo(() => {
     const rows = data?.data.rows ?? [];
@@ -261,7 +270,11 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
   const d = data.data;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
+      {/* keepPreviousData 模式：切日時舊資料留在畫面，這條細 bar 提示「資料背景刷新中」 */}
+      {isValidating && (
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-[var(--color-brand)] animate-pulse z-10" />
+      )}
       {/* Date strip — 左右滑動選日期。
           V3.8 §5：老闆要看 5 月（未來日期）的預約 → maxValue 放寬到 60 天後，
           覆蓋 45 天預約窗口 + 緩衝。日結 / 對帳對未來日期不適用是 expected

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import { MCard } from "./m-card";
 import { MTag } from "./m-tag";
 
@@ -62,7 +62,11 @@ function deltaClass(delta: number | null | undefined): string {
   return "text-[var(--color-text-muted)]";
 }
 
-export function KpiCard({
+// V3.8 perf (Wave 2): memo'd because monthly view 顯示 4 個 KpiCard，每次
+// expenses/closes useSWR resolve 都會觸發 monthly 整體 re-render；KpiCard 內含
+// BenchmarkRail .map + 多層條件 JSX，不該白白重算。props 都是 primitive/小物件，
+// 預設 shallow 比較足夠。
+function KpiCardImpl({
   label,
   primary,
   secondary,
@@ -106,6 +110,8 @@ export function KpiCard({
     </MCard>
   );
 }
+
+export const KpiCard = memo(KpiCardImpl);
 
 function BenchmarkRail({
   benchmark,

@@ -21,14 +21,38 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { preload } from "swr";
+import dynamic from "next/dynamic";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { todayInTaipei } from "@/lib/utils/time";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { MToggle } from "@/components/admin/reports/v3.6/m-toggle";
 import { PastDueBanner } from "@/components/admin/past-due-banner";
-import { DailyView } from "./views/daily";
-import { MonthlyView } from "./views/monthly";
-import { AnnualView } from "./views/annual";
+
+// V3.8 perf (Wave 2): code-split 3 個 view — 首次進 /reports 時老闆只看一個視圖，
+// 不需要立刻載入另外 2 個（每個 view 帶其專屬的 widget cluster 和 useSWR hooks）。
+// SSR 預設 true（Next 16 admin pages 走 client-component 但 dynamic 仍能 split bundle）。
+const DailyView = dynamic(
+  () => import("./views/daily").then((m) => ({ default: m.DailyView })),
+  { loading: () => <ViewSkeleton /> },
+);
+const MonthlyView = dynamic(
+  () => import("./views/monthly").then((m) => ({ default: m.MonthlyView })),
+  { loading: () => <ViewSkeleton /> },
+);
+const AnnualView = dynamic(
+  () => import("./views/annual").then((m) => ({ default: m.AnnualView })),
+  { loading: () => <ViewSkeleton /> },
+);
+
+function ViewSkeleton() {
+  return (
+    <div className="space-y-3">
+      <div className="h-12 bg-[var(--color-surface)] rounded-lg animate-pulse" />
+      <div className="h-32 bg-[var(--color-surface)] rounded-lg animate-pulse" />
+      <div className="h-48 bg-[var(--color-surface)] rounded-lg animate-pulse" />
+    </div>
+  );
+}
 
 const reportsFetcher = (url: string) =>
   fetch(url, { headers: adminHeaders() }).then((r) => {
