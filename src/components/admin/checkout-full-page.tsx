@@ -18,10 +18,10 @@
  */
 
 import { useEffect, useState } from "react";
-import { Drawer } from "vaul";
 import { Plus, X, User, Calendar, Clock } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
+import { FullscreenModal } from "./fullscreen-modal";
 
 export type PaymentMethod = "CASH" | "BANK_TRANSFER" | "ECPAY_ATM";
 
@@ -178,18 +178,14 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
   const dateObj = new Date(booking.date.slice(0, 10) + "T00:00:00+08:00");
   const billingDateLabel = `${dateObj.getMonth() + 1} 月 ${dateObj.getDate()} 日, ${dateObj.getFullYear()}`;
 
-  return (
-    <Drawer.Root open={open} onOpenChange={onOpenChange}>
-      <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 bg-[var(--color-text-body)]/60 z-[60] backdrop-blur-sm" />
-        {/* `h-[92dvh]` (dynamic viewport height) so the drawer shrinks when
-            the iOS keyboard opens during 結帳備註 / 加購商品 input. The legacy
-            `vh` unit stays at full-screen height, causing the textarea + flex
-            content to scroll above the visible area when the keyboard appears. */}
-        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[60] bg-[var(--color-bg)] rounded-t-2xl h-[92dvh] outline-none flex flex-col">
-          <div className="mx-auto w-10 h-1 rounded-full bg-[var(--color-surface)] mt-3 mb-2 flex-shrink-0" />
+  if (!open) return null;
 
-          <div className="flex items-center justify-between px-5 pb-2 flex-shrink-0">
+  return (
+    // FullscreenModal — PR #92 已驗證 vaul 在 iOS PWA 不穩；preventDismiss
+    // 確保結帳流程不會被誤觸關閉。
+    <FullscreenModal onClose={() => onOpenChange(false)} preventDismiss>
+      <div className="flex flex-col h-full">
+          <div className="flex items-center justify-between px-5 pt-3 pb-2 flex-shrink-0">
             <button
               onClick={() => {
                 if (step === "method") {
@@ -438,8 +434,7 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
                   : `結帳 NT$${finalAmount.toLocaleString()}`}
             </button>
           </div>
-        </Drawer.Content>
-      </Drawer.Portal>
-    </Drawer.Root>
+      </div>
+    </FullscreenModal>
   );
 }
