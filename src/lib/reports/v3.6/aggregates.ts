@@ -414,14 +414,14 @@ export function computeAlerts(ctx: AlertContext): Alert[] {
         id: "yoy_3m_red",
         level: "red",
         title: "近 3 月營收嚴重下滑",
-        detail: `YoY ${ctx.yoyTrailing3M.toFixed(1)}% — 跌幅超過 15% 警戒線，需立即介入`,
+        detail: `近 3 月比去年同期少了 ${Math.abs(ctx.yoyTrailing3M).toFixed(1)}% — 跌幅超過 15% 警戒線，需立即介入`,
       });
     } else if (ctx.yoyTrailing3M < -10) {
       alerts.push({
         id: "yoy_3m_yellow",
         level: "yellow",
         title: "近 3 月營收下滑",
-        detail: `YoY ${ctx.yoyTrailing3M.toFixed(1)}%，建議檢視染燙佔比 + 客單價`,
+        detail: `近 3 月比去年同期少了 ${Math.abs(ctx.yoyTrailing3M).toFixed(1)}%，建議檢視染燙佔比 + 客單價`,
       });
     }
   }
@@ -716,14 +716,23 @@ export function pickRootCause(ctx: NarrativeContext): RootCause {
 }
 
 export function pickAction(narrative: NarrativeKind, cause: RootCause): string {
+  // Practical, owner-friendly playbook — written for a 1-person barbershop.
+  // Sources synthesized from Taiwan industry blogs (好剪才、TinyBook、bonjouraura).
   const map: Record<RootCause, string> = {
-    chemical_share_drop: "本月主動詢問每位客戶染燙意願 + 推進染燙促銷組合",
-    new_retention_low: "啟用「離店再預約」流程：結帳當下直接幫客戶排下次",
-    ticket_drop: "檢視價目表 + 推升級服務組合（剪+護髮、剪+染）",
-    occupancy_low: "把週四下午 / 週六晚上的空檔靠社群推播填滿",
-    seasonal: "順著季節節奏：旺季多排、淡季靠老客電話通知",
+    chemical_share_drop:
+      "每位客人剪完，主動聊「上次染的顏色該補了」；把染後成果照片貼到 LINE 圖文選單，讓客人看得到才會被選",
+    new_retention_low:
+      "結帳當下直接幫新客排下次預約；7 天後 LINE 一句「整理還順嗎？」是回流率最高的招",
+    ticket_drop:
+      "把「剪+染」「剪+護髮」寫成搭配價貼在價目表；結帳前固定問一句「下次染的時間先排嗎？」",
+    occupancy_low:
+      "週四下午、週六晚上的空檔，挑最近 60 天沒回的老客 LINE 個別發 8 折券 — 比群發精準 10 倍",
+    seasonal:
+      "旺季（開學、年末）提前一週 LINE 提醒老客先約；淡季打電話給 VIP 順便聊家常養關係",
   };
-  if (narrative === "new_high") return "守住節奏，把流量導入推升染燙佔比 → 將高峰拉長";
+  if (narrative === "new_high") {
+    return "守住現在的節奏：每位剪髮客都試著聊一次染或護，把高峰拉得更長";
+  }
   if (narrative === "declining") return "立刻介入：" + map[cause];
   return map[cause];
 }
@@ -733,27 +742,33 @@ export function renderSummary(ctx: NarrativeContext): string {
   const cause = pickRootCause(ctx);
   const action = pickAction(narr, cause);
 
-  const yoyStr = ctx.yoyChangePct !== null
-    ? `${ctx.yoyChangePct >= 0 ? "+" : ""}${ctx.yoyChangePct.toFixed(1)}%`
-    : "—";
-  const momStr = ctx.momChangePct !== null
-    ? `${ctx.momChangePct >= 0 ? "+" : ""}${ctx.momChangePct.toFixed(1)}%`
-    : "—";
+  // Plain-Chinese delta phrase. No YoY/MoM jargon — owners read this on phone.
+  const yoyPhrase = ctx.yoyChangePct !== null
+    ? `比去年同月${ctx.yoyChangePct >= 0 ? "多" : "少"} ${Math.abs(ctx.yoyChangePct).toFixed(1)}%`
+    : null;
+  const momPhrase = ctx.momChangePct !== null
+    ? `比上月${ctx.momChangePct >= 0 ? "多" : "少"} ${Math.abs(ctx.momChangePct).toFixed(1)}%`
+    : null;
+  const joinPhrases = (...parts: (string | null)[]) => {
+    const kept = parts.filter((p): p is string => Boolean(p));
+    return kept.length === 0 ? "" : `，${kept.join("、")}`;
+  };
 
+  const revStr = `營收 NT$${ctx.revenue.toLocaleString()}`;
   const headline: Record<NarrativeKind, string> = {
-    healthy_growth: `${ctx.monthLabel} **健康成長**：營收 NT$${ctx.revenue.toLocaleString()}（YoY ${yoyStr}、MoM ${momStr}）`,
-    new_high: `${ctx.monthLabel} **創新高**！營收 NT$${ctx.revenue.toLocaleString()}（YoY ${yoyStr}）`,
-    rebounding: `${ctx.monthLabel} **回升中**：營收 NT$${ctx.revenue.toLocaleString()}（MoM ${momStr}）`,
-    declining: `${ctx.monthLabel} **下滑警訊**：營收 NT$${ctx.revenue.toLocaleString()}（YoY ${yoyStr}）`,
-    flat: `${ctx.monthLabel} **持平**：營收 NT$${ctx.revenue.toLocaleString()}（YoY ${yoyStr}、MoM ${momStr}）`,
+    healthy_growth: `${ctx.monthLabel} **健康成長**：${revStr}${joinPhrases(yoyPhrase, momPhrase)}`,
+    new_high: `${ctx.monthLabel} **創新高**！${revStr}${joinPhrases(yoyPhrase)}`,
+    rebounding: `${ctx.monthLabel} **回升中**：${revStr}${joinPhrases(momPhrase)}`,
+    declining: `${ctx.monthLabel} **下滑警訊**：${revStr}${joinPhrases(yoyPhrase)}`,
+    flat: `${ctx.monthLabel} **持平**：${revStr}${joinPhrases(yoyPhrase, momPhrase)}`,
   };
 
   const causeText: Record<RootCause, string> = {
-    chemical_share_drop: `主因：**染燙佔比下滑**（${ctx.chemicalShareLastMonth.toFixed(1)}% → ${ctx.chemicalShare.toFixed(1)}%），客單拉不起來`,
-    new_retention_low: `主因：**新客 90 天回訪率僅 ${ctx.retention90.toFixed(1)}%**，第一次體驗沒留住人`,
-    ticket_drop: `主因：**客單價 NT$${ctx.ticket}** vs 12 月均 NT$${Math.round(ctx.ticket12mAvg)}，服務組合需調整`,
-    occupancy_low: `主因：**佔用率 ${ctx.occupancy.toFixed(1)}%** 偏低，產能沒填滿`,
-    seasonal: `主因：**季節節奏正常**，依歷史慣性發展`,
+    chemical_share_drop: `主因：**染燙服務變少了**（佔比 ${ctx.chemicalShareLastMonth.toFixed(1)}% → ${ctx.chemicalShare.toFixed(1)}%），整體客單價拉不起來`,
+    new_retention_low: `主因：**新客 90 天內只有 ${ctx.retention90.toFixed(1)}% 會再回來**，第一次體驗沒抓住人`,
+    ticket_drop: `主因：**這個月平均一位客人只消費 NT$${ctx.ticket}**，比過去 12 月平均 NT$${Math.round(ctx.ticket12mAvg)} 還低`,
+    occupancy_low: `主因：**時段填不滿**（佔用率僅 ${ctx.occupancy.toFixed(1)}%），客人來得不夠密`,
+    seasonal: `主因：**季節正常波動**，照歷史節奏發展`,
   };
 
   return `💡 ${headline[narr]}。${causeText[cause]}。**行動建議**：${action}。`;
