@@ -16,7 +16,7 @@ import { notifyAdminNewBooking } from "@/lib/notifications/admin-notify";
 import { rescheduleBookingSchema } from "@/lib/utils/validation";
 import { errorResponse, SlotUnavailableError, AppError } from "@/lib/utils/errors";
 import { addHours, addDaysToISO, getDayOfWeek, todayInTaipei } from "@/lib/utils/time";
-import { MAX_ADVANCE_DAYS } from "@/lib/utils/constants";
+import { MAX_ADVANCE_DAYS, ADMIN_MAX_ADVANCE_DAYS } from "@/lib/utils/constants";
 import { logger } from "@/lib/utils/logger";
 import { requireBookingAuth, requireBookingOwnership } from "@/lib/auth/booking-auth";
 import { invalidateReportsCache } from "@/lib/cache/invalidate";
@@ -112,10 +112,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // LIFF 客戶改期同樣受 45 天 + 公休日限制（admin 不受限）
+    // LIFF 客戶改期 45 天 + 公休日限制；Admin 365 天上限。
     const newDateObj = new Date(input.date + "T00:00:00.000Z");
+    const today = todayInTaipei();
     if (auth.type === "liff") {
-      const today = todayInTaipei();
       const maxDate = addDaysToISO(today, MAX_ADVANCE_DAYS);
       if (input.date > maxDate) {
         throw new AppError(
@@ -143,6 +143,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           holiday.reason ? `本日公休（${holiday.reason}）` : "本日公休，請選其他日期",
           400,
           "HOLIDAY",
+        );
+      }
+    } else {
+      // Admin 路徑 — 1 年上限避免誤觸
+      const adminMaxDate = addDaysToISO(today, ADMIN_MAX_ADVANCE_DAYS);
+      if (input.date > adminMaxDate) {
+        throw new AppError(
+          `改期日期最多只能提前 ${ADMIN_MAX_ADVANCE_DAYS} 天（1 年）`,
+          400,
+          "BEYOND_ADMIN_WINDOW",
         );
       }
     }
