@@ -8,10 +8,40 @@ const withSerwist = withSerwistInit({
   disable: process.env.NODE_ENV === "development",
 });
 
-// Baseline hardening. CSP is deliberately NOT here — LINE LIFF injects inline
-// scripts from liff.line.me and this app loads the LIFF SDK + profile images
-// from line-scdn.net, so a strict CSP needs per-route tuning. HSTS is already
-// applied by Vercel at the edge.
+// Baseline hardening. HSTS is applied by Vercel at the edge.
+//
+// CSP — single permissive policy ship-able today. Keep `unsafe-inline` for
+// styles (Tailwind injects inline) and `unsafe-eval` for Next.js dev runtime
+// + Sentry dynamic instrumentation. Frame-ancestors 'none' duplicates
+// X-Frame-Options DENY for browsers that prefer one over the other.
+//
+// Allowlist breakdown (verified against actual app loads — see /qa run 2026-05-05):
+//   script-src   liff.line.me + static.line-scdn.net   → LIFF SDK
+//                vercel.live                            → Vercel preview toolbar
+//   style-src    fonts.googleapis.com                   → Manrope + Noto Sans TC stylesheet
+//   font-src     fonts.gstatic.com                      → Google Fonts file payloads
+//   img-src      *.line-scdn.net + *.supabase.co        → LINE profile + storage uploads
+//                data: blob: https:                     → uploaded screenshots, QR codes
+//   connect-src  api.line.me + *.supabase.co            → LIFF verify, DB direct (RLS)
+//                *.sentry.io                            → Sentry error reporting (covers all ingest subdomains)
+//                *.upstash.io                           → Redis REST (server-side; client doesn't hit)
+//   worker-src   self blob:                             → Serwist PWA service worker
+const cspParts = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.line-scdn.net https://liff.line.me https://vercel.live",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "img-src 'self' data: blob: https:",
+  "connect-src 'self' https://api.line.me https://liff.line.me https://*.line-scdn.net https://*.supabase.co https://*.sentry.io https://*.upstash.io",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "frame-src 'none'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+];
+
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -20,6 +50,7 @@ const securityHeaders = [
     key: "Permissions-Policy",
     value: "geolocation=(), camera=(), microphone=(), payment=(), usb=()",
   },
+  { key: "Content-Security-Policy", value: cspParts.join("; ") },
 ];
 
 const nextConfig: NextConfig = {

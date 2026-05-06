@@ -129,7 +129,7 @@ export default function CalendarPage() {
         // and guarded by deepLinkHandledRef so it can't loop.
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setCurrentDate(d);
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+         
         setView("day");
       }
     }

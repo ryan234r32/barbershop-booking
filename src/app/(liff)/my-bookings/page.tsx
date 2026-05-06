@@ -110,7 +110,7 @@ export default function MyBookingsPage() {
     if (cached) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- SWR optimistic paint
       setBookings(cached);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- SWR optimistic paint
+       
       setLoading(false);
     }
 

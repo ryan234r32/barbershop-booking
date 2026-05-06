@@ -5,6 +5,8 @@ import { PrismaPg } from "@prisma/adapter-pg";
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
+// Reference list — kept inline for clarity, used only via the queries below.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const TARGET_LINE_USER_IDS = [
   "Ufb5e0c7d45371b2f5952615c4dc36279", // 陳昶龍 Ryan — 你的測試 LINE
   "U671fe71bc32", // 碩展 partial — list any U... that matches

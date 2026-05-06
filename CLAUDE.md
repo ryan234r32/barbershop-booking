@@ -143,13 +143,15 @@ Body-supplied `lineUserId` is **ignored** — caller identity always comes from 
 
 ## Landmines (踩過會痛，不寫不行)
 - **TZ — `nowTaipei()` is broken on UTC servers (Vercel)**: it double-shifts the moment +8h, so `.toLocaleDateString({ timeZone: 'Asia/Taipei' })` returns *tomorrow* between Taipei 16:00–24:00. For "today's Taipei date" use `todayInTaipei()` from `src/lib/utils/time.ts`. Caused a P0 demo incident on 2026-04-27. Don't `nowTaipei().toLocaleDateString(...)` — always go through `todayInTaipei()` for date-string compares. Tests in `src/lib/utils/__tests__/time.test.ts`.
-- **Vaul `Drawer.Content` full-page sheets must use `h-[Ndvh]`, not `h-[Nvh]`**: `vh` is static, so the iOS keyboard pushes content above the visible viewport, leaving only the sticky footer. Applies to all admin sheets with input/textarea (BookingDetailFullPage / CheckoutFullPage / NewBookingSheet).
+- **Full-page sheets must use `h-[Ndvh]`, not `h-[Nvh]`**: `vh` is static, so the iOS keyboard pushes content above the visible viewport, leaving only the sticky footer. Originally hit on Vaul Drawer (PR #95 migrated to FullscreenModal); the dvh/vh trap survives the swap, so the rule applies to FullscreenModal too. All admin sheets with input/textarea: BookingDetailFullPage / CheckoutFullPage / NewBookingSheet.
 - **Booking-mutating sheets need a local `liveBooking` optimistic state**: parent's `selectedBooking` is a snapshot at click time; the SWR list refetch does *not* re-seed the prop. After every PATCH/POST inside the sheet, merge the response into local state. Otherwise segments + buttons stay stale until the user closes + reopens the sheet. Reference: `src/components/admin/booking-detail-full-page.tsx`.
 - **OCC pattern for booking writes**: body carries `expectedUpdatedAt`; route does `prisma.booking.updateMany({ where: { id, tenantId, ...statusGuard, updatedAt: <prev> }, data })`; `count === 0` → 409 `stale_write` (also rolls back any in-flight transaction). Already applied to `/checkin`, `/no-show`, `/checkout`, `/acknowledge` — follow when adding new mutating endpoints.
 - **Feature-flag the disruptive UI swaps**: V3.5 `BookingDetailFullPage` is behind `useFullPageBookingDetailFlag()` — env var `NEXT_PUBLIC_FULL_PAGE_BOOKING_DETAIL=false` or URL `?legacyBookingDetail=1` rolls back to the legacy bottom-sheet. Pattern in `src/lib/hooks/use-feature-flags.ts`.
 - **`prisma db push` reads `.env`, not `.env.local`**: dotenv loads `.env` only by default; check which file has the right `DIRECT_URL` before pushing schema (Vercel `DIRECT_URL` ≠ pooler URL).
 - **`npm run preflight` is the pre-commit gate**: typecheck + lint + test. Run before every commit. Catches 80% of "智障 bug" before they reach CI/prod.
-- **GitHub Actions `security-daily.yml`**: runs 11:00 Taipei (npm audit + gitleaks + trivy + tsc), reports auto-committed to `docs/security-reports/YYYY-MM-DD.md`. For deeper LLM analysis run `/cso comprehensive` locally.
+- **GitHub Actions `security-daily.yml`**: runs 11:00 Taipei (npm audit + gitleaks + trivy + tsc), reports auto-committed to `docs/security-reports/YYYY-MM-DD.md`. Third-party actions are SHA-pinned (gitleaks, trivy) — bump SHAs via `gh api repos/<owner>/<repo>/git/refs/tags/<tag> --jq .object.sha`. For deeper LLM analysis run `/cso comprehensive` locally.
+- **knip cannot see CSS `@import` references**: removed `shadcn` once because knip flagged it as unused; `globals.css:5` does `@import "shadcn/tailwind.css"` (resolved via the package's `exports["./tailwind.css"]` map). Result: every page returned HTTP 500 because Tailwind preset failed to compile. Before removing any dep knip flags as unused, also `grep -rE "from ['\"]<pkg>|@import.*<pkg>" src/` and check `src/app/globals.css`. Caught by `/qa-only` 2026-05-05 before ship.
+- **CSP allowlist must include Google Fonts hosts explicitly**: `globals.css:1` loads Manrope + Noto Sans TC from `fonts.googleapis.com` (CSS) which then loads files from `fonts.gstatic.com`. CSP `style-src` needs the first, `font-src` needs the second. Also: never use wildcard at the start of a CSP host (`o*.ingest.sentry.io` is invalid syntax — the browser silently ignores the entry). Use `*.sentry.io` instead. Verified by browse `console --errors` after deploy.
 
 ## Health Stack
 Used by `/health`. Update if the toolchain changes.
@@ -157,7 +159,7 @@ Used by `/health`. Update if the toolchain changes.
 - typecheck: `npm run typecheck`  (alias: `npx tsc --noEmit`)
 - lint: `npm run lint`
 - test: `npm run test`
-- deadcode: (not installed — consider adding `knip`)
+- deadcode: `npx knip` (config in `knip.json`; cannot see CSS `@import` — see Landmines)
 - shell: (no shell scripts in repo)
 
 ## Environment Variables

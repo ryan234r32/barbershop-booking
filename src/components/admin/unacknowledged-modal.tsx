@@ -114,7 +114,7 @@ export function UnacknowledgedModal({ bookings, onAllAcknowledged, onStale }: Pr
       // 404 / other non-success — booking might have been cancelled. Advance
       // the queue rather than wedging the user; they'll see truth on the calendar.
       if (!res.ok && res.status !== 404) {
-        // eslint-disable-next-line no-console
+         
         console.warn(`acknowledge failed: ${res.status}`);
       }
 
