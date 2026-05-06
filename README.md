@@ -64,3 +64,16 @@ npm run lint         # ESLint
 npm run db:studio    # Prisma Studio
 npm run db:seed      # Seed data
 ```
+
+## 交付文件
+
+如果你是接手者（買主 / 老闆 / 技術接手人），先讀對應的這份：
+
+| 你是 | 先讀 |
+|---|---|
+| 買主 / 新老闆 | [docs/HANDOVER.md](docs/HANDOVER.md) — 主交付文件 + 30 天上手計畫 |
+| 老闆 / 店員（日常操作） | [docs/OPERATIONS.md](docs/OPERATIONS.md) — Top 10 admin 操作 cookbook |
+| 出包了 | [docs/RUNBOOK.md](docs/RUNBOOK.md) — 10 種常見 incident SOP |
+| 技術接手人 | [docs/TECHNICAL-HANDOVER.md](docs/TECHNICAL-HANDOVER.md) — clone repo 到 ship prod 完整路徑 |
+| 驗收當下對照 | [docs/BUYER-VALIDATION.md](docs/BUYER-VALIDATION.md) — 90 分鐘 7-phase 驗收 checklist |
+| 想了解全貌 | [docs/PRD.md](docs/PRD.md) + [CLAUDE.md](CLAUDE.md) |
