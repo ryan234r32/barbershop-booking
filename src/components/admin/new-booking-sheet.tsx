@@ -35,6 +35,45 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
+// Same human, two User rows: e.g. LIFF created "陳昶龍 Ryan" (real lineUserId,
+// phone filled), then admin manually typed "陳昶龍" (lineUserId="manual-…",
+// phone null). Treat as one suggestion so admin can't pick the empty record.
+function isLikelySamePerson(a: CustomerSuggestion, b: CustomerSuggestion) {
+  if (a.id === b.id) return true;
+  if (a.phone && b.phone && a.phone === b.phone) return true;
+  const an = a.displayName.trim();
+  const bn = b.displayName.trim();
+  if (an && an === bn) return true;
+  // One name is the other + " <Latin alias>" — e.g. "陳昶龍" vs "陳昶龍 Ryan".
+  // Latin-only suffix is a common LINE-display-name pattern; pure-Chinese
+  // suffixes (e.g. "陳昶" vs "陳昶龍") could be different people, so we
+  // require the trailing fragment to be Latin/alphanumeric only.
+  const [shorter, longer] = an.length <= bn.length ? [an, bn] : [bn, an];
+  if (shorter.length >= 2 && longer.startsWith(shorter)) {
+    const rest = longer.slice(shorter.length).trim();
+    if (rest && /^[A-Za-z][A-Za-z0-9 .'-]*$/.test(rest)) return true;
+  }
+  return false;
+}
+
+// Pick the more useful record: prefer phone-filled, then more visits,
+// then real LIFF user (lineUserId starts with "U") over manual stubs.
+function preferRecord(a: CustomerSuggestion, b: CustomerSuggestion) {
+  if (!!a.phone !== !!b.phone) return a.phone ? a : b;
+  if (a.totalVisits !== b.totalVisits) return a.totalVisits > b.totalVisits ? a : b;
+  return a;
+}
+
+function dedupeCustomers(list: CustomerSuggestion[]): CustomerSuggestion[] {
+  const out: CustomerSuggestion[] = [];
+  for (const c of list) {
+    const i = out.findIndex((kept) => isLikelySamePerson(kept, c));
+    if (i === -1) out.push(c);
+    else out[i] = preferRecord(out[i], c);
+  }
+  return out;
+}
+
 export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, onCreated }: Props) {
   const [source, setSource] = useState<"PHONE" | "WALK_IN">("PHONE");
   const [customerName, setCustomerName] = useState("");
@@ -65,14 +104,25 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
       setSuggestions([]);
       return;
     }
+    // 200ms debounce + AbortController: stale "陳" responses can't overwrite
+    // the "陳昶龍" results when typing fast on a cold-started Vercel function.
+    // Pull 8 raw rows so dedupe still has 5 distinct people to show.
+    const ctrl = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/customers?search=${encodeURIComponent(customerName)}&limit=5`);
+        const res = await fetch(
+          `/api/customers?search=${encodeURIComponent(customerName)}&limit=8`,
+          { signal: ctrl.signal }
+        );
+        if (!res.ok) return;
         const data = await res.json();
-        setSuggestions(data.customers || []);
-      } catch { /* silent */ }
-    }, 500);
-    return () => clearTimeout(timer);
+        setSuggestions(dedupeCustomers(data.customers || []).slice(0, 5));
+      } catch { /* silent — abort or network */ }
+    }, 200);
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+    };
   }, [customerName, boundCustomer]);
 
   const selectCustomer = (c: CustomerSuggestion) => {
