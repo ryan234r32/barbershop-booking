@@ -171,7 +171,22 @@ export default function SettingsPage() {
 
       {/* Business hours */}
       <section className="bg-card rounded-xl border border-border p-6">
-        <h2 className="font-semibold text-foreground mb-4">營業時間</h2>
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="font-semibold text-foreground">營業時間 / 每週公休</h2>
+          {(() => {
+            const closed = businessHours.filter((bh) => !bh.isOpen).map((bh) => WEEKDAY_NAMES[bh.dayOfWeek]);
+            if (closed.length === 0) return <span className="text-xs text-muted-foreground">尚未設定公休</span>;
+            return (
+              <span className="text-xs text-muted-foreground">
+                每週公休 <span className="font-semibold text-foreground">{closed.length} 天</span>（{closed.join("、")}）
+              </span>
+            );
+          })()}
+        </div>
+        <p className="text-[11px] text-muted-foreground mb-4 leading-relaxed">
+          客戶端日曆只顯示未來 45 天 — 取消勾選某天就會在客戶端標灰、無法預約。
+          需要公告的國定假日 / 臨時請假請在下方「假日設定」加單一日期。
+        </p>
         <div className="space-y-2">
           {businessHours
             .sort((a, b) => a.dayOfWeek - b.dayOfWeek)

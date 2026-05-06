@@ -12,6 +12,7 @@ import { UserInfoSheet } from "@/components/liff/booking/user-info-sheet";
 import { LoadingScreen } from "@/components/liff/loading-screen";
 import { IconArrowBack, IconClose } from "@/components/liff/icons";
 import { Modal } from "@/components/ui/modal";
+import { useBusinessConfig } from "@/lib/hooks/use-business-config";
 
 interface Service {
   id: string;
@@ -51,6 +52,9 @@ export default function BookingPage() {
   // server returns code=SLOT_UNAVAILABLE. Show a blocking modal, bounce back
   // to calendar, and refresh availability so the taken slot greys out.
   const [slotConflictOpen, setSlotConflictOpen] = useState(false);
+
+  // 公休 / 預約窗口設定（從 /api/business-config 讀，取代寫死的 30 天 + 週一）
+  const { config: businessConfig } = useBusinessConfig();
 
   // Load services
   useEffect(() => {
@@ -336,6 +340,9 @@ export default function BookingPage() {
               serviceSlotsNeeded={selectedService.slotsNeeded}
               onDateSelect={handleDateSelect}
               onTimeSelect={handleTimeSelect}
+              closedWeekdays={businessConfig.closedWeekdays}
+              holidays={businessConfig.holidays.map((h) => h.date)}
+              maxAdvanceDays={businessConfig.maxAdvanceDays}
             />
           )}
 

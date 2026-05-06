@@ -11,8 +11,8 @@ import { createBookingSchema } from "@/lib/utils/validation";
 import { errorResponse, AppError, SlotUnavailableError, BookingRestrictedError } from "@/lib/utils/errors";
 import { requireBookingAuth } from "@/lib/auth/booking-auth";
 import { randomUUID } from "node:crypto";
-import { addHours, parseTimeToHour, todayInTaipei } from "@/lib/utils/time";
-import { DEFAULT_BUSINESS_HOURS } from "@/lib/utils/constants";
+import { addHours, parseTimeToHour, todayInTaipei, addDaysToISO, getDayOfWeek } from "@/lib/utils/time";
+import { DEFAULT_BUSINESS_HOURS, MAX_ADVANCE_DAYS } from "@/lib/utils/constants";
 import { logger } from "@/lib/utils/logger";
 
 /** GET /api/bookings — list bookings */
@@ -124,6 +124,41 @@ export async function POST(request: NextRequest) {
     const today = todayInTaipei();
     if (input.date < today) {
       throw new AppError("預約日期不可為過去", 400, "PAST_DATE");
+    }
+
+    // 1b-2. LIFF 客戶最遠只能預約 45 天內 + 公休日不能預約。
+    // Admin 不受限（手動補單可以填任何日期）。
+    if (auth.type === "liff") {
+      const maxDate = addDaysToISO(today, MAX_ADVANCE_DAYS);
+      if (input.date > maxDate) {
+        throw new AppError(
+          `預約日期最多只能提前 ${MAX_ADVANCE_DAYS} 天`,
+          400,
+          "BEYOND_ADVANCE_WINDOW",
+        );
+      }
+      const dateObj = new Date(input.date + "T00:00:00.000Z");
+      const dayOfWeek = getDayOfWeek(dateObj);
+      const [bh, holiday] = await Promise.all([
+        prisma.businessHours.findUnique({
+          where: { tenantId_dayOfWeek: { tenantId, dayOfWeek } },
+          select: { isOpen: true },
+        }),
+        prisma.holiday.findUnique({
+          where: { tenantId_date: { tenantId, date: dateObj } },
+          select: { reason: true },
+        }),
+      ]);
+      if (bh && !bh.isOpen) {
+        throw new AppError("本日公休，請選其他日期", 400, "CLOSED_WEEKDAY");
+      }
+      if (holiday) {
+        throw new AppError(
+          holiday.reason ? `本日公休（${holiday.reason}）` : "本日公休，請選其他日期",
+          400,
+          "HOLIDAY",
+        );
+      }
     }
 
     // 1c. Validate startTime + slotsNeeded fits within business hours
