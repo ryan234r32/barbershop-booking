@@ -40,8 +40,10 @@ interface MonthlyResponse {
   };
   previousTotals: MonthlyResponse["totals"];
   servicePie: Array<{ category: string; count: number; revenue: number }>;
-  /** V3.10 — 上月 servicePie，用來算 per-category MoM */
-  prevServicePie: Array<{ category: string; count: number; revenue: number }>;
+  /** V3.10 — 上月 servicePie，用來算 per-category MoM。
+   * Optional：舊 PWA SW 快取的 v1 API response 沒有這欄位，新 JS 讀它必須
+   * 防禦（否則 `prevPie.reduce` undefined → 整個月報表白屏）。 */
+  prevServicePie?: Array<{ category: string; count: number; revenue: number }>;
   retention: { retention30Days: number; retention60Days: number; retention90Days: number };
   prebook: PrebookRateResult;
   prebookPrev: PrebookRateResult;
@@ -372,7 +374,7 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
           <SectionDivider number="02" title="服務組合佔營收" subtitle="各服務類別貢獻比例 + 客單均價 + vs 上月">
             <ServiceMixWidget
               pie={data.servicePie}
-              prevPie={data.prevServicePie}
+              prevPie={data.prevServicePie ?? []}
               chemicalShare={data.chemicalShare}
               chemicalShareLast={data.chemicalShareLastMonth}
               totalRevenue={revenue}
@@ -461,7 +463,8 @@ const ServiceMixWidget = memo(function ServiceMixWidget({
   totalRevenue,
 }: {
   pie: Array<{ category: string; count: number; revenue: number }>;
-  prevPie: Array<{ category: string; count: number; revenue: number }>;
+  /** Optional：舊 PWA / CDN cache 的 v1 response 沒這個欄位 */
+  prevPie?: Array<{ category: string; count: number; revenue: number }>;
   chemicalShare: number;
   chemicalShareLast: number;
   totalRevenue: number;
@@ -469,11 +472,15 @@ const ServiceMixWidget = memo(function ServiceMixWidget({
   // V3.8 perf: useMemo so unrelated re-renders (expenses/closes useSWR
   // resolving at different ms) don't re-sort/re-reduce.
   const { rows, total, chemDelta, gapPp, monthlyChemRev, upliftRev, targetShare } = useMemo(() => {
+    // 防禦：舊 cache 的 response 沒 prevPie → undefined。`?? []` 讓 reduce
+    // 落在 0，per-category MoM 就會變 null（畫面顯示「—」），不會白屏。
+    const safePie = pie ?? [];
+    const safePrev = prevPie ?? [];
     const tShare = 35;
-    const t = pie.reduce((s, p) => s + p.revenue, 0) || 1;
-    const prevT = prevPie.reduce((s, p) => s + p.revenue, 0) || 1;
-    const prevByCat = new Map(prevPie.map((p) => [p.category, p]));
-    const built: ServiceRow[] = [...pie]
+    const t = safePie.reduce((s, p) => s + p.revenue, 0) || 1;
+    const prevT = safePrev.reduce((s, p) => s + p.revenue, 0) || 1;
+    const prevByCat = new Map(safePrev.map((p) => [p.category, p]));
+    const built: ServiceRow[] = [...safePie]
       .sort((a, b) => b.revenue - a.revenue)
       .map((s) => {
         const prev = prevByCat.get(s.category);
