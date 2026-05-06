@@ -14,6 +14,16 @@ export const DEFAULT_BUSINESS_HOURS = {
  */
 export const MAX_ADVANCE_DAYS = 45;
 
+/**
+ * Admin 手動建單 / 改期 / 報表瀏覽最遠天數。
+ * 老闆有時會幫熟客排半年後預約 (常客 / 染髮回診)，所以放寬到 1 年。
+ * 同時也是 admin 行事曆 + 對帳報表 DateStrip 的最大值（讓老闆能滑到任何
+ * 已建立的預約日期）。
+ *
+ * LIFF 客戶仍只能訂 MAX_ADVANCE_DAYS = 45 天內。
+ */
+export const ADMIN_MAX_ADVANCE_DAYS = 365;
+
 // Generates all possible slot start times: ["11:00", "12:00", ..., "19:00"]
 export function generateAllSlots(startTime: string, endTime: string): string[] {
   const slots: string[] = [];

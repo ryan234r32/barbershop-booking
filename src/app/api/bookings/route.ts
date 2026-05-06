@@ -12,7 +12,7 @@ import { errorResponse, AppError, SlotUnavailableError, BookingRestrictedError }
 import { requireBookingAuth } from "@/lib/auth/booking-auth";
 import { randomUUID } from "node:crypto";
 import { addHours, parseTimeToHour, todayInTaipei, addDaysToISO, getDayOfWeek } from "@/lib/utils/time";
-import { DEFAULT_BUSINESS_HOURS, MAX_ADVANCE_DAYS } from "@/lib/utils/constants";
+import { DEFAULT_BUSINESS_HOURS, MAX_ADVANCE_DAYS, ADMIN_MAX_ADVANCE_DAYS } from "@/lib/utils/constants";
 import { logger } from "@/lib/utils/logger";
 
 /** GET /api/bookings — list bookings */
@@ -126,8 +126,7 @@ export async function POST(request: NextRequest) {
       throw new AppError("預約日期不可為過去", 400, "PAST_DATE");
     }
 
-    // 1b-2. LIFF 客戶最遠只能預約 45 天內 + 公休日不能預約。
-    // Admin 不受限（手動補單可以填任何日期）。
+    // 1b-2. LIFF 客戶 45 天 + 公休日不能預約；Admin 365 天（一年內），不受公休限制。
     if (auth.type === "liff") {
       const maxDate = addDaysToISO(today, MAX_ADVANCE_DAYS);
       if (input.date > maxDate) {
@@ -157,6 +156,16 @@ export async function POST(request: NextRequest) {
           holiday.reason ? `本日公休（${holiday.reason}）` : "本日公休，請選其他日期",
           400,
           "HOLIDAY",
+        );
+      }
+    } else {
+      // Admin 路徑 — 1 年上限避免誤觸 (例：手滑點到 2030)
+      const adminMaxDate = addDaysToISO(today, ADMIN_MAX_ADVANCE_DAYS);
+      if (input.date > adminMaxDate) {
+        throw new AppError(
+          `預約日期最多只能提前 ${ADMIN_MAX_ADVANCE_DAYS} 天（1 年）`,
+          400,
+          "BEYOND_ADMIN_WINDOW",
         );
       }
     }
