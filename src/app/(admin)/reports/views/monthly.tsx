@@ -2,7 +2,7 @@
 
 import { memo, useMemo } from "react";
 import useSWR from "swr";
-import { AlertTriangle, ArrowRight, BarChart3, CheckCircle2, Coins } from "lucide-react";
+import { BarChart3, Coins } from "lucide-react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { MCard } from "@/components/admin/reports/v3.6/m-card";
 import { MTag } from "@/components/admin/reports/v3.6/m-tag";
@@ -40,6 +40,8 @@ interface MonthlyResponse {
   };
   previousTotals: MonthlyResponse["totals"];
   servicePie: Array<{ category: string; count: number; revenue: number }>;
+  /** V3.10 — 上月 servicePie，用來算 per-category MoM */
+  prevServicePie: Array<{ category: string; count: number; revenue: number }>;
   retention: { retention30Days: number; retention60Days: number; retention90Days: number };
   prebook: PrebookRateResult;
   prebookPrev: PrebookRateResult;
@@ -110,9 +112,6 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
     .filter((e) => e.type === "VARIABLE")
     .reduce((s, e) => s + e.amount, 0);
   const closedDates = new Set(closesData?.snapshots.map((s) => s.date) ?? []);
-  const closesWithDiff = (closesData?.snapshots ?? []).filter(
-    (s) => s.cashDiff !== 0,
-  );
 
   if (isLoading || !data) {
     return (
@@ -274,9 +273,6 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
                   /{range.daysInMonth}
                 </span>
               </p>
-              <p className="text-[11px] text-[var(--color-text-muted)] mt-1 leading-tight">
-                {closesWithDiff.length > 0 ? `${closesWithDiff.length} 天有差異` : "全部準時對上"}
-              </p>
             </MCard>
           </div>
 
@@ -285,7 +281,6 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
             period={period}
             daysInMonth={range.daysInMonth}
             closedDates={closedDates}
-            diffDates={new Set(closesWithDiff.map((s) => s.date))}
           />
 
           {/* ④ KPI 2×2 grid */}
@@ -372,10 +367,12 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
             </MCard>
           </SectionDivider>
 
-          {/* ⑥ 服務組合 */}
-          <SectionDivider number="02" title="服務組合" subtitle="本月各服務佔比 + actionable insight">
+          {/* ⑥ 服務組合 — V3.10 redesign：donut + 對比表（reference 業界 SaaS
+               ：Phorest / GlossGenius / Fresha 都用相同 hero pattern） */}
+          <SectionDivider number="02" title="服務組合佔營收" subtitle="各服務類別貢獻比例 + 客單均價 + vs 上月">
             <ServiceMixWidget
               pie={data.servicePie}
+              prevPie={data.prevServicePie}
               chemicalShare={data.chemicalShare}
               chemicalShareLast={data.chemicalShareLastMonth}
               totalRevenue={revenue}
@@ -414,28 +411,95 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
 
 // ─── Sub-widgets ─────────────────────────────────────────────────────────
 
+/**
+ * V3.10 ServiceMix redesign — donut + comparison table.
+ *
+ * Reference (頂尖理髮 SaaS 怎麼呈現「服務組合佔營收」)：
+ *   - Phorest / GlossGenius / Fresha：Hero donut + legend + detail table。
+ *     重點：donut 是「比例」一眼看完，table 是 supporting metrics
+ *     (revenue / 客單均價 / vs 上月 trend arrow)。
+ *   - Square Appointments：類似 pattern，再加一個 "top services" list。
+ *   - Stripe / Shopify Reports：mix breakdown 永遠是 donut + per-row
+ *     comparison vs 上期，不是裸 bar list。
+ *
+ * 設計重點：
+ *   1. Donut 為 hero — % 是主訊息（老闆 5 秒就能看完）。
+ *   2. 每一服務固定顏色（穩定 mental model：染永遠是紫、燙永遠是棕）。
+ *   3. Table 加客單均價 (avg ticket) + MoM trend — 之前完全沒有，
+ *      只有「revenue + count」 → 老闆無法判斷哪個服務是「漲量」or「漲價」。
+ *   4. 染燙 actionable banner 保留 — 還是最重要的一句話。
+ */
+const SERVICE_COLOR: Record<string, string> = {
+  剪: "#0F6E56", // brand 綠（最常被點選的服務）
+  染: "#7E22CE", // 紫（化學服務）
+  燙: "#BA7517", // 棕
+  漂: "#A32D2D", // 紅（高難度）
+  護: "#1D9E75", // 薄荷綠
+};
+const FALLBACK_COLOR = "#5B6770"; // 灰 — 「其他」未知類別
+
+function colourFor(category: string): string {
+  return SERVICE_COLOR[category] ?? FALLBACK_COLOR;
+}
+
+interface ServiceRow {
+  category: string;
+  revenue: number;
+  count: number;
+  share: number;       // % of total revenue this month
+  avgTicket: number;   // revenue / count
+  momPct: number | null;       // revenue MoM %
+  momSharePp: number | null;   // 佔比 MoM (pp)
+  colour: string;
+}
+
 const ServiceMixWidget = memo(function ServiceMixWidget({
   pie,
+  prevPie,
   chemicalShare,
   chemicalShareLast,
   totalRevenue,
 }: {
   pie: Array<{ category: string; count: number; revenue: number }>;
+  prevPie: Array<{ category: string; count: number; revenue: number }>;
   chemicalShare: number;
   chemicalShareLast: number;
   totalRevenue: number;
 }) {
   // V3.8 perf: useMemo so unrelated re-renders (expenses/closes useSWR
-  // resolving at different ms) don't re-sort/re-reduce. Recomputes only
-  // when the SWR fetch returns a fresh `pie` reference or share changes.
-  const { sorted, total, chemDelta, gapPp, monthlyChemRev, upliftRev, targetShare } = useMemo(() => {
+  // resolving at different ms) don't re-sort/re-reduce.
+  const { rows, total, chemDelta, gapPp, monthlyChemRev, upliftRev, targetShare } = useMemo(() => {
     const tShare = 35;
     const t = pie.reduce((s, p) => s + p.revenue, 0) || 1;
-    const s = [...pie].sort((a, b) => b.revenue - a.revenue);
+    const prevT = prevPie.reduce((s, p) => s + p.revenue, 0) || 1;
+    const prevByCat = new Map(prevPie.map((p) => [p.category, p]));
+    const built: ServiceRow[] = [...pie]
+      .sort((a, b) => b.revenue - a.revenue)
+      .map((s) => {
+        const prev = prevByCat.get(s.category);
+        const share = (s.revenue / t) * 100;
+        const prevShare = prev ? (prev.revenue / prevT) * 100 : null;
+        const momPct = prev && prev.revenue > 0
+          ? Math.round(((s.revenue - prev.revenue) / prev.revenue) * 1000) / 10
+          : null;
+        const momSharePp = prevShare !== null
+          ? Math.round((share - prevShare) * 10) / 10
+          : null;
+        return {
+          category: s.category,
+          revenue: s.revenue,
+          count: s.count,
+          share,
+          avgTicket: s.count > 0 ? Math.round(s.revenue / s.count) : 0,
+          momPct,
+          momSharePp,
+          colour: colourFor(s.category),
+        };
+      });
     const monthlyChem = (chemicalShare / 100) * totalRevenue;
     const targetRev = (tShare / 100) * totalRevenue;
     return {
-      sorted: s,
+      rows: built,
       total: t,
       chemDelta: chemicalShare - chemicalShareLast,
       gapPp: tShare - chemicalShare,
@@ -443,35 +507,69 @@ const ServiceMixWidget = memo(function ServiceMixWidget({
       upliftRev: Math.max(0, targetRev - monthlyChem),
       targetShare: tShare,
     };
-  }, [pie, chemicalShare, chemicalShareLast, totalRevenue]);
+  }, [pie, prevPie, chemicalShare, chemicalShareLast, totalRevenue]);
+
+  if (rows.length === 0) {
+    return (
+      <MCard padding="md">
+        <p className="text-sm text-[var(--color-text-muted)] text-center py-6">
+          本月尚無服務紀錄
+        </p>
+      </MCard>
+    );
+  }
 
   return (
     <MCard padding="md">
-      <div className="space-y-2">
-        {sorted.map((s) => {
-          const pct = (s.revenue / total) * 100;
-          return (
-            <div key={s.category} className="flex items-center gap-3 text-xs">
-              <span className="w-8 shrink-0 font-semibold text-[var(--color-text-primary)]">
-                {s.category}
-              </span>
-              <div className="flex-1 bg-[var(--color-surface)] rounded h-5 overflow-hidden relative">
-                <div
-                  className="h-full bg-[var(--color-brand)]/70 rounded"
-                  style={{ width: `${pct}%` }}
-                />
-                <span className="absolute inset-0 flex items-center pl-2 text-[10px] text-[var(--color-text-primary)] font-mono">
-                  {s.revenue.toLocaleString()} ({s.count})
-                </span>
-              </div>
-              <span className="w-10 text-right font-mono text-[var(--color-text-muted)] tabular-nums">
-                {pct.toFixed(0)}%
-              </span>
-            </div>
-          );
-        })}
+      {/* Hero: Donut + legend + 染燙 share callout —— 一眼看完比例 */}
+      <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-6">
+        <ServiceDonut rows={rows} totalRevenue={total} />
+        <ServiceLegend rows={rows} />
       </div>
 
+      {/* Detail table — 每服務的營收 / 佔比 / 客單均價 / vs 上月
+           設計 reference: Phorest「Service mix」報表 */}
+      <div className="mt-5 pt-5 border-t border-[var(--color-brand)]/8 overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] border-b border-[var(--color-brand)]/10">
+              <th className="text-left py-2 font-medium">服務</th>
+              <th className="text-right py-2 font-medium">營收</th>
+              <th className="text-right py-2 font-medium">佔比</th>
+              <th className="text-right py-2 font-medium hidden sm:table-cell">客單均價</th>
+              <th className="text-right py-2 font-medium hidden sm:table-cell">筆數</th>
+              <th className="text-right py-2 font-medium">vs 上月</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.category} className="border-b border-[var(--color-brand)]/5">
+                <td className="py-2.5">
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                      style={{ background: r.colour }}
+                      aria-hidden
+                    />
+                    <span className="font-semibold text-[var(--color-text-primary)]">{r.category}</span>
+                  </span>
+                </td>
+                <td className="py-2.5 text-right tabular-nums">{r.revenue.toLocaleString()}</td>
+                <td className="py-2.5 text-right tabular-nums font-semibold">{r.share.toFixed(1)}%</td>
+                <td className="py-2.5 text-right tabular-nums hidden sm:table-cell text-[var(--color-text-body)]">
+                  {r.avgTicket > 0 ? r.avgTicket.toLocaleString() : "—"}
+                </td>
+                <td className="py-2.5 text-right tabular-nums hidden sm:table-cell text-[var(--color-text-muted)]">{r.count}</td>
+                <td className="py-2.5 text-right tabular-nums">
+                  <MomCell pct={r.momPct} pp={r.momSharePp} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 染燙佔比 actionable banner — 保留原 V3.6 設計，這是最值錢的 insight */}
       {gapPp > 0 && (
         <div className="mt-4 bg-[var(--color-danger)]/8 border-l-[3px] border-[var(--color-danger)] rounded-r-md px-3 py-2 text-xs">
           <p className="font-semibold text-[var(--color-text-primary)] inline-flex items-start gap-1.5">
@@ -488,6 +586,120 @@ const ServiceMixWidget = memo(function ServiceMixWidget({
     </MCard>
   );
 });
+
+/**
+ * SVG donut showing service share. Center label = top category + its share.
+ * 用 stroke-dasharray 切片是業界常見做法（Phorest / GlossGenius / Recharts
+ * 內部都用同樣手法），cumulative offset 把每個 segment 接在上一個結束的角度。
+ */
+function ServiceDonut({ rows, totalRevenue }: { rows: ServiceRow[]; totalRevenue: number }) {
+  const SIZE = 144;
+  const STROKE = 22;
+  const R = (SIZE - STROKE) / 2;
+  const C = 2 * Math.PI * R;
+  const top = rows[0];
+
+  // React Compiler doesn't allow render-time mutation, so pre-compute each
+  // segment's dashoffset via a single reduce — same effect, immutable.
+  const segments = rows.reduce<Array<{ category: string; colour: string; dash: number; offset: number }>>(
+    (acc, r) => {
+      const frac = totalRevenue > 0 ? r.revenue / totalRevenue : 0;
+      const dash = frac * C;
+      const prevTotal = acc.length > 0 ? acc[acc.length - 1].offset - acc[acc.length - 1].dash : 0;
+      acc.push({ category: r.category, colour: r.colour, dash, offset: prevTotal });
+      return acc;
+    },
+    [],
+  );
+
+  return (
+    <div className="relative shrink-0" style={{ width: SIZE, height: SIZE }}>
+      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} className="-rotate-90">
+        {/* Track */}
+        <circle
+          cx={SIZE / 2}
+          cy={SIZE / 2}
+          r={R}
+          fill="none"
+          stroke="var(--color-surface)"
+          strokeWidth={STROKE}
+        />
+        {segments.map((seg) => (
+          <circle
+            key={seg.category}
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={R}
+            fill="none"
+            stroke={seg.colour}
+            strokeWidth={STROKE}
+            strokeDasharray={`${seg.dash} ${C - seg.dash}`}
+            strokeDashoffset={seg.offset}
+            strokeLinecap="butt"
+          />
+        ))}
+      </svg>
+      {/* Center label — top category share is the headline */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+        <p className="text-[10px] tracking-wider text-[var(--color-text-muted)] uppercase">主力</p>
+        <p className="text-2xl font-bold tabular-nums text-[var(--color-text-primary)] leading-none mt-0.5">
+          {top.share.toFixed(0)}%
+        </p>
+        <p className="text-xs text-[var(--color-text-body)] mt-1 font-semibold">{top.category}</p>
+      </div>
+    </div>
+  );
+}
+
+function ServiceLegend({ rows }: { rows: ServiceRow[] }) {
+  return (
+    <ul className="flex-1 w-full grid grid-cols-2 sm:grid-cols-1 gap-x-3 gap-y-1.5 text-xs">
+      {rows.map((r) => (
+        <li key={r.category} className="flex items-center gap-2">
+          <span
+            className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+            style={{ background: r.colour }}
+            aria-hidden
+          />
+          <span className="font-semibold text-[var(--color-text-primary)] w-6">{r.category}</span>
+          <span className="flex-1 text-right tabular-nums text-[var(--color-text-muted)]">
+            {r.share.toFixed(1)}%
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * MoM cell — shows revenue % change with arrow + 佔比 pp delta below.
+ * Renders "新出現" if last month had 0 of this category (no MoM math possible),
+ * 「無變化」 if % is exactly 0, otherwise ↑/↓ arrow with colour.
+ */
+function MomCell({ pct, pp }: { pct: number | null; pp: number | null }) {
+  if (pct === null) {
+    return <span className="text-[10px] text-[var(--color-text-muted)]">新出現</span>;
+  }
+  const tone = pct > 0
+    ? "text-[var(--color-success)]"
+    : pct < 0
+      ? "text-[var(--color-danger)]"
+      : "text-[var(--color-text-muted)]";
+  const arrow = pct > 0 ? "↑" : pct < 0 ? "↓" : "→";
+  return (
+    <span className={`inline-flex flex-col items-end ${tone}`}>
+      <span className="font-semibold tabular-nums">
+        {arrow} {Math.abs(pct).toFixed(0)}%
+      </span>
+      {pp !== null && pp !== 0 && (
+        <span className="text-[10px] text-[var(--color-text-muted)] tabular-nums">
+          {pp > 0 ? "+" : ""}
+          {pp.toFixed(1)}pp 佔比
+        </span>
+      )}
+    </span>
+  );
+}
 
 function SetTargetButton({
   period,
@@ -532,38 +744,21 @@ function SetTargetButton({
 // ─── V3.7 §E — Close-status grid ────────────────────────────────────────
 
 /**
- * V3.9 redesign — 結帳狀態 calendar grid.
- *
- * Why this exists: pre-V3.9, every "未結" day used the same flat surface fill,
- * so future / today / past-not-closed all looked identical → owner thought
- * "確認對帳" on each booking row was the same as 完成今日結帳, never noticed the
- * grid stayed blank. This rewrite fixes both the visual grammar and the
- * call-to-action gap.
- *
- * Visual grammar (5 states, distinct shape + hue):
- *   - 已結帳 / 無差異 → solid green fill
- *   - 已結帳 / 有差異 → solid amber fill (drives clicks back to daily view)
- *   - 過去 / 未結    → dashed amber outline ("待結" — needs action)
- *   - 今日 / 未結    → solid brand-color outline + bold (the "do this now" cell)
- *   - 未來          → faint, no fill
- *
- * UX guards on top of the grid:
- *   - **Summary line** "X / Y 天已結帳" answers "where am I" instantly.
- *   - **Today CTA** appears only when today is unclosed → one tap to daily view.
- *   - **Empty-state hint** explains the gap when the grid is blank
- *     (closes 0 yet days have elapsed) — this is exactly the trap that bit
- *     the owner on 2026-05-05.
+ * V3.10 老闆 feedback 簡化：上一版 5 種狀態（已結 / 有差異 / 待結 / 今日 / 未來）
+ * 老闆覺得太複雜，「只要區分『已結帳』和『還沒結帳』就好」。同時：
+ *   - 過去 + 未結的日期要可以點 → 跳到該日結帳頁（不只今日才能點）
+ *   - Legend 放在格子上方（首屏就看到顏色意義，不用滾到下面）
+ *   - 顏色：綠 = 已結帳；中性灰底 = 未結（過去+今日都同色）；淡 = 未來
+ *   - 今日仍保留一圈 brand ring 方便視覺定位（不算第三種「狀態」）
  */
 function CloseStatusGrid({
   period,
   daysInMonth,
   closedDates,
-  diffDates,
 }: {
   period: string;
   daysInMonth: number;
   closedDates: Set<string>;
-  diffDates: Set<string>;
 }) {
   const [year, month] = period.split("-").map((s) => parseInt(s, 10));
   const todayStr = new Date().toLocaleDateString("en-CA", {
@@ -578,30 +773,23 @@ function CloseStatusGrid({
     cells.push({ day: d, iso });
   }
 
-  // Summary stats — "elapsed" = past days + today (if today is in this month).
-  // For other months, elapsed = whole month if month < today's month, else 0.
+  // Elapsed = past days + today (only count days that already happened).
   const elapsedDays = cells.reduce((n, c) => {
     if (!c) return n;
     return c.iso <= todayStr ? n + 1 : n;
   }, 0);
   const closedCount = closedDates.size;
-  const diffCount = diffDates.size;
   const pendingCount = Math.max(0, elapsedDays - closedCount);
-  const todayInMonth = cells.some((c) => c?.iso === todayStr);
-  const todayClosed = closedDates.has(todayStr);
-  const showTodayCta = todayInMonth && !todayClosed;
-  const showEmptyHint = closedCount === 0 && elapsedDays > 0;
 
-  const jumpToDailyToday = () => {
-    // Page-level effect mirrors state to URL on mount, so an absolute nav
-    // re-enters the report page on the daily tab for today. Full reload is
-    // <300ms on the SWR-prefetched bundle and avoids prop-drilling setView.
-    window.location.assign(`/reports?view=daily&date=${todayStr}`);
+  const jumpToDaily = (iso: string) => {
+    // Absolute nav — page-level effect mirrors state to URL on mount, so a
+    // hard navigate re-enters the report page on the daily tab for that date.
+    window.location.assign(`/reports?view=daily&date=${iso}`);
   };
 
   return (
     <MCard padding="md">
-      <div className="flex items-baseline justify-between mb-1 gap-2 flex-wrap">
+      <div className="flex items-baseline justify-between mb-2 gap-2 flex-wrap">
         <p className="text-sm font-semibold text-[var(--color-text-primary)]">
           結帳狀態
         </p>
@@ -613,17 +801,11 @@ function CloseStatusGrid({
               <span className="text-[var(--color-success)] font-semibold">
                 {closedCount}
               </span>
-              <span> / {elapsedDays} 天已結帳</span>
-              {diffCount > 0 && (
-                <span className="text-[var(--color-warning)]">
-                  {" "}
-                  · {diffCount} 天有差異
-                </span>
-              )}
+              <span> / {elapsedDays} 天已結</span>
               {pendingCount > 0 && (
-                <span className="text-[var(--color-warning)]">
+                <span className="text-[var(--color-text-muted)]">
                   {" "}
-                  · {pendingCount} 天待結
+                  · {pendingCount} 天未結
                 </span>
               )}
             </>
@@ -631,40 +813,22 @@ function CloseStatusGrid({
         </p>
       </div>
 
-      {/* Today CTA — primary call-to-action when today isn't closed yet.
-          Appears only on the current month's view (todayInMonth check). */}
-      {showTodayCta && (
-        <button
-          onClick={jumpToDailyToday}
-          className="w-full mb-3 mt-2 flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg bg-[var(--color-brand)]/8 border border-[var(--color-brand)]/25 text-[var(--color-brand)] hover:bg-[var(--color-brand)]/12 transition-colors text-left"
-        >
-          <span className="flex items-center gap-2 text-sm font-semibold">
-            <CheckCircle2 size={16} aria-hidden />
-            今日（{todayStr.slice(5).replace("-", "/")}）尚未結帳
-          </span>
-          <span className="flex items-center gap-1 text-xs font-semibold whitespace-nowrap">
-            前往結帳
-            <ArrowRight size={14} aria-hidden />
-          </span>
-        </button>
-      )}
-
-      {/* Empty-state hint — disambiguates "我有按確認啊，為什麼還是空的？"
-          The owner confused per-booking settle with day-close on 2026-05-05. */}
-      {showEmptyHint && !showTodayCta && (
-        <div className="mb-3 mt-2 px-3 py-2 rounded-md bg-[var(--color-surface)]/60 border-l-[3px] border-[var(--color-text-muted)]/40">
-          <p className="text-[11px] text-[var(--color-text-body)] leading-relaxed inline-flex items-start gap-1.5">
-            <AlertTriangle
-              size={12}
-              aria-hidden
-              className="mt-0.5 shrink-0 text-[var(--color-text-muted)]"
-            />
-            <span>
-              在「每日」分頁底完成「<span className="font-semibold">完成今日結帳</span>」按鈕後，這裡才會點亮綠色。逐筆「確認對帳」尚不算結帳。
-            </span>
-          </p>
-        </div>
-      )}
+      {/* Legend — 放在格子上方，第一眼就讀到顏色意義。3 個 chip 對應 3 種視覺
+          （已結 / 未結 / 未來）；功能上仍是「已結 / 未結」兩態。 */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-3 text-[11px] text-[var(--color-text-muted)]">
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-sm bg-[var(--color-success)]/30 border border-[var(--color-success)]" />
+          已結帳
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-sm bg-[var(--color-surface)] border border-[var(--color-text-muted)]/30" />
+          未結（點可前往該日結帳）
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-sm border border-[var(--color-text-disabled)]/30" />
+          未來
+        </span>
+      </div>
 
       <div className="grid grid-cols-7 gap-1 text-[11px] tabular-nums">
         {["日", "一", "二", "三", "四", "五", "六"].map((w) => (
@@ -678,45 +842,35 @@ function CloseStatusGrid({
         {cells.map((c, i) => {
           if (!c) return <div key={`b${i}`} />;
           const isClosed = closedDates.has(c.iso);
-          const hasDiff = diffDates.has(c.iso);
           const isFuture = c.iso > todayStr;
           const isToday = c.iso === todayStr;
-          // 5-state classification. Each branch sets the cell's full visual
-          // grammar (fill + text + border) so the cases are mutually exclusive
-          // and easy to scan.
+
+          // 兩種功能態：已結（綠）/ 未結（中性）。未來日另外淡掉以免被當未結。
           let cellClass: string;
           if (isFuture) {
             cellClass = "bg-transparent text-[var(--color-text-disabled)]";
-          } else if (isClosed && hasDiff) {
-            cellClass =
-              "bg-[var(--color-warning)]/20 text-[var(--color-warning)] font-bold";
           } else if (isClosed) {
             cellClass =
               "bg-[var(--color-success)]/20 text-[var(--color-success)] font-bold";
-          } else if (isToday) {
-            // Today + unclosed → the "do this now" cell. Brand-color outline
-            // + tinted fill stands out among past-grey / future-faint.
-            cellClass =
-              "bg-[var(--color-brand)]/10 text-[var(--color-brand)] font-bold border-2 border-dashed border-[var(--color-brand)]/60";
           } else {
-            // Past + unclosed → amber dashed outline, hints "should be done".
             cellClass =
-              "bg-[var(--color-warning)]/5 text-[var(--color-warning)] border border-dashed border-[var(--color-warning)]/35 font-semibold";
+              "bg-[var(--color-surface)] text-[var(--color-text-body)] font-semibold";
           }
-          // Today gets an extra ring so the eye finds it instantly.
-          const ring = isToday ? "ring-2 ring-[var(--color-brand)]/40 ring-offset-1 ring-offset-[var(--color-bg)]" : "";
-          // Today + unclosed is also clickable — same destination as the
-          // hero CTA above. Past dates aren't clickable to keep the grid
-          // glanceable rather than a navigation surface.
-          const clickable = isToday && !isClosed;
+          // 今日加一圈 ring，方便老闆一眼看到「我在哪」。
+          const ring = isToday
+            ? "ring-2 ring-[var(--color-brand)]/55 ring-offset-1 ring-offset-[var(--color-bg)]"
+            : "";
+
+          // 過去 + 今日 + 未結 都可點 → 直接跳該日結帳頁。未來不可點。
+          const clickable = !isFuture && !isClosed;
           const cellBaseClass = `aspect-square rounded-md flex items-center justify-center ${cellClass} ${ring}`;
           if (clickable) {
             return (
               <button
                 key={c.iso}
-                onClick={jumpToDailyToday}
-                aria-label="今日尚未結帳，前往每日結帳"
-                className={`${cellBaseClass} cursor-pointer hover:bg-[var(--color-brand)]/15 transition-colors`}
+                onClick={() => jumpToDaily(c.iso)}
+                aria-label={`${c.iso} 尚未結帳，前往該日結帳`}
+                className={`${cellBaseClass} cursor-pointer hover:bg-[var(--color-brand)]/15 hover:text-[var(--color-brand)] transition-colors`}
               >
                 {c.day}
               </button>
@@ -728,31 +882,6 @@ function CloseStatusGrid({
             </div>
           );
         })}
-      </div>
-
-      {/* Legend — placed below the grid so first scan goes status → grid → key.
-          5 states (was 3) — added 待結 + 今日 to disambiguate. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3 pt-3 border-t border-[var(--color-brand)]/8 text-[10px] text-[var(--color-text-muted)]">
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm bg-[var(--color-success)]/30 border border-[var(--color-success)]" />
-          已結帳
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm bg-[var(--color-warning)]/30 border border-[var(--color-warning)]" />
-          有差異
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm border border-dashed border-[var(--color-warning)]/60" />
-          待結
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm bg-[var(--color-brand)]/15 border-2 border-dashed border-[var(--color-brand)]/60" />
-          今日
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm border border-[var(--color-text-disabled)]/30" />
-          未來
-        </span>
       </div>
     </MCard>
   );

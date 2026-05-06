@@ -7,10 +7,11 @@ interface ThreeWayDecompositionProps {
   revenue: number;
 }
 
-// V3.8 老闆反映：「不用寫 NT 哦，就直接寫多少，大家都會知道是台幣」
-// 直接 toLocaleString() 不加前綴。
 const fmt = (n: number) => n.toLocaleString();
 
+// V3.10 老闆 feedback：「月營收」cell 的 30,400 在窄手機被擠成「30,40 / 0」兩行。
+// Hero 上方已經有大字「本月營收 30,400」，這裡再放一遍是冗余 → 改 2-col 只放
+// 客數 + 客單價，月營收用底下的 equation footer 帶出（粗+brand 色強調）。
 export function ThreeWayDecomposition({
   customers,
   ticket,
@@ -18,13 +19,13 @@ export function ThreeWayDecomposition({
 }: ThreeWayDecompositionProps) {
   return (
     <div className="bg-[var(--color-surface)]/40 rounded-xl p-4 sm:p-5 border border-[var(--color-brand)]/8">
-      <div className="grid grid-cols-3 items-center gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 items-center gap-4 sm:gap-6">
         <Cell label="服務客數" value={customers.toLocaleString()} unit="人" />
         <Cell label="客單價" value={fmt(ticket)} unit="" />
-        <Cell label="月營收" value={fmt(revenue)} unit="" highlight />
       </div>
-      <p className="text-xs text-[var(--color-text-muted)] text-center mt-3 font-mono tabular-nums break-all">
-        {customers.toLocaleString()} × {ticket.toLocaleString()} = {fmt(revenue)}
+      <p className="text-xs sm:text-sm text-[var(--color-text-muted)] text-center mt-3 pt-3 border-t border-[var(--color-brand)]/8 font-mono tabular-nums">
+        {customers.toLocaleString()} × {ticket.toLocaleString()} ={" "}
+        <span className="font-bold text-[var(--color-brand)]">{fmt(revenue)}</span>
       </p>
     </div>
   );
@@ -34,25 +35,23 @@ function Cell({
   label,
   value,
   unit,
-  highlight,
 }: {
   label: string;
   value: string;
   unit: string;
-  highlight?: boolean;
 }) {
   return (
     <div className="text-center min-w-0">
-      <p className="text-xs sm:text-sm tracking-wider text-[var(--color-text-muted)] uppercase truncate">
+      <p className="text-xs sm:text-sm tracking-wider text-[var(--color-text-muted)] uppercase">
         {label}
       </p>
-      <p
-        className={`text-2xl sm:text-3xl font-bold tabular-nums mt-1.5 break-all leading-tight ${
-          highlight ? "text-[var(--color-brand)]" : "text-[var(--color-text-primary)]"
-        }`}
-      >
+      <p className="text-2xl sm:text-3xl font-bold tabular-nums mt-1.5 leading-tight text-[var(--color-text-primary)] whitespace-nowrap">
         {value}
-        {unit && <span className="text-base font-normal text-[var(--color-text-muted)] ml-0.5">{unit}</span>}
+        {unit && (
+          <span className="text-base font-normal text-[var(--color-text-muted)] ml-0.5">
+            {unit}
+          </span>
+        )}
       </p>
     </div>
   );
