@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { classifyIntent, type KeywordIntent } from "@/app/api/webhook/classify-intent";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
 import { prisma } from "@/lib/prisma";
+import { formatBusinessHoursLabel } from "@/lib/utils/business-hours-label";
 import {
   bookingGuideMessage,
   pricingCarouselMessage,
@@ -102,11 +103,16 @@ export async function POST(request: NextRequest) {
       const googleMapsUrl = tenant?.address
         ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tenant.address)}`
         : undefined;
+      // 動態從 DB 組營業時間字串（同 webhook handler）— 跟 admin /settings 同步
+      const bizHoursRows = await prisma.businessHours.findMany({
+        where: { tenantId: admin.tenantId },
+        select: { dayOfWeek: true, startTime: true, endTime: true, isOpen: true },
+      });
       preview = businessInfoMessage({
         shopName,
         address: tenant?.address || "請洽店家",
         phone: tenant?.phone || "請洽店家",
-        hours: "週二至週日 11:00-20:00（週一公休）",
+        hours: formatBusinessHoursLabel(bizHoursRows),
         googleMapsUrl,
       });
       break;

@@ -11,6 +11,7 @@ import { ExpenseEntrySheet } from "@/components/admin/expense-entry-sheet";
 import { DailyCloseSheet } from "@/components/admin/daily-close-sheet";
 import { CATEGORY_LABELS, type ExpenseCategory } from "@/lib/expenses/categories";
 import type { DailyView, DailyBookingRow } from "@/lib/reports/v3.6/aggregates";
+import { MAX_ADVANCE_DAYS } from "@/lib/utils/constants";
 
 interface ExpenseRowData {
   id: string;
@@ -117,10 +118,11 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
   const progressPct = reconcileTotal > 0 ? Math.round((settledCount / reconcileTotal) * 100) : 0;
 
   // V3.8 §5：DateStrip 預設 maxValue = today，未來日期會被 disabled。但老闆要看
-  // 5 月（未來）的預定 → 放寬到「today + 60 天」覆蓋 45 天預約窗口 + 緩衝。
+  // 未來預定 → 放寬到「today + MAX_ADVANCE_DAYS + 15 天」（45+15=60 天緩衝）。
+  // 用常數而非寫死 60，避免改 MAX_ADVANCE_DAYS 後 drift。
   const maxNavDate = useMemo(() => {
     const d = new Date();
-    d.setDate(d.getDate() + 60);
+    d.setDate(d.getDate() + MAX_ADVANCE_DAYS + 15);
     return d.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
   }, []);
 
