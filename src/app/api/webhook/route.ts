@@ -6,6 +6,7 @@ import { verifyLineSignature } from "@/lib/line/webhook";
 import { logger } from "@/lib/utils/logger";
 import { triggerEmergencyAlert } from "@/lib/notifications/emergency-alert";
 import { formatBusinessHoursLabel } from "@/lib/utils/business-hours-label";
+import { consumeBindToken, isBindTokenMessage } from "@/lib/booking/bind-token";
 
 // V3.8: 偵測 webhook signature 連續失敗 → 推 LINE alert
 // (in-process state，serverless cold start 會清掉 — 這對 attack 偵測夠用，
@@ -236,10 +237,139 @@ interface KeywordReplyResult {
 // non-handler symbols from `route.ts`.
 
 /**
+ * 處理 admin 結帳邀請的 BIND-xxx token 訊息 — 把 manual user 升級成真實 LINE 客戶。
+ *
+ * 流程：
+ *   1. consumeBindToken — 一次性取出 bookingId / tenantId
+ *   2. fetch booking + manual user
+ *   3. 已綁 LINE 的 user 直接 reject（防誤觸）
+ *   4. 若 lineUserId 已有對應 user (follow event 剛建的)：MERGE manual → real
+ *      （搬 bookings、合併 profile/visit counts、刪 manual）
+ *      否則：直接 rename manual.lineUserId 為真實值
+ *   5. push 銀行 Flex 給客人，附本筆預約金額 + 帳號
+ */
+async function handleBindToken(
+  token: string,
+  tenantId: string,
+  lineUserId: string,
+): Promise<KeywordReplyResult> {
+  const reply = (text: string): KeywordReplyResult => ({
+    message: { type: "text", text },
+    usePush: false,
+  });
+
+  if (!lineUserId) {
+    return reply("請從 LINE 帳號內傳送 🙏");
+  }
+
+  const payload = await consumeBindToken(token);
+  if (!payload) {
+    return reply("綁定連結已失效或已被使用，請請店家重新產生 QR Code 🙏");
+  }
+  if (payload.tenantId !== tenantId) {
+    // 跨 tenant token — 不應發生（除非攻擊）
+    return reply("綁定連結無效，請聯絡店家 🙏");
+  }
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: payload.bookingId },
+    include: {
+      user: true,
+      service: { select: { name: true, price: true } },
+      tenant: { select: { businessName: true, bankInfo: true, bankAccountName: true, bankAccountNumber: true } },
+    },
+  });
+  if (!booking || booking.tenantId !== tenantId) {
+    return reply("找不到對應的預約，請聯絡店家 🙏");
+  }
+
+  const manualUser = booking.user;
+  if (!manualUser.lineUserId.startsWith("manual-")) {
+    return reply("此預約已綁定 LINE，無需重複綁定 ✓");
+  }
+
+  // 是否已有同一 lineUserId 的真實 user (follow event 剛建的孤兒)
+  const existingReal = await prisma.user.findUnique({
+    where: { tenantId_lineUserId: { tenantId, lineUserId } },
+  });
+
+  try {
+    if (existingReal && existingReal.id !== manualUser.id) {
+      // MERGE: manual 的 booking history 搬到 real，刪 manual
+      await prisma.$transaction(async (tx) => {
+        await tx.booking.updateMany({
+          where: { userId: manualUser.id, tenantId },
+          data: { userId: existingReal.id },
+        });
+        await tx.user.update({
+          where: { id: existingReal.id },
+          data: {
+            // manual 是 admin 親手填的，優先採用
+            displayName: manualUser.displayName ?? existingReal.displayName,
+            realName: manualUser.realName ?? existingReal.realName,
+            phone: manualUser.phone ?? existingReal.phone,
+            birthday: manualUser.birthday ?? existingReal.birthday,
+            // 訪次累計
+            totalVisits: existingReal.totalVisits + manualUser.totalVisits,
+            firstVisitAt:
+              existingReal.firstVisitAt && manualUser.firstVisitAt
+                ? existingReal.firstVisitAt < manualUser.firstVisitAt
+                  ? existingReal.firstVisitAt
+                  : manualUser.firstVisitAt
+                : (existingReal.firstVisitAt ?? manualUser.firstVisitAt),
+            lastVisitAt:
+              existingReal.lastVisitAt && manualUser.lastVisitAt
+                ? existingReal.lastVisitAt > manualUser.lastVisitAt
+                  ? existingReal.lastVisitAt
+                  : manualUser.lastVisitAt
+                : (existingReal.lastVisitAt ?? manualUser.lastVisitAt),
+          },
+        });
+        await tx.user.delete({ where: { id: manualUser.id } });
+      });
+    } else {
+      // 簡單 rename：manual user 的 lineUserId 改成真實值
+      await prisma.user.update({
+        where: { id: manualUser.id },
+        data: { lineUserId },
+      });
+    }
+  } catch (err) {
+    logger.error("bind-token merge failed", err, "webhook", {
+      bookingId: payload.bookingId,
+      manualUserId: manualUser.id,
+      lineUserId,
+    });
+    return reply("綁定失敗，請聯絡店家手動處理 🙏");
+  }
+
+  // 推銀行 Flex 給客人 — 立刻可看金額 + 帳號 + 末五碼指引
+  const bookingDate = booking.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+  return {
+    message: paymentGuideMessage({
+      bankName: booking.tenant.bankInfo || "請洽店家",
+      bankAccountName: booking.tenant.bankAccountName || "請洽店家",
+      bankAccountNumber: booking.tenant.bankAccountNumber || "請洽店家",
+      amount: booking.service.price,
+      serviceName: booking.service.name,
+      bookingDate,
+      bookingStartTime: booking.startTime,
+      bookingEndTime: booking.endTime,
+    }),
+    usePush: true, // 已寫 DB，避免 webhook 1s timeout
+  };
+}
+
+/**
  * Build a keyword reply. Returns null when no intent matched — caller decides
  * whether to send a busy notice (cooldown-gated) or stay silent.
  */
 async function buildKeywordReply(text: string, tenantId: string, lineUserId: string): Promise<KeywordReplyResult | null> {
+  // Priority 0: BIND-xxx token from QR scan — bind walk-in (manual user) to real LINE id
+  if (isBindTokenMessage(text)) {
+    return await handleBindToken(text.trim(), tenantId, lineUserId);
+  }
+
   const intent = classifyIntent(text);
   if (intent === "none") return null;
 

@@ -16,6 +16,9 @@ export interface Booking {
   user: {
     id: string;
     displayName: string | null;
+    /** "manual-{adminId}-{uuid}" 表示 admin 手動建單但客人尚未綁 LINE。
+     *  CheckoutFullPage 會偵測這個前綴跳出 QR 邀請流程。 */
+    lineUserId: string;
     phone: string | null;
     segment: string;
     totalVisits: number;

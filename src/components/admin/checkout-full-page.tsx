@@ -57,7 +57,11 @@ interface BookingForCheckout {
   checkedInAt?: string | null;
   updatedAt?: string;
   service: { name: string; price: number; slotsNeeded: number };
-  user: { displayName: string | null };
+  user: {
+    displayName: string | null;
+    /** "manual-..." prefix → walk-in 客人尚未綁 LINE，BANK_TRANSFER 時跳 QR 流程 */
+    lineUserId: string;
+  };
 }
 
 interface Props {
@@ -74,6 +78,9 @@ const METHODS: Array<{ key: PaymentMethod; label: string; description: string }>
   { key: "ECPAY_ATM", label: "綠界虛擬帳號", description: "Tier S 啟用後才使用" },
 ];
 
+/** walk-in 客人 BANK_TRANSFER 三選項 */
+type WalkinOption = "invite" | "manual_5" | "skip";
+
 export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: Props) {
   const [step, setStep] = useState<"review" | "method">("review");
   const [method, setMethod] = useState<PaymentMethod>("CASH");
@@ -81,7 +88,16 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
   const [products, setProducts] = useState<ProductLine[]>([]);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
+  // walk-in 客人 BANK_TRANSFER 流程的選項與輔助狀態
+  const [walkinOption, setWalkinOption] = useState<WalkinOption>("invite");
+  const [manualLast5, setManualLast5] = useState("");
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
   const { toast } = useToast();
+
+  // 偵測 walk-in（手動建單但未綁 LINE）— 用於 BANK_TRANSFER 時跳三選項
+  const isWalkin = booking?.user.lineUserId.startsWith("manual-") ?? false;
+  const showWalkinOptions = method === "BANK_TRANSFER" && isWalkin;
 
   // Reset on open/close so a previous checkout doesn't leak state.
   useEffect(() => {
@@ -92,6 +108,10 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
       setProducts([]);
       setNotes("");
       setLoading(false);
+      setWalkinOption("invite");
+      setManualLast5("");
+      setQrUrl(null);
+      setQrLoading(false);
     }
   }, [open, booking]);
 
@@ -111,6 +131,29 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
   const removeProduct = (id: string) =>
     setProducts((prev) => prev.filter((p) => p.id !== id));
 
+  /** 拿 bind-token API 產的 QR URL（admin 點「顯示 QR」時呼叫一次） */
+  const handleShowQr = async () => {
+    if (!booking || qrLoading) return;
+    setQrLoading(true);
+    try {
+      const res = await fetch(`/api/admin/bookings/${booking.id}/bind-token`, {
+        method: "POST",
+        headers: adminHeaders(),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.message || "產生 QR 失敗");
+      if (!data.qrUrl) {
+        toast({ type: "error", message: "QR Code 未啟用 — 請聯絡開發者設定 LINE_OA_BASIC_ID" });
+        return;
+      }
+      setQrUrl(data.qrUrl);
+    } catch (err) {
+      toast({ type: "error", message: err instanceof Error ? err.message : "QR 產生失敗" });
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (loading) return;
     // Validation: every visible product must have a non-empty name AND a positive price.
@@ -119,6 +162,19 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
     if (incompleteProducts > 0) {
       toast({ type: "error", message: "加購商品的名稱和金額都要填" });
       return;
+    }
+
+    // walk-in BANK_TRANSFER 額外驗證
+    let transferLastFive: string | undefined;
+    if (showWalkinOptions) {
+      if (walkinOption === "manual_5") {
+        if (!/^\d{5}$/.test(manualLast5)) {
+          toast({ type: "error", message: "請輸入 5 位數字後 5 碼" });
+          return;
+        }
+        transferLastFive = manualLast5;
+      }
+      // option=invite or skip → 不傳 transferLastFive
     }
 
     setLoading(true);
@@ -159,6 +215,7 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
           // top of (or in place of) the service price, so be explicit.
           amount: finalAmount,
           notes: composedNotes,
+          ...(transferLastFive ? { transferLastFive } : {}),
           ...(booking.updatedAt ? { expectedUpdatedAt: booking.updatedAt } : {}),
         }),
       });
@@ -404,9 +461,77 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
                 <p className="text-[11px] text-[var(--color-text-muted)] mt-4 leading-relaxed">
                   Phase 2 將支援拆分多種支付（現金 + 信用卡）。目前一次結帳只能選擇一種。
                 </p>
+
+                {/* Walk-in 客人 BANK_TRANSFER 三選項 — 客人尚未綁 LINE，
+                    管理員需指定後續對帳方式 */}
+                {showWalkinOptions && (
+                  <div className="mt-5 border-t border-[var(--color-surface)] pt-4">
+                    <p className="text-xs font-semibold text-[var(--color-text-primary)] mb-1">
+                      客人尚未綁 LINE
+                    </p>
+                    <p className="text-[11px] text-[var(--color-text-muted)] mb-3 leading-relaxed">
+                      請選擇收款資訊的傳遞方式
+                    </p>
+                    <div className="space-y-2">
+                      <WalkinOptionCard
+                        selected={walkinOption === "invite"}
+                        onSelect={() => setWalkinOption("invite")}
+                        title="邀請客人加 LINE 好友（推薦）"
+                        description="掃 QR 後客人即收到帳號 + 金額；之後傳 5 碼自動入帳"
+                      >
+                        {walkinOption === "invite" && (
+                          <button
+                            type="button"
+                            onClick={handleShowQr}
+                            disabled={qrLoading}
+                            className="mt-2 w-full py-2 bg-[var(--color-brand)]/10 text-[var(--color-brand)] rounded text-xs font-semibold hover:bg-[var(--color-brand)]/20 disabled:opacity-50"
+                          >
+                            {qrLoading ? "產生中..." : "顯示 QR Code 給客人掃"}
+                          </button>
+                        )}
+                      </WalkinOptionCard>
+
+                      <WalkinOptionCard
+                        selected={walkinOption === "manual_5"}
+                        onSelect={() => setWalkinOption("manual_5")}
+                        title="直接輸入後 5 碼"
+                        description="現場詢問客人匯款後 5 碼"
+                      >
+                        {walkinOption === "manual_5" && (
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="\d{5}"
+                            maxLength={5}
+                            value={manualLast5}
+                            onChange={(e) => setManualLast5(e.target.value.replace(/\D/g, "").slice(0, 5))}
+                            placeholder="12345"
+                            className="mt-2 w-full px-3 py-2 border border-[var(--color-surface)] rounded text-sm tracking-widest text-center font-mono outline-none focus:border-[var(--color-brand)]"
+                          />
+                        )}
+                      </WalkinOptionCard>
+
+                      <WalkinOptionCard
+                        selected={walkinOption === "skip"}
+                        onSelect={() => setWalkinOption("skip")}
+                        title="暫不收款（記為待匯款）"
+                        description="客人事後再補轉帳，老闆收 SMS 後手動補 5 碼"
+                      />
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
+
+          {/* QR Code 覆蓋層 — 邀請 walk-in 客人加 LINE 好友 */}
+          {qrUrl && (
+            <BindLineQrOverlay
+              qrUrl={qrUrl}
+              customerName={booking.user.displayName ?? "客人"}
+              onClose={() => setQrUrl(null)}
+            />
+          )}
 
           {/* Sticky footer with total + primary action */}
           <div
@@ -436,5 +561,96 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
           </div>
       </div>
     </FullscreenModal>
+  );
+}
+
+/** Walk-in BANK_TRANSFER 選項卡片 — radio button + 條件 children */
+function WalkinOptionCard({
+  selected,
+  onSelect,
+  title,
+  description,
+  children,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  title: string;
+  description: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div
+      className={`rounded-lg border px-4 py-3 transition-colors cursor-pointer ${
+        selected
+          ? "border-[var(--color-brand)] bg-[var(--color-brand)]/5"
+          : "border-[var(--color-surface)] hover:bg-[var(--color-surface)]"
+      }`}
+      onClick={onSelect}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-[var(--color-text-primary)]">{title}</p>
+          <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5 leading-relaxed">
+            {description}
+          </p>
+        </div>
+        <span
+          className={`mt-0.5 w-4 h-4 rounded-full border flex-shrink-0 ${
+            selected
+              ? "border-[var(--color-brand)] bg-[var(--color-brand)]"
+              : "border-[var(--color-text-muted)]/40"
+          }`}
+          aria-hidden
+        />
+      </div>
+      {children && <div onClick={(e) => e.stopPropagation()}>{children}</div>}
+    </div>
+  );
+}
+
+/** QR Code 覆蓋層 — 給 walk-in 客人掃描加 LINE 好友。
+ *  使用 api.qrserver.com 產生 QR 圖（free, no API key, sufficient for in-store use）。
+ *  TODO: 之後改用本地 qrcode lib 避免依賴外部服務。 */
+function BindLineQrOverlay({
+  qrUrl,
+  customerName,
+  onClose,
+}: {
+  qrUrl: string;
+  customerName: string;
+  onClose: () => void;
+}) {
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=12&data=${encodeURIComponent(qrUrl)}`;
+  return (
+    <div
+      className="absolute inset-0 z-10 bg-black/60 flex items-center justify-center p-6"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[var(--color-bg)] rounded-2xl p-6 max-w-sm w-full text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-base font-bold text-[var(--color-text-primary)] mb-1">
+          請客人掃 QR Code
+        </h3>
+        <p className="text-xs text-[var(--color-text-muted)] mb-4">
+          {customerName} 掃描後加為好友 + 點傳送，銀行帳號自動發送到 LINE
+        </p>
+        <div className="bg-white rounded-xl p-3 inline-block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={qrImageUrl} alt="LINE 好友邀請 QR Code" width={280} height={280} />
+        </div>
+        <p className="text-[11px] text-[var(--color-text-muted)] mt-3 leading-relaxed">
+          連結 10 分鐘內有效。客人加好友後直接按「傳送」即可完成綁定。
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-4 w-full py-2.5 border border-[var(--color-surface)] rounded-lg text-sm text-[var(--color-text-body)] hover:bg-[var(--color-surface)]"
+        >
+          關閉
+        </button>
+      </div>
+    </div>
   );
 }

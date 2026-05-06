@@ -7,6 +7,9 @@ import { scheduleThankYou, scheduleFollowUp } from "@/lib/notifications/schedule
 import { issueCouponForCompletedBooking } from "@/lib/coupons/issue";
 import { logger } from "@/lib/utils/logger";
 import { invalidateReportsCache } from "@/lib/cache/invalidate";
+import { getLineClient } from "@/lib/line/client";
+import { paymentGuideMessage } from "@/lib/line/messages";
+import { TIMEZONE } from "@/lib/utils/constants";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -27,6 +30,11 @@ const checkoutSchema = z.object({
    */
   amount: z.number().int().nonnegative().optional(),
   notes: z.string().max(500).optional(),
+  /**
+   * 老闆 walk-in 結帳時，若客人現場給後 5 碼可直接填（避免之後對不到帳）。
+   * 5 位純數字格式驗證；空字串視為未填。
+   */
+  transferLastFive: z.string().regex(/^\d{5}$/).optional(),
   expectedUpdatedAt: z.string().datetime().optional(),
 });
 
@@ -149,6 +157,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           status: "RECEIVED",
           receivedAt: now,
           notes: input.notes,
+          // 老闆 walk-in 結帳當下若直接問客人後 5 碼，這裡填入；省掉之後對帳工
+          transferLastFive: input.transferLastFive,
         },
         update: {
           amount: finalAmount,
@@ -156,6 +166,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           status: "RECEIVED",
           receivedAt: now,
           ...(input.notes !== undefined ? { notes: input.notes } : {}),
+          // transferLastFive 是 audit trail，已存在的不覆寫；只在新填時 set
+          ...(input.transferLastFive ? { transferLastFive: input.transferLastFive } : {}),
         },
       });
 
@@ -171,6 +183,40 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
       return fresh;
     });
+
+    // BANK_TRANSFER + 已綁 LINE + 沒填 5 碼 → 自動推播銀行 Flex 給客人，
+    // 客人按 LINE 即可看到帳號 + 金額 + 後續傳 5 碼指引。
+    // walk-in (manual-*) 不在這條 — 那條走 admin 邀請加 LINE QR 流程。
+    if (
+      input.method === "BANK_TRANSFER" &&
+      !input.transferLastFive &&
+      !booking.user.lineUserId.startsWith("manual-")
+    ) {
+      try {
+        const tenant = await prisma.tenant.findUnique({
+          where: { id: booking.tenantId },
+          select: { bankInfo: true, bankAccountName: true, bankAccountNumber: true },
+        });
+        const lineClient = getLineClient();
+        const bookingDate = booking.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+        await lineClient.pushMessage(
+          booking.user.lineUserId,
+          paymentGuideMessage({
+            bankName: tenant?.bankInfo || "請洽店家",
+            bankAccountName: tenant?.bankAccountName || "請洽店家",
+            bankAccountNumber: tenant?.bankAccountNumber || "請洽店家",
+            amount: finalAmount,
+            serviceName: booking.service.name,
+            bookingDate,
+            bookingStartTime: booking.startTime,
+            bookingEndTime: booking.endTime,
+          }),
+        );
+      } catch (err) {
+        // 推播失敗不阻擋結帳成功（客人如果有問題會主動傳「付款」keyword 補拿）
+        logger.error("auto-push payment Flex failed", err, "checkout", { bookingId: id });
+      }
+    }
 
     // Best-effort post-checkout effects — never blocks success response.
     try {
