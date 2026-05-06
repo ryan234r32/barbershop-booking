@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import { CalendarStep } from "@/components/liff/booking/calendar-step";
 import { LoadingScreen } from "@/components/liff/loading-screen";
 import { IconArrowBack, IconClose } from "@/components/liff/icons";
+import { useBusinessConfig } from "@/lib/hooks/use-business-config";
 
 interface BookingDetail {
   id: string;
@@ -51,6 +52,7 @@ export default function ReschedulePage({
   const [selectedTime, setSelectedTime] = useState("");
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const { config: businessConfig } = useBusinessConfig();
 
   useEffect(() => {
     if (!isReady) return;
@@ -225,6 +227,9 @@ export default function ReschedulePage({
           serviceSlotsNeeded={booking.service.slotsNeeded}
           onDateSelect={handleDateSelect}
           onTimeSelect={setSelectedTime}
+          closedWeekdays={businessConfig.closedWeekdays}
+          holidays={businessConfig.holidays.map((h) => h.date)}
+          maxAdvanceDays={businessConfig.maxAdvanceDays}
         />
 
         {/* Old → New comparison */}
