@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import useSWR from "swr";
+import useSWR, { mutate as globalMutate } from "swr";
 import { Banknote, Landmark, Lock, Plus, ClipboardList, Coins, CheckCircle2, Trash2 } from "lucide-react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { MCard } from "@/components/admin/reports/v3.6/m-card";
@@ -500,6 +500,11 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
         onClosed={() => {
           mutate();
           mutateExpenses();
+          // V3.10：結帳完同步去 invalidate 月報表的 day-close range key，這樣切回
+          // 月報表時格子就會立即點亮綠色，不用等 PWA 整個重整。
+          globalMutate(
+            (key) => typeof key === "string" && key.startsWith("/api/admin/day-close"),
+          );
         }}
       />
 

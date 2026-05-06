@@ -175,6 +175,9 @@ const buildMonthlyPayload = unstable_cache(
       previousTotals: prevTotals,
       trend,
       servicePie,
+      // V3.10 service-mix redesign: 上月每一服務類別的營收 + 筆數，前端用來算
+      // MoM 變化（per-category）。已經在 Promise.all 算過所以 zero extra cost。
+      prevServicePie,
       serviceMixByCustomer,
       heatmap,
       topServices,
@@ -194,7 +197,7 @@ const buildMonthlyPayload = unstable_cache(
       yoyChangePct,
     };
   },
-  ["reports-monthly-v1"],
+  ["reports-monthly-v2"],
   { revalidate: CACHE_TTL_SECONDS, tags: ["reports"] },
 );
 
