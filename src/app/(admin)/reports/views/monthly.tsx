@@ -2,7 +2,7 @@
 
 import { memo, useMemo } from "react";
 import useSWR from "swr";
-import { BarChart3, Coins } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, CheckCircle2, Coins } from "lucide-react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { MCard } from "@/components/admin/reports/v3.6/m-card";
 import { MTag } from "@/components/admin/reports/v3.6/m-tag";
@@ -162,22 +162,22 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
 
           {/* ③ Hero: 三段拆解 + sparkline + target progress + summary */}
           <MCard padding="lg">
-            <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="flex items-start justify-between gap-3 mb-4">
               <div>
-                <p className="text-[10px] tracking-wider text-[var(--color-text-muted)] uppercase">
+                <p className="text-xs sm:text-sm tracking-wider text-[var(--color-text-muted)] uppercase">
                   {data.range.label}營收
                 </p>
-                <p className="text-3xl font-bold tabular-nums text-[var(--color-text-primary)] mt-1">
+                <p className="text-4xl sm:text-5xl font-bold tabular-nums text-[var(--color-text-primary)] mt-1.5">
                   {revenue.toLocaleString()}
                 </p>
-                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <div className="flex items-center gap-2 mt-2.5 flex-wrap">
                   {data.momChangePct !== null && (
-                    <MTag tone={data.momChangePct >= 0 ? "success" : "danger"}>
+                    <MTag size="sm" tone={data.momChangePct >= 0 ? "success" : "danger"}>
                       較上月 {data.momChangePct >= 0 ? "+" : ""}{data.momChangePct.toFixed(1)}%
                     </MTag>
                   )}
                   {data.yoyChangePct !== null && (
-                    <MTag tone={data.yoyChangePct >= 0 ? "success" : "danger"}>
+                    <MTag size="sm" tone={data.yoyChangePct >= 0 ? "success" : "danger"}>
                       較去年同月 {data.yoyChangePct >= 0 ? "+" : ""}{data.yoyChangePct.toFixed(1)}%
                     </MTag>
                   )}
@@ -227,23 +227,26 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
           {/* V3.7 §E — 支出 / 淨利 / 結帳天數 row.
               `min-w-0` on each MCard so flex children can shrink instead of
               forcing horizontal overflow on narrow phones. Numbers use
-              `whitespace-nowrap` to avoid mid-thousands wrapping; sublines wrap. */}
+              `whitespace-nowrap` to avoid mid-thousands wrapping; sublines wrap.
+              V3.9 a11y: labels were `text-[10px] uppercase` — failed Apple HIG
+              minimum readable size on phone. Bump to `text-xs font-semibold`
+              (12px) without uppercase for normal Chinese-character cadence. */}
           <div className="grid grid-cols-3 gap-2">
             <MCard padding="md">
-              <p className="text-[10px] tracking-wider text-[var(--color-text-muted)] uppercase">
+              <p className="text-xs sm:text-sm font-semibold text-[var(--color-text-muted)]">
                 本月支出
               </p>
               <p className="text-base sm:text-xl font-bold tabular-nums text-[var(--color-danger)] mt-1 whitespace-nowrap">
                 -{expenseTotal.toLocaleString()}
               </p>
-              <p className="text-[10px] text-[var(--color-text-muted)] mt-1 tabular-nums leading-tight break-words">
+              <p className="text-[11px] text-[var(--color-text-muted)] mt-1 tabular-nums leading-tight break-words">
                 固定 {expenseFixed.toLocaleString()}
                 <br />
                 變動 {expenseVariable.toLocaleString()}
               </p>
             </MCard>
             <MCard padding="md">
-              <p className="text-[10px] tracking-wider text-[var(--color-text-muted)] uppercase">
+              <p className="text-xs sm:text-sm font-semibold text-[var(--color-text-muted)]">
                 本月淨利
               </p>
               <p
@@ -257,12 +260,12 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
               >
                 {(revenue - expenseTotal).toLocaleString()}
               </p>
-              <p className="text-[10px] text-[var(--color-text-muted)] mt-1 leading-tight">
+              <p className="text-[11px] text-[var(--color-text-muted)] mt-1 leading-tight">
                 淨利率 {revenue > 0 ? (((revenue - expenseTotal) / revenue) * 100).toFixed(1) : "—"}%
               </p>
             </MCard>
             <MCard padding="md">
-              <p className="text-[10px] tracking-wider text-[var(--color-text-muted)] uppercase">
+              <p className="text-xs sm:text-sm font-semibold text-[var(--color-text-muted)]">
                 結帳天數
               </p>
               <p className="text-base sm:text-xl font-bold tabular-nums text-[var(--color-text-primary)] mt-1 whitespace-nowrap">
@@ -271,7 +274,7 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
                   /{range.daysInMonth}
                 </span>
               </p>
-              <p className="text-[10px] text-[var(--color-text-muted)] mt-1 leading-tight">
+              <p className="text-[11px] text-[var(--color-text-muted)] mt-1 leading-tight">
                 {closesWithDiff.length > 0 ? `${closesWithDiff.length} 天有差異` : "全部準時對上"}
               </p>
             </MCard>
@@ -528,6 +531,29 @@ function SetTargetButton({
 
 // ─── V3.7 §E — Close-status grid ────────────────────────────────────────
 
+/**
+ * V3.9 redesign — 結帳狀態 calendar grid.
+ *
+ * Why this exists: pre-V3.9, every "未結" day used the same flat surface fill,
+ * so future / today / past-not-closed all looked identical → owner thought
+ * "確認對帳" on each booking row was the same as 完成今日結帳, never noticed the
+ * grid stayed blank. This rewrite fixes both the visual grammar and the
+ * call-to-action gap.
+ *
+ * Visual grammar (5 states, distinct shape + hue):
+ *   - 已結帳 / 無差異 → solid green fill
+ *   - 已結帳 / 有差異 → solid amber fill (drives clicks back to daily view)
+ *   - 過去 / 未結    → dashed amber outline ("待結" — needs action)
+ *   - 今日 / 未結    → solid brand-color outline + bold (the "do this now" cell)
+ *   - 未來          → faint, no fill
+ *
+ * UX guards on top of the grid:
+ *   - **Summary line** "X / Y 天已結帳" answers "where am I" instantly.
+ *   - **Today CTA** appears only when today is unclosed → one tap to daily view.
+ *   - **Empty-state hint** explains the gap when the grid is blank
+ *     (closes 0 yet days have elapsed) — this is exactly the trap that bit
+ *     the owner on 2026-05-05.
+ */
 function CloseStatusGrid({
   period,
   daysInMonth,
@@ -552,27 +578,94 @@ function CloseStatusGrid({
     cells.push({ day: d, iso });
   }
 
+  // Summary stats — "elapsed" = past days + today (if today is in this month).
+  // For other months, elapsed = whole month if month < today's month, else 0.
+  const elapsedDays = cells.reduce((n, c) => {
+    if (!c) return n;
+    return c.iso <= todayStr ? n + 1 : n;
+  }, 0);
+  const closedCount = closedDates.size;
+  const diffCount = diffDates.size;
+  const pendingCount = Math.max(0, elapsedDays - closedCount);
+  const todayInMonth = cells.some((c) => c?.iso === todayStr);
+  const todayClosed = closedDates.has(todayStr);
+  const showTodayCta = todayInMonth && !todayClosed;
+  const showEmptyHint = closedCount === 0 && elapsedDays > 0;
+
+  const jumpToDailyToday = () => {
+    // Page-level effect mirrors state to URL on mount, so an absolute nav
+    // re-enters the report page on the daily tab for today. Full reload is
+    // <300ms on the SWR-prefetched bundle and avoids prop-drilling setView.
+    window.location.assign(`/reports?view=daily&date=${todayStr}`);
+  };
+
   return (
     <MCard padding="md">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-baseline justify-between mb-1 gap-2 flex-wrap">
         <p className="text-sm font-semibold text-[var(--color-text-primary)]">
           結帳狀態
         </p>
-        <div className="flex items-center gap-3 text-[10px] text-[var(--color-text-muted)]">
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-[var(--color-success)]" />
-            已結帳
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-[var(--color-warning)]" />
-            有差異
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-[var(--color-text-disabled)]/40" />
-            未結
-          </span>
-        </div>
+        <p className="text-xs text-[var(--color-text-muted)] tabular-nums">
+          {elapsedDays === 0 ? (
+            "本月尚未開始"
+          ) : (
+            <>
+              <span className="text-[var(--color-success)] font-semibold">
+                {closedCount}
+              </span>
+              <span> / {elapsedDays} 天已結帳</span>
+              {diffCount > 0 && (
+                <span className="text-[var(--color-warning)]">
+                  {" "}
+                  · {diffCount} 天有差異
+                </span>
+              )}
+              {pendingCount > 0 && (
+                <span className="text-[var(--color-warning)]">
+                  {" "}
+                  · {pendingCount} 天待結
+                </span>
+              )}
+            </>
+          )}
+        </p>
       </div>
+
+      {/* Today CTA — primary call-to-action when today isn't closed yet.
+          Appears only on the current month's view (todayInMonth check). */}
+      {showTodayCta && (
+        <button
+          onClick={jumpToDailyToday}
+          className="w-full mb-3 mt-2 flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg bg-[var(--color-brand)]/8 border border-[var(--color-brand)]/25 text-[var(--color-brand)] hover:bg-[var(--color-brand)]/12 transition-colors text-left"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <CheckCircle2 size={16} aria-hidden />
+            今日（{todayStr.slice(5).replace("-", "/")}）尚未結帳
+          </span>
+          <span className="flex items-center gap-1 text-xs font-semibold whitespace-nowrap">
+            前往結帳
+            <ArrowRight size={14} aria-hidden />
+          </span>
+        </button>
+      )}
+
+      {/* Empty-state hint — disambiguates "我有按確認啊，為什麼還是空的？"
+          The owner confused per-booking settle with day-close on 2026-05-05. */}
+      {showEmptyHint && !showTodayCta && (
+        <div className="mb-3 mt-2 px-3 py-2 rounded-md bg-[var(--color-surface)]/60 border-l-[3px] border-[var(--color-text-muted)]/40">
+          <p className="text-[11px] text-[var(--color-text-body)] leading-relaxed inline-flex items-start gap-1.5">
+            <AlertTriangle
+              size={12}
+              aria-hidden
+              className="mt-0.5 shrink-0 text-[var(--color-text-muted)]"
+            />
+            <span>
+              在「每日」分頁底完成「<span className="font-semibold">完成今日結帳</span>」按鈕後，這裡才會點亮綠色。逐筆「確認對帳」尚不算結帳。
+            </span>
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-7 gap-1 text-[11px] tabular-nums">
         {["日", "一", "二", "三", "四", "五", "六"].map((w) => (
           <div
@@ -588,23 +681,78 @@ function CloseStatusGrid({
           const hasDiff = diffDates.has(c.iso);
           const isFuture = c.iso > todayStr;
           const isToday = c.iso === todayStr;
-          const bg = isFuture
-            ? "bg-transparent text-[var(--color-text-disabled)]"
-            : isClosed && hasDiff
-              ? "bg-[var(--color-warning)]/15 text-[var(--color-warning)] font-semibold"
-              : isClosed
-                ? "bg-[var(--color-success)]/15 text-[var(--color-success)] font-semibold"
-                : "bg-[var(--color-surface)] text-[var(--color-text-muted)]";
-          const ring = isToday ? "ring-2 ring-[var(--color-brand)]/40" : "";
+          // 5-state classification. Each branch sets the cell's full visual
+          // grammar (fill + text + border) so the cases are mutually exclusive
+          // and easy to scan.
+          let cellClass: string;
+          if (isFuture) {
+            cellClass = "bg-transparent text-[var(--color-text-disabled)]";
+          } else if (isClosed && hasDiff) {
+            cellClass =
+              "bg-[var(--color-warning)]/20 text-[var(--color-warning)] font-bold";
+          } else if (isClosed) {
+            cellClass =
+              "bg-[var(--color-success)]/20 text-[var(--color-success)] font-bold";
+          } else if (isToday) {
+            // Today + unclosed → the "do this now" cell. Brand-color outline
+            // + tinted fill stands out among past-grey / future-faint.
+            cellClass =
+              "bg-[var(--color-brand)]/10 text-[var(--color-brand)] font-bold border-2 border-dashed border-[var(--color-brand)]/60";
+          } else {
+            // Past + unclosed → amber dashed outline, hints "should be done".
+            cellClass =
+              "bg-[var(--color-warning)]/5 text-[var(--color-warning)] border border-dashed border-[var(--color-warning)]/35 font-semibold";
+          }
+          // Today gets an extra ring so the eye finds it instantly.
+          const ring = isToday ? "ring-2 ring-[var(--color-brand)]/40 ring-offset-1 ring-offset-[var(--color-bg)]" : "";
+          // Today + unclosed is also clickable — same destination as the
+          // hero CTA above. Past dates aren't clickable to keep the grid
+          // glanceable rather than a navigation surface.
+          const clickable = isToday && !isClosed;
+          const cellBaseClass = `aspect-square rounded-md flex items-center justify-center ${cellClass} ${ring}`;
+          if (clickable) {
+            return (
+              <button
+                key={c.iso}
+                onClick={jumpToDailyToday}
+                aria-label="今日尚未結帳，前往每日結帳"
+                className={`${cellBaseClass} cursor-pointer hover:bg-[var(--color-brand)]/15 transition-colors`}
+              >
+                {c.day}
+              </button>
+            );
+          }
           return (
-            <div
-              key={c.iso}
-              className={`aspect-square rounded-md flex items-center justify-center ${bg} ${ring}`}
-            >
+            <div key={c.iso} className={cellBaseClass}>
               {c.day}
             </div>
           );
         })}
+      </div>
+
+      {/* Legend — placed below the grid so first scan goes status → grid → key.
+          5 states (was 3) — added 待結 + 今日 to disambiguate. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3 pt-3 border-t border-[var(--color-brand)]/8 text-[10px] text-[var(--color-text-muted)]">
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-sm bg-[var(--color-success)]/30 border border-[var(--color-success)]" />
+          已結帳
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-sm bg-[var(--color-warning)]/30 border border-[var(--color-warning)]" />
+          有差異
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-sm border border-dashed border-[var(--color-warning)]/60" />
+          待結
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-sm bg-[var(--color-brand)]/15 border-2 border-dashed border-[var(--color-brand)]/60" />
+          今日
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-sm border border-[var(--color-text-disabled)]/30" />
+          未來
+        </span>
       </div>
     </MCard>
   );

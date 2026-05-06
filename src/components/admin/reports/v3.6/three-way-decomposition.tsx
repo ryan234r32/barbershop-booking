@@ -43,16 +43,16 @@ function Cell({
 }) {
   return (
     <div className="text-center min-w-0">
-      <p className="text-[11px] tracking-wider text-[var(--color-text-muted)] uppercase truncate">
+      <p className="text-xs sm:text-sm tracking-wider text-[var(--color-text-muted)] uppercase truncate">
         {label}
       </p>
       <p
-        className={`text-lg sm:text-2xl font-bold tabular-nums mt-1 break-all leading-tight ${
+        className={`text-2xl sm:text-3xl font-bold tabular-nums mt-1.5 break-all leading-tight ${
           highlight ? "text-[var(--color-brand)]" : "text-[var(--color-text-primary)]"
         }`}
       >
         {value}
-        {unit && <span className="text-sm font-normal text-[var(--color-text-muted)] ml-0.5">{unit}</span>}
+        {unit && <span className="text-base font-normal text-[var(--color-text-muted)] ml-0.5">{unit}</span>}
       </p>
     </div>
   );
