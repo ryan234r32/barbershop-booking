@@ -223,17 +223,20 @@ export default function CalendarPage() {
     return { from: formatDate(firstDay), to: formatDate(lastDay) };
   }, [view, currentDate, weekDates, monthYear]);
 
+  // keepPreviousData: switching day↔week↔month or arrowing dates changes the SWR
+  // key (date range moves) — without it the calendar flashes blank on every nav.
+  // Same pattern as reports/views/{daily,monthly,annual}.tsx (PR #98).
   const { data: bookingsData, isLoading, mutate: mutateBookings } = useSWR(
     dateRange ? `/api/bookings?from=${dateRange.from}&to=${dateRange.to}` : null,
     fetcher,
-    { refreshInterval: 30000, revalidateOnFocus: true },
+    { refreshInterval: 30000, revalidateOnFocus: true, keepPreviousData: true, dedupingInterval: 3000 },
   );
 
   const monthKey = `${monthYear.year}-${String(monthYear.month + 1).padStart(2, "0")}`;
   const { data: monthData } = useSWR(
     view === "month" ? `/api/bookings/monthly-summary?month=${monthKey}` : null,
     fetcher,
-    { refreshInterval: 60000 },
+    { refreshInterval: 60000, keepPreviousData: true, dedupingInterval: 3000 },
   );
 
   const bookings: Booking[] = useMemo(
