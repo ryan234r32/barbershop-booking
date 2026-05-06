@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import useSWR from "swr";
@@ -58,16 +58,30 @@ type View = "list" | "analytics";
 export default function CustomersPage() {
   usePageTitle("顧客管理");
   const [view, setView] = useState<View>("list");
-  const [search, setSearch] = useState("");
+  // searchInput = what's in the box right now; debouncedSearch = what gets sent to API.
+  // Without debounce every keystroke fires a new fetch + flashes the list to spinner.
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [segment, setSegment] = useState("");
   const [page, setPage] = useState(1);
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchInput), 200);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
   const params = new URLSearchParams();
-  if (search) params.set("search", search);
+  if (debouncedSearch) params.set("search", debouncedSearch);
   if (segment) params.set("segment", segment);
   params.set("page", page.toString());
 
-  const { data, isLoading } = useSWR(view === "list" ? `/api/customers?${params}` : null, fetcher);
+  // keepPreviousData: when search/segment/page changes the SWR key, the previous
+  // list stays on screen while the new one loads — no white flash.
+  const { data, isLoading } = useSWR(
+    view === "list" ? `/api/customers?${params}` : null,
+    fetcher,
+    { keepPreviousData: true, dedupingInterval: 3000 },
+  );
   const customers: Customer[] = data?.customers || [];
   const total: number = data?.total || 0;
   const totalPages = Math.ceil(total / 20);
@@ -108,14 +122,14 @@ export default function CustomersPage() {
         <CustomerAnalyticsView />
       ) : (
         <ListView
-          search={search}
-          setSearch={setSearch}
+          search={searchInput}
+          setSearch={setSearchInput}
           segment={segment}
           setSegment={setSegment}
           page={page}
           setPage={setPage}
           customers={customers}
-          isLoading={isLoading}
+          isLoading={isLoading && !data}
           totalPages={totalPages}
         />
       )}
