@@ -22,7 +22,9 @@
  */
 
 import { useEffect, useState } from "react";
-import { Coins, Check } from "lucide-react";
+import Link from "next/link";
+import useSWR from "swr";
+import { Coins, Check, Crown, AlertTriangle, ChevronRight } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { CheckoutFullPage } from "./checkout-full-page";
@@ -119,6 +121,56 @@ const segmentColors: Record<string, string> = {
   LAPSED: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
 };
 
+/// Shape of `/api/customers/[id]` slice we use here. Only fields the summary
+/// card + accordion read — keeping it narrow makes the contract explicit and
+/// stops drift if the customer page adds new fields later.
+interface CustomerSummary {
+  customer: {
+    id: string;
+    isVip: boolean;
+    violationCount: number;
+    bookingRestricted: boolean;
+    notes: string | null;
+    bookings: Array<{
+      id: string;
+      date: string;
+      startTime: string;
+      status: string;
+      service: { name: string; price: number };
+    }>;
+  };
+  stats: {
+    totalRevenue: number;
+    totalBookings: number;
+  };
+}
+
+const customerFetcher = (url: string) =>
+  fetch(url, { headers: adminHeaders() }).then((r) => {
+    if (!r.ok) throw new Error("failed");
+    return r.json() as Promise<CustomerSummary>;
+  });
+
+/// Asia/Taipei "YYYY/M/D" — historical bookings cross years so we always show year.
+function formatYMD(dateStr: string): string {
+  return new Date(dateStr)
+    .toLocaleDateString("en-CA", {
+      timeZone: "Asia/Taipei",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    })
+    .replace(/-/g, "/");
+}
+
+const BOOKING_STATUS_LABEL: Record<string, string> = {
+  COMPLETED: "已完成",
+  CONFIRMED: "已預約",
+  CANCELLED: "已取消",
+  CANCELLED_BY_ADMIN: "已取消",
+  NO_SHOW: "爽約",
+};
+
 export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }: Props) {
   const [subState, setSubState] = useState<SubState>("detail");
   const [loading, setLoading] = useState(false);
@@ -144,6 +196,17 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
   }, [booking?.id]);
 
   const view = liveBooking ?? booking;
+
+  // Lazy-fetch customer summary (KPIs + recent bookings) only while the sheet
+  // is open — keeps the calendar hot path light and dedupes re-opens via SWR
+  // cache. Key=null shape ensures no request fires before the user clicks a
+  // booking. Using a typed admin-aware fetcher (Bearer fallback for iOS PWA).
+  const userId = view?.user?.id;
+  const { data: customerData } = useSWR<CustomerSummary>(
+    open && userId ? `/api/customers/${userId}` : null,
+    customerFetcher,
+  );
+
   if (!view) return null;
 
   const currentSegment = segmentForBooking(view);
@@ -398,6 +461,7 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
               {subState === "detail" && (
                 <DetailView
                   booking={view}
+                  customerData={customerData}
                   currentSegment={currentSegment}
                   isFinal={isFinal}
                   loading={loading}
@@ -450,6 +514,7 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
 
 function DetailView({
   booking,
+  customerData,
   currentSegment,
   isFinal,
   loading,
@@ -461,6 +526,7 @@ function DetailView({
   onCancel,
 }: {
   booking: BookingDetail;
+  customerData: CustomerSummary | undefined;
   currentSegment: ReturnType<typeof segmentForBooking>;
   isFinal: boolean;
   loading: boolean;
@@ -472,45 +538,90 @@ function DetailView({
   onCancel: () => void;
 }) {
   const showCheckout = currentSegment === "checked_in";
+  const stats = customerData?.stats;
+  const customer = customerData?.customer;
+  const recentBookings = (customer?.bookings ?? []).slice(0, 5);
 
   return (
     <>
-      {/* Customer header */}
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <h2 className="text-lg font-bold text-[var(--color-text-primary)]">
-            {booking.user.displayName || "顧客"}
-          </h2>
-          <p className="text-sm text-[var(--color-text-body)] mt-0.5">
-            {booking.service.name} · NT${booking.service.price.toLocaleString()}
-          </p>
-          <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-            {booking.startTime} — {booking.endTime}
-          </p>
+      {/* Customer summary card — name + tags + service info + KPI row +
+          jump-to-full-profile button. Replaces the old 3-block header so the
+          admin sees revenue / visit / last-visit at a glance without leaving
+          the calendar. Full notes + recent bookings live in the accordion at
+          the bottom of the sheet. */}
+      <div className="mb-4">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+              <h2 className="text-lg font-bold text-[var(--color-text-primary)] truncate">
+                {booking.user.displayName || "顧客"}
+              </h2>
+              <span
+                className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-medium tracking-wider ${segmentColors[booking.user.segment] || segmentColors.NEW}`}
+              >
+                {segmentLabels[booking.user.segment] || booking.user.segment}
+              </span>
+              {customer?.isVip && (
+                <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--color-warning)]/15 text-[var(--color-warning)]">
+                  <Crown size={10} aria-hidden /> VIP
+                </span>
+              )}
+              {customer?.bookingRestricted && (
+                <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--color-danger)]/15 text-[var(--color-danger)]">
+                  <AlertTriangle size={10} aria-hidden /> 限制中
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-[var(--color-text-body)]">
+              {booking.service.name} · NT${booking.service.price.toLocaleString()}
+            </p>
+            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+              {booking.startTime} — {booking.endTime}
+            </p>
+          </div>
+          <Link
+            href={`/customers/${booking.user.id}?from=booking`}
+            className="shrink-0 inline-flex items-center gap-0.5 text-[11px] text-[var(--color-brand)] hover:underline whitespace-nowrap"
+          >
+            完整檔案
+            <ChevronRight size={12} aria-hidden />
+          </Link>
         </div>
-        <span
-          className={`px-2 py-0.5 rounded text-[10px] font-medium tracking-wider ${segmentColors[booking.user.segment] || segmentColors.NEW}`}
-        >
-          {segmentLabels[booking.user.segment] || booking.user.segment}
-        </span>
+
+        {/* KPI row — totals come from /api/customers/[id]; visits / last
+            visit fall back to the embedded booking.user (always present). */}
+        <div className="grid grid-cols-3 gap-2 bg-[var(--color-surface)] rounded-lg p-3">
+          <div className="text-center">
+            <p className="text-[10px] text-[var(--color-text-muted)] tracking-wider mb-0.5">
+              總消費
+            </p>
+            <p className="text-sm font-bold text-[var(--color-text-primary)]">
+              {stats ? `NT$${stats.totalRevenue.toLocaleString()}` : "—"}
+            </p>
+          </div>
+          <div className="text-center border-x border-[var(--color-text-muted)]/15">
+            <p className="text-[10px] text-[var(--color-text-muted)] tracking-wider mb-0.5">
+              來訪
+            </p>
+            <p className="text-sm font-bold text-[var(--color-text-primary)]">
+              {booking.user.totalVisits} 次
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="text-[10px] text-[var(--color-text-muted)] tracking-wider mb-0.5">
+              上次
+            </p>
+            <p className="text-sm font-bold text-[var(--color-text-primary)]">
+              {booking.user.lastVisitAt
+                ? new Date(booking.user.lastVisitAt).toLocaleDateString("zh-TW", {
+                    month: "numeric",
+                    day: "numeric",
+                  })
+                : "—"}
+            </p>
+          </div>
+        </div>
       </div>
-
-      <p className="text-xs text-[var(--color-text-muted)] mb-4">
-        來訪 {booking.user.totalVisits} 次
-        {booking.user.lastVisitAt &&
-          ` · 上次: ${new Date(booking.user.lastVisitAt).toLocaleDateString("zh-TW", { month: "numeric", day: "numeric" })}`}
-      </p>
-
-      {booking.user.notes && (
-        <div className="bg-[var(--color-surface)] rounded-lg p-3 mb-4">
-          <p className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider mb-1">
-            備註
-          </p>
-          <p className="text-sm text-[var(--color-text-body)] whitespace-pre-line line-clamp-3">
-            {booking.user.notes}
-          </p>
-        </div>
-      )}
 
       {/* Status segment — only when booking is in an actionable state.
           Each state has its own colour so the current state is unmistakable
@@ -621,6 +732,68 @@ function DetailView({
           </button>
         </div>
       )}
+
+      {/* Customer history accordion — recent bookings + full notes + violations.
+          Native <details> avoids pulling in a new component dep. The chevron
+          rotates via group-open utility. */}
+      <details className="mt-4 group rounded-lg bg-[var(--color-surface)] [&>summary]:list-none">
+        <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer">
+          <span className="text-xs font-medium text-[var(--color-text-body)]">
+            最近預約與備註
+          </span>
+          <ChevronRight
+            size={14}
+            aria-hidden
+            className="text-[var(--color-text-muted)] transition-transform group-open:rotate-90"
+          />
+        </summary>
+        <div className="px-3 pb-3 space-y-3 border-t border-[var(--color-text-muted)]/10 pt-3">
+          {(customer?.notes ?? booking.user.notes) && (
+            <div>
+              <p className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider mb-1">
+                備註
+              </p>
+              <p className="text-sm text-[var(--color-text-body)] whitespace-pre-line">
+                {customer?.notes ?? booking.user.notes}
+              </p>
+            </div>
+          )}
+          {customer && customer.violationCount > 0 && (
+            <p className="text-[11px] text-[var(--color-danger)]">
+              違規 {customer.violationCount} 次
+            </p>
+          )}
+          <div>
+            <p className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider mb-1.5">
+              最近 5 筆預約
+            </p>
+            {customer ? (
+              recentBookings.length === 0 ? (
+                <p className="text-xs text-[var(--color-text-muted)]">無紀錄</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {recentBookings.map((b) => (
+                    <li
+                      key={b.id}
+                      className="flex items-center justify-between gap-2 text-xs"
+                    >
+                      <span className="text-[var(--color-text-body)] truncate">
+                        {formatYMD(b.date)} · {b.service.name}
+                      </span>
+                      <span className="shrink-0 text-[var(--color-text-muted)]">
+                        {BOOKING_STATUS_LABEL[b.status] ?? b.status} · NT$
+                        {b.service.price.toLocaleString()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )
+            ) : (
+              <p className="text-xs text-[var(--color-text-muted)]">載入中…</p>
+            )}
+          </div>
+        </div>
+      </details>
     </>
   );
 }
