@@ -2,6 +2,7 @@
 
 import { useState, use, type ReactNode } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import useSWR from "swr";
 import { ChevronLeft, Plus, Phone, Cake, Pencil, X, CheckCircle2, XCircle, AlertTriangle, Circle } from "lucide-react";
@@ -120,6 +121,12 @@ export default function CustomerDetailPage({
   const { id } = use(params);
   usePageTitle("顧客詳情");
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  // `from=booking` means the user landed here from a calendar booking detail —
+  // returning to /customers would lose their place. Send them back to the calendar.
+  const cameFromBooking = searchParams.get("from") === "booking";
+  const backHref = cameFromBooking ? "/calendar" : "/customers";
+  const backLabel = cameFromBooking ? "返回行事曆" : "返回客戶";
   const [newNote, setNewNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
@@ -234,7 +241,11 @@ export default function CustomerDetailPage({
     <div className="max-w-lg mx-auto">
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
-        <Link href="/customers" className="p-1.5 rounded-lg hover:bg-[var(--color-surface)]">
+        <Link
+          href={backHref}
+          aria-label={backLabel}
+          className="p-1.5 rounded-lg hover:bg-[var(--color-surface)]"
+        >
           <ChevronLeft size={20} className="text-[var(--color-text-body)]" />
         </Link>
         <h1 className="text-lg font-bold text-[var(--color-text-primary)] truncate">
