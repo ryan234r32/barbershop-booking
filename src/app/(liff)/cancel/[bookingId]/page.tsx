@@ -73,7 +73,7 @@ export default function CancelPage({
         setState(p.canCancelOnline ? "confirm" : "phone-required");
       })
       .catch(() => setState("error"));
-  }, [isReady, bookingId]);
+  }, [isReady, bookingId, liff]);
 
   const handleCancel = async () => {
     setCancelling(true);

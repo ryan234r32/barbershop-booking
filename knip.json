@@ -1,0 +1,32 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/app/**/{page,layout,route,loading,error,not-found,template,default,sw}.{ts,tsx}",
+    "src/app/**/(opengraph|twitter)-image.{ts,tsx}",
+    "src/app/**/icon.{ts,tsx}",
+    "src/app/**/manifest.{ts,tsx}",
+    "src/middleware.ts",
+    "src/instrumentation.ts",
+    "src/instrumentation-client.ts",
+    "next.config.ts",
+    "scripts/**/*.ts",
+    "prisma/seed.ts",
+    "vitest.config.ts"
+  ],
+  "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts"],
+  "ignore": [
+    ".claude/**",
+    "docs/**",
+    "**/__tests__/**",
+    "**/*.test.{ts,tsx}",
+    "**/*.spec.{ts,tsx}",
+    "src/sentry.*.config.ts",
+    "**/sentry.client.config.ts",
+    "**/sentry.server.config.ts"
+  ],
+  "ignoreDependencies": [
+    "@types/web-push",
+    "@vitejs/plugin-react"
+  ],
+  "ignoreExportsUsedInFile": true
+}

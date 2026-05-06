@@ -21,7 +21,6 @@ loadEnv({ path: ".env.local", override: true });
 
 import { prisma } from "../src/lib/prisma";
 import { signAdminToken } from "../src/lib/auth/jwt";
-import { generateMerchantTradeNo } from "../src/lib/ecpay/merchant-trade-no";
 
 const BASE = "http://localhost:3000";
 const TENANT_ID = process.env.DEFAULT_TENANT_ID!;

@@ -20,9 +20,17 @@
 
 import { NextRequest } from "next/server";
 import { z } from "zod";
+import crypto from "crypto";
 import { errorResponse } from "@/lib/utils/errors";
 import { triggerEmergencyAlert } from "@/lib/notifications/emergency-alert";
 import { logger } from "@/lib/utils/logger";
+
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
 
 const uptimeAlertSchema = z.object({
   /** Shared secret，必須等於 env UPTIME_WEBHOOK_SECRET */
@@ -50,7 +58,7 @@ export async function POST(request: NextRequest) {
       );
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
-    if (parsed.secret !== expected) {
+    if (!safeEqual(parsed.secret, expected)) {
       logger.warn(
         "uptime-alert webhook rejected: bad secret",
         "webhook/uptime-alert",

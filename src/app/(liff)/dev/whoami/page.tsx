@@ -67,6 +67,7 @@ export default function WhoAmIPage() {
       </header>
 
       {pictureUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={pictureUrl}
           alt={displayName ?? ""}

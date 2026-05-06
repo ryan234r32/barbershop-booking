@@ -131,11 +131,13 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
   const [liveBooking, setLiveBooking] = useState<BookingDetail | null>(booking);
   const { toast } = useToast();
 
-  // Re-seed live state whenever the parent points at a different booking
-  // (e.g. closing this sheet and clicking another one).
+  // Re-seed live state only when the parent switches to a different booking
+  // (e.g. closing this sheet and clicking another one). Listing `booking` in
+  // deps would re-seed on every parent re-render and clobber in-sheet
+  // optimistic updates from PATCH responses.
   useEffect(() => {
     setLiveBooking(booking);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [booking?.id]);
 
   const view = liveBooking ?? booking;
