@@ -5,6 +5,7 @@ import { getLineClient } from "@/lib/line/client";
 import { verifyLineSignature } from "@/lib/line/webhook";
 import { logger } from "@/lib/utils/logger";
 import { triggerEmergencyAlert } from "@/lib/notifications/emergency-alert";
+import { formatBusinessHoursLabel } from "@/lib/utils/business-hours-label";
 
 // V3.8: 偵測 webhook signature 連續失敗 → 推 LINE alert
 // (in-process state，serverless cold start 會清掉 — 這對 attack 偵測夠用，
@@ -564,11 +565,17 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
     const googleMapsUrl = tenant?.address
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tenant.address)}`
       : undefined;
+    // 動態從 DB 組營業時間字串，跟 admin /settings 同步（避免老闆改公休後 LINE
+    // 還回覆「週一公休」誤導客戶）。
+    const bizHoursRows = await prisma.businessHours.findMany({
+      where: { tenantId },
+      select: { dayOfWeek: true, startTime: true, endTime: true, isOpen: true },
+    });
     return reply(businessInfoMessage({
       shopName,
       address: tenant?.address || "請洽店家",
       phone: tenant?.phone || "請洽店家",
-      hours: "週二至週日 11:00-20:00（週一公休）",
+      hours: formatBusinessHoursLabel(bizHoursRows),
       googleMapsUrl,
     }));
   }
