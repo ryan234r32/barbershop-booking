@@ -2348,6 +2348,118 @@ export function launchAnnouncementMessage(params: {
   };
 }
 
+/**
+ * Switch-day broadcast — 4-bubble carousel that introduces the new booking
+ * system to existing LINE friends. Each bubble teaches one core action so
+ * users don't need to discover features through trial and error.
+ */
+export function launchCarouselMessage(params: {
+  shopName: string;
+  liffBaseUrl: string; // e.g. https://liff.line.me/{liffId}
+  shopPhone: string;
+}): FlexMessage {
+  const { shopName, liffBaseUrl, shopPhone } = params;
+
+  const labelStyle = {
+    weight: "bold" as const,
+    size: "xs" as const,
+    color: "#FFF8F1",
+  };
+  const titleStyle = {
+    weight: "bold" as const,
+    size: "lg" as const,
+    color: "#003D2B",
+    wrap: true,
+  };
+  const bodyStyle = {
+    size: "sm" as const,
+    color: "#2D3A30",
+    wrap: true,
+  };
+
+  const makeBubble = (opts: {
+    label: string;
+    title: string;
+    body: string;
+    button?: { label: string; uri: string };
+  }): FlexBubble => ({
+    type: "bubble",
+    size: "kilo",
+    header: {
+      type: "box",
+      layout: "vertical",
+      backgroundColor: "#003D2B",
+      paddingAll: "md",
+      contents: [{ type: "text", text: opts.label, ...labelStyle }],
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      spacing: "sm",
+      paddingAll: "lg",
+      contents: [
+        { type: "text", text: opts.title, ...titleStyle },
+        { type: "text", text: opts.body, ...bodyStyle },
+      ],
+    },
+    footer: opts.button
+      ? {
+          type: "box",
+          layout: "vertical",
+          paddingAll: "md",
+          contents: [
+            {
+              type: "button",
+              style: "primary",
+              color: "#003D2B",
+              height: "sm",
+              action: {
+                type: "uri",
+                label: opts.button.label,
+                uri: opts.button.uri,
+              },
+            },
+          ],
+        }
+      : undefined,
+  });
+
+  const carousel: FlexCarousel = {
+    type: "carousel",
+    contents: [
+      makeBubble({
+        label: "新系統上線",
+        title: `${shopName} 預約全面升級`,
+        body: "現在可以線上預約、線上取消、線上改期，不用再傳訊息等回覆。先滑滑看右邊的卡片，30 秒就上手。",
+      }),
+      makeBubble({
+        label: "STEP 01",
+        title: "想預約？三步完成",
+        body: "選服務 → 選日期時段 → 確認。第一次預約會請你補登手機與生日（30 秒），之後就免了。",
+        button: { label: "立即預約", uri: `${liffBaseUrl}/booking` },
+      }),
+      makeBubble({
+        label: "STEP 02",
+        title: "想取消或改期？",
+        body: "點下方選單「我的預約」找到該筆預約，前一天以前線上免費取消或改期；當天請打電話告知。",
+        button: { label: "我的預約", uri: `${liffBaseUrl}/my-bookings` },
+      }),
+      makeBubble({
+        label: "需要協助",
+        title: "找不到功能？",
+        body: "任何頁面右下角都有「？」按鈕，常見問題（取消、改期、匯款、提醒）都整理好了。或直接打給店家。",
+        button: { label: "撥打店家電話", uri: `tel:${shopPhone}` },
+      }),
+    ],
+  };
+
+  return {
+    type: "flex",
+    altText: `${shopName} 預約系統升級了！可線上預約、取消、改期 — 點開查看使用說明。`,
+    contents: carousel,
+  };
+}
+
 /** Weekly report Flex Message for admin LINE push */
 export function weeklyReportMessage(report: {
   period: { from: string; to: string };

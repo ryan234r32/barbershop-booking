@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { FullscreenModal } from "./fullscreen-modal";
+import { Modal } from "@/components/ui/modal";
 import useSWR from "swr";
 
 interface Props {
@@ -75,6 +77,7 @@ function dedupeCustomers(list: CustomerSuggestion[]): CustomerSuggestion[] {
 }
 
 export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, onCreated }: Props) {
+  const router = useRouter();
   const [source, setSource] = useState<"PHONE" | "WALK_IN">("PHONE");
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
@@ -84,6 +87,11 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<CustomerSuggestion[]>([]);
   const [boundCustomer, setBoundCustomer] = useState<CustomerSuggestion | null>(null);
+  // Phase 6 P1: post-creation prompt to fill missing customer data.
+  const [completePrompt, setCompletePrompt] = useState<{
+    userId: string;
+    missing: string[];
+  } | null>(null);
   const { toast } = useToast();
 
   const { data: servicesData } = useSWR("/api/services", fetcher);
@@ -179,8 +187,8 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
         const err = await res.json();
         throw new Error(err.error || "Failed");
       }
+      const data = await res.json();
       toast({ type: "success", message: "預約已新增" });
-      onOpenChange(false);
       onCreated();
       setCustomerName("");
       setPhone("");
@@ -188,6 +196,24 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
       setNotes("");
       setBoundCustomer(null);
       setIsTest(false);
+
+      // Phase 6 P1: if the resulting customer is missing key profile fields,
+      // prompt admin to fill them now (sunk-cost moment — they just typed
+      // the booking, the customer is fresh in mind).
+      const u = data?.booking?.user as
+        | { id: string; phone: string | null; gender: string | null; birthday: string | null }
+        | undefined;
+      if (u) {
+        const missing: string[] = [];
+        if (!u.phone) missing.push("手機");
+        if (!u.gender) missing.push("性別");
+        if (!u.birthday) missing.push("生日");
+        if (missing.length > 0) {
+          setCompletePrompt({ userId: u.id, missing });
+          return; // keep sheet rendered as backdrop until prompt is dismissed
+        }
+      }
+      onOpenChange(false);
     } catch (err) {
       toast({ type: "error", message: err instanceof Error ? err.message : "新增失敗" });
     } finally {
@@ -209,9 +235,10 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
   if (!open) return null;
 
   return (
-    // Full-page overlay via FullscreenModal (跟 ExpenseEntrySheet / DailyCloseSheet 同 pattern，
-    // PR #92 已驗證 vaul 在 iOS PWA 不穩 → 改用 portal + fixed div)。
-    // preventDismiss=true：背景 / ESC 不關閉，唯一出口是左上 X / 底部取消 / 確認新增。
+    <>
+    {/* Full-page overlay via FullscreenModal (跟 ExpenseEntrySheet / DailyCloseSheet 同 pattern，
+        PR #92 已驗證 vaul 在 iOS PWA 不穩 → 改用 portal + fixed div)。
+        preventDismiss=true：背景 / ESC 不關閉，唯一出口是左上 X / 底部取消 / 確認新增。 */}
     <FullscreenModal onClose={() => onOpenChange(false)} preventDismiss>
       {/* Header — X close on the left, title centred */}
       <div
@@ -369,5 +396,48 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
         </button>
       </div>
     </FullscreenModal>
+
+    {/* Phase 6 P1: 順便補登 prompt — fires when the just-created booking's
+        customer is missing phone / gender / birthday. */}
+    <Modal
+      isOpen={!!completePrompt}
+      title="這位顧客缺資料，要順便補登嗎？"
+    >
+      {completePrompt && (
+        <>
+          <p className="text-sm text-[var(--color-text-body)] leading-relaxed mb-2">
+            缺：<span className="font-semibold">{completePrompt.missing.join("、")}</span>
+          </p>
+          <p className="text-xs text-[var(--color-text-muted)] mb-5">
+            趁印象還新時補登最快 — 之後行銷推播、提醒訊息都會用到這些資料。
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setCompletePrompt(null);
+                onOpenChange(false);
+              }}
+              className="flex-1 h-11 rounded-lg border border-[var(--color-brand)]/20 text-[var(--color-brand)] text-sm font-medium"
+            >
+              稍後再說
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const target = `/customers/${completePrompt.userId}`;
+                setCompletePrompt(null);
+                onOpenChange(false);
+                router.push(target);
+              }}
+              className="flex-1 h-11 rounded-lg bg-[var(--color-brand)] text-[var(--color-bg)] text-sm font-semibold"
+            >
+              去補登 →
+            </button>
+          </div>
+        </>
+      )}
+    </Modal>
+    </>
   );
 }

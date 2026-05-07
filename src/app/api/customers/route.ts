@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl;
     const segment = searchParams.get("segment");
     const search = searchParams.get("search");
+    const incomplete = searchParams.get("incomplete") === "1";
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
 
@@ -24,6 +25,21 @@ export async function GET(request: NextRequest) {
         { displayName: { contains: search, mode: "insensitive" } },
         { realName: { contains: search, mode: "insensitive" } },
         { phone: { contains: search } },
+      ];
+    }
+    // Phase 6 P0: profile-completeness filter — admin can sweep customers
+    // missing any of phone / gender / birthday so they can fill the gaps in-store.
+    if (incomplete) {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? (where.AND as unknown[]) : []),
+        {
+          OR: [
+            { phone: null },
+            { phone: "" },
+            { gender: null },
+            { birthday: null },
+          ],
+        },
       ];
     }
 
@@ -44,6 +60,8 @@ export async function GET(request: NextRequest) {
           realName: true,
           pictureUrl: true,
           phone: true,
+          gender: true,
+          birthday: true,
           segment: true,
           isVip: true,
           violationCount: true,

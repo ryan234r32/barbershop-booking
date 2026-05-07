@@ -47,7 +47,7 @@ export default function BookingPage() {
   const [notes, setNotes] = useState("");
   const [policyAgreed, setPolicyAgreed] = useState(false);
   const [showUserInfoSheet, setShowUserInfoSheet] = useState(false);
-  const [userInfo, setUserInfo] = useState<{ name: string; phone: string; birthday?: string } | null>(null);
+  const [userInfo, setUserInfo] = useState<{ name: string; phone: string; birthday?: string; gender?: "MALE" | "FEMALE" | "OTHER" | "PREFER_NOT_TO_SAY" } | null>(null);
   // Slot-conflict UX: when two clients race for the same slot and we lose,
   // server returns code=SLOT_UNAVAILABLE. Show a blocking modal, bounce back
   // to calendar, and refresh availability so the taken slot greys out.
@@ -108,7 +108,7 @@ export default function BookingPage() {
     }
   };
 
-  const handleSubmit = async (infoOverride?: { name: string; phone: string; birthday?: string }) => {
+  const handleSubmit = async (infoOverride?: { name: string; phone: string; birthday?: string; gender?: "MALE" | "FEMALE" | "OTHER" | "PREFER_NOT_TO_SAY" }) => {
     if (!selectedService || !selectedDate || !selectedTime || !userId) return;
 
     const info = infoOverride || userInfo;
@@ -132,6 +132,7 @@ export default function BookingPage() {
           realName: info?.name,
           phone: info?.phone,
           birthday: info?.birthday,
+          gender: info?.gender,
         }),
       });
 

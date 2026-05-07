@@ -3,10 +3,13 @@
 import { useState, useEffect } from "react";
 import { BottomSheet } from "@/components/liff/bottom-sheet";
 
+type Gender = "MALE" | "FEMALE" | "PREFER_NOT_TO_SAY";
+
 interface UserInfoData {
   name: string;
   phone: string;
-  birthday?: string; // "MM-DD" format
+  birthday?: string; // "YYYY-MM-DD" format
+  gender?: Gender;
 }
 
 export function UserInfoSheet({
@@ -24,6 +27,7 @@ export function UserInfoSheet({
 }) {
   const [name, setName] = useState(defaultName || "");
   const [phone, setPhone] = useState(defaultPhone || "");
+  const [gender, setGender] = useState<Gender | "">("");
   const [birthdayYear, setBirthdayYear] = useState(""); // 民國年
   const [birthdayMonth, setBirthdayMonth] = useState("");
   const [birthdayDay, setBirthdayDay] = useState("");
@@ -71,6 +75,7 @@ export function UserInfoSheet({
       name: name.trim(),
       phone: phone.trim(),
       birthday: `${westernYear}-${birthdayMonth.padStart(2, "0")}-${birthdayDay.padStart(2, "0")}`,
+      ...(gender ? { gender } : {}),
     };
 
     onSubmit(data);
@@ -137,6 +142,38 @@ export function UserInfoSheet({
             {errors.phone && (
               <span className="text-xs text-[#A84A3B] mt-1 block">{errors.phone}</span>
             )}
+          </div>
+
+          {/* Gender — 選填，三選一 */}
+          <div>
+            <label className="text-[0.7rem] font-bold tracking-[0.1em] uppercase text-[#003D2B]/40 mb-1 block">
+              性別（選填）
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { value: "MALE", label: "生理男" },
+                  { value: "FEMALE", label: "生理女" },
+                  { value: "PREFER_NOT_TO_SAY", label: "略" },
+                ] as const
+              ).map((opt) => {
+                const active = gender === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setGender(active ? "" : opt.value)}
+                    className={`h-10 rounded-lg text-sm font-medium transition-colors ${
+                      active
+                        ? "bg-[#003D2B] text-[#FFF8F1]"
+                        : "bg-[#faf2ea] text-[#003D2B]/70 hover:bg-[#003D2B]/5"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Birthday — 民國年月日 */}
