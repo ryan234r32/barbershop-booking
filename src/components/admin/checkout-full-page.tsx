@@ -19,6 +19,7 @@
 
 import { useEffect, useState } from "react";
 import { Plus, X, User, Calendar, Clock } from "lucide-react";
+import QRCode from "react-qr-code";
 import { useToast } from "@/components/ui/toast";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { FullscreenModal } from "./fullscreen-modal";
@@ -609,8 +610,7 @@ function WalkinOptionCard({
 }
 
 /** QR Code 覆蓋層 — 給 walk-in 客人掃描加 LINE 好友。
- *  使用 api.qrserver.com 產生 QR 圖（free, no API key, sufficient for in-store use）。
- *  TODO: 之後改用本地 qrcode lib 避免依賴外部服務。 */
+ *  使用 react-qr-code 在本地產生 inline SVG（避免依賴外部服務 + 規避 CSP 阻擋）。 */
 function BindLineQrOverlay({
   qrUrl,
   customerName,
@@ -620,7 +620,6 @@ function BindLineQrOverlay({
   customerName: string;
   onClose: () => void;
 }) {
-  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=12&data=${encodeURIComponent(qrUrl)}`;
   return (
     <div
       className="absolute inset-0 z-10 bg-black/60 flex items-center justify-center p-6"
@@ -636,9 +635,8 @@ function BindLineQrOverlay({
         <p className="text-xs text-[var(--color-text-muted)] mb-4">
           {customerName} 掃描後加為好友 + 點傳送，銀行帳號自動發送到 LINE
         </p>
-        <div className="bg-white rounded-xl p-3 inline-block">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={qrImageUrl} alt="LINE 好友邀請 QR Code" width={280} height={280} />
+        <div className="bg-white rounded-xl p-4 inline-block">
+          <QRCode value={qrUrl} size={256} level="M" />
         </div>
         <p className="text-[11px] text-[var(--color-text-muted)] mt-3 leading-relaxed">
           連結 10 分鐘內有效。客人加好友後直接按「傳送」即可完成綁定。
