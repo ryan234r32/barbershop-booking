@@ -263,7 +263,7 @@ npm run rich-menu:upload -- \
 - 聯絡店家 → `tel:{tenant.phone}`；若 tenant 無電話則發訊息 `電話`
 - 匯款資訊 → message `匯款`
 
-> 上線紀錄：2026-05-07 已執行 `npm run rich-menu:upload -- --image docs/rich-menu/rich-menu.jpg --commit`。新 Rich Menu ID：`richmenu-bc4d688195795ed5ce1ce5ec6ec7866e`；前一版 default 已保留，可 rollback 至 `richmenu-a25878d708e4926abf8dec17a8eb9b46`。
+> 上線紀錄：2026-05-07 已執行 `npm run rich-menu:upload -- --image docs/rich-menu/rich-menu.jpg --commit`。新 Rich Menu ID：`richmenu-2876908ee666220a79153d67a618df91`；前一版 default 已保留，可 rollback 至 `richmenu-bc4d688195795ed5ce1ce5ec6ec7866e`。
 
 **驗收：**
 - [x] LINE Rich Menu API 成功設為 default
@@ -275,7 +275,7 @@ npm run rich-menu:upload -- \
 
 ---
 
-### Phase 4：切換日 Flex Carousel 廣播 ✅ 已完成
+### Phase 4：切換日 Flex Carousel 廣播 ✅ 已正式發送（2026-05-07）
 **目的：** 解決顧慮 #2 — 系統穿到老闆帳號當天，主動推 Flex Carousel 給所有既有好友。
 
 **檔案：** `src/app/api/admin/launch-carousel/route.ts` + `src/lib/line/messages.ts`
@@ -290,11 +290,13 @@ npm run rich-menu:upload -- \
 - Ryan 上線當天以 admin token 呼叫 `POST /api/admin/launch-carousel`
 - 先送 `{"dryRun": true}` 看會推播幾人，再正式送 `{}`
 - 使用 per-user `pushMessage`，個別失敗記 log，不使用 LINE broadcast endpoint
+- 2026-05-07 已用同一套 `launchCarouselMessage()` 正式推送：`sent=2`、`failed=0`、`total=2`
 
 **驗收：**
 - [x] Carousel builder 已完成
 - [x] 每張卡按鈕能跳回對應 LIFF 頁面
 - [x] 廣播 endpoint 回傳 sent / failed / total
+- [x] 正式推送完成（2/2 成功）
 
 **Owner：** Claude（腳本+文案）+ Ryan（執行時機 + 文案最終確認）
 
@@ -332,17 +334,16 @@ npm run rich-menu:upload -- \
 
 ---
 
-## 4. 執行順序（依阻塞關係）
+## 4. 執行狀態總結
 
 ```
-Phase 0 ✅ → Phase 1 → Phase 2 (框架) → 等 Ryan 給 FAQ 文案 → Phase 2 (補文案)
-                ↓
-       Ryan 並行生 Rich Menu 圖
-                ↓
-       Phase 3 (Claude 上傳+路由) → Phase 4 (廣播腳本) → 上線當天 Ryan 執行
-                                          ↓
-                              Phase 5 (follow webhook，可同步)
-                              Phase 6 (admin 補登 audit)
+Phase 0 ✅ Profile gate + 性別欄位
+Phase 1 ✅ LIFF Intro Modal
+Phase 2 ✅ HelpFab + FAQ（使用預設文案，之後可替換）
+Phase 3 ✅ Rich Menu 6 格已正式設為 default
+Phase 4 ✅ 切換日 Flex Carousel 已正式推送
+Phase 5 ✅ Follow webhook 自動歡迎已存在
+Phase 6 ✅ Admin 手動補登入口已完成
 ```
 
 ---
@@ -351,10 +352,8 @@ Phase 0 ✅ → Phase 1 → Phase 2 (框架) → 等 Ryan 給 FAQ 文案 → Pha
 
 | # | 問題 | 影響 |
 |---|---|---|
-| Q1 | FAQ 6 題的文案要怎麼寫？（先用預設） | Phase 2 完整度 |
-| Q2 | Phase 5 follow webhook 要不要做？ | 未來新好友體驗 |
-| Q3 | Phase 6 admin 補登 — 要不要審核既有 UI？ | 長輩客回流 |
-| Q4 | 切換日什麼時候？需不需要先 dry-run 廣播給 Ryan 自己看 carousel 效果？ | Phase 4 上線時機 |
+| Q1 | FAQ 6 題若要換成老闆口吻，之後可直接替換 `src/components/liff/help-fab.tsx` 文案 | 非阻塞；目前預設文案可用 |
+| Q2 | 手機端實測 Rich Menu 六格與 Flex Carousel 顯示 | 需 Ryan 在 LINE 手機端確認；程式與 API 已完成 |
 
 ---
 
