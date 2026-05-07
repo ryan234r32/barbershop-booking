@@ -75,7 +75,8 @@ interface MonthlyResponse {
   yoy: YoYResult;
   momChangePct: number | null;
   yoyChangePct: number | null;
-  diagnostics: MonthlyDiagnostics;
+  /** Optional for backwards compatibility with cached PWA/API responses. */
+  diagnostics?: MonthlyDiagnostics;
 }
 
 const fetcher = (url: string) =>
@@ -103,6 +104,58 @@ function monthRange(period: string): MonthRangeMeta {
     from: `${y}-${pad(m)}-01`,
     to: `${y}-${pad(m)}-${pad(daysInMonth)}`,
     daysInMonth,
+  };
+}
+
+function buildFallbackDiagnostics(data: MonthlyResponse): MonthlyDiagnostics {
+  const customerCount = data.rfm.total || data.totals.uniqueCustomers;
+  const bookingCount = data.totals.bookings;
+  const historyMonths = Math.max(1, data.sparkline.length);
+  const medianGap = data.totals.medianGapDays || 0;
+  const avgGap = data.totals.avgGapDays || 0;
+  const intervalStatus = medianGap > 70 || avgGap > 90 ? "danger" : medianGap > 50 || avgGap > 70 ? "warning" : "ok";
+
+  return {
+    history: {
+      fromIso: data.sparkline[0]?.month ? `${data.sparkline[0].month}-01` : null,
+      toIso: data.range.toIso,
+      monthCount: historyMonths,
+      bookingCount,
+      customerCount,
+    },
+    funnel: [
+      { fromVisit: 1, toVisit: 2, fromCount: 0, toCount: 0, rate: data.retention.retention90Days },
+      { fromVisit: 2, toVisit: 3, fromCount: 0, toCount: 0, rate: 0 },
+      { fromVisit: 3, toVisit: 4, fromCount: 0, toCount: 0, rate: 0 },
+      { fromVisit: 4, toVisit: 5, fromCount: 0, toCount: 0, rate: 0 },
+    ],
+    pareto: [
+      { key: "top10", label: "前 10% 核心客", customerCount: Math.ceil(customerCount * 0.1), revenue: 0, revenueShare: 0 },
+      { key: "top20", label: "前 20% 熟客主力", customerCount: Math.ceil(customerCount * 0.2), revenue: 0, revenueShare: 0 },
+      { key: "rest80", label: "其餘客戶", customerCount: Math.max(0, customerCount - Math.ceil(customerCount * 0.2)), revenue: 0, revenueShare: 0 },
+    ],
+    intervals: [
+      {
+        category: "剪",
+        medianDays: medianGap,
+        avgDays: avgGap,
+        targetDays: 50,
+        targetLabel: "50天",
+        sampleSize: data.totals.bookings,
+        status: intervalStatus,
+      },
+      { category: "染", medianDays: 0, avgDays: 0, targetDays: 35, targetLabel: "35天", sampleSize: 0, status: "warning" },
+      { category: "燙", medianDays: 0, avgDays: 0, targetDays: 120, targetLabel: "90-120天", sampleSize: 0, status: "warning" },
+    ],
+    fansAtRisk: [],
+    sleepers: [],
+    serviceLtv: {
+      chemicalCustomers: 0,
+      chemicalAvgSpend: 0,
+      haircutOnlyCustomers: 0,
+      haircutOnlyAvgSpend: 0,
+      multiplier: null,
+    },
   };
 }
 
@@ -157,6 +210,7 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
   const customers = t.uniqueCustomers;
   const ticket = t.arpu;
   const revenue = t.revenue;
+  const diagnostics = data.diagnostics ?? buildFallbackDiagnostics(data);
 
   return (
     <div className="space-y-5 relative">
@@ -181,12 +235,13 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
 
           <MonthlyExecutiveSummary
             data={data}
+            diagnostics={diagnostics}
             revenue={revenue}
             customers={customers}
             ticket={ticket}
           />
 
-          <SignalGrid data={data} />
+          <SignalGrid data={data} diagnostics={diagnostics} />
 
           <ComparisonTable data={data} />
 
@@ -226,24 +281,24 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
               chemicalShare={data.chemicalShare}
               chemicalShareLast={data.chemicalShareLastMonth}
               totalRevenue={revenue}
-              serviceLtv={data.diagnostics.serviceLtv}
+              serviceLtv={diagnostics.serviceLtv}
             />
           </SectionDivider>
 
-          <SectionDivider number="03" title="回訪轉換漏斗" subtitle={`${data.diagnostics.history.monthCount} 個月歷史顧客的第 1 到第 5 次回訪`}>
-            <FunnelWidget diagnostics={data.diagnostics} />
+          <SectionDivider number="03" title="回訪轉換漏斗" subtitle={`${diagnostics.history.monthCount} 個月歷史顧客的第 1 到第 5 次回訪`}>
+            <FunnelWidget diagnostics={diagnostics} />
           </SectionDivider>
 
           <SectionDivider number="04" title="客戶集中度" subtitle="80/20 法則：先守住高價值熟客">
-            <ParetoWidget diagnostics={data.diagnostics} />
+            <ParetoWidget diagnostics={diagnostics} />
           </SectionDivider>
 
           <SectionDivider number="05" title="回訪間隔" subtitle="剪 / 染 / 燙依歷史實際間隔計算">
-            <ReturnIntervalsWidget diagnostics={data.diagnostics} />
+            <ReturnIntervalsWidget diagnostics={diagnostics} />
           </SectionDivider>
 
           <SectionDivider number="06" title="本月待行動名單" subtitle="自動偵測鐵粉預警與沉睡客戶">
-            <ActionCustomersWidget diagnostics={data.diagnostics} />
+            <ActionCustomersWidget diagnostics={diagnostics} />
           </SectionDivider>
 
           <SectionDivider
@@ -259,7 +314,7 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
             </MCard>
           </SectionDivider>
 
-          <NextActionsWidget data={data} />
+          <NextActionsWidget data={data} diagnostics={diagnostics} />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button
@@ -280,11 +335,13 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
 
 function MonthlyExecutiveSummary({
   data,
+  diagnostics,
   revenue,
   customers,
   ticket,
 }: {
   data: MonthlyResponse;
+  diagnostics: MonthlyDiagnostics;
   revenue: number;
   customers: number;
   ticket: number;
@@ -305,7 +362,7 @@ function MonthlyExecutiveSummary({
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <MTag tone="brand" size="sm">{data.range.label}月報</MTag>
               <MTag tone="info" size="sm">
-                {data.diagnostics.history.monthCount} 個月 · {data.diagnostics.history.bookingCount.toLocaleString()} 筆歷史
+                {diagnostics.history.monthCount} 個月 · {diagnostics.history.bookingCount.toLocaleString()} 筆歷史
               </MTag>
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold leading-tight text-[var(--color-text-primary)]">
@@ -403,8 +460,9 @@ function HeroMiniStat({
   );
 }
 
-function SignalGrid({ data }: { data: MonthlyResponse }) {
+function SignalGrid({ data, diagnostics }: { data: MonthlyResponse; diagnostics: MonthlyDiagnostics }) {
   const chemicalCountShare = serviceCountShare(data.servicePie, ["染", "燙", "漂"]);
+  const fanCount = diagnostics.fansAtRisk.length;
   const signals = [
     {
       label: "離店再預約率",
@@ -429,9 +487,9 @@ function SignalGrid({ data }: { data: MonthlyResponse }) {
     },
     {
       label: "鐵粉預警",
-      value: `${data.diagnostics.fansAtRisk.length}`,
+      value: `${fanCount}`,
       note: "超過個人習慣間隔 1.5 倍",
-      status: data.diagnostics.fansAtRisk.length === 0 ? "ok" : data.diagnostics.fansAtRisk.length <= 3 ? "warning" : "danger",
+      status: fanCount === 0 ? "ok" : fanCount <= 3 ? "warning" : "danger",
       icon: Users,
     },
   ] as const;
@@ -840,9 +898,9 @@ function CustomerActionRows({
   );
 }
 
-function NextActionsWidget({ data }: { data: MonthlyResponse }) {
-  const fanCount = data.diagnostics.fansAtRisk.length;
-  const firstFunnel = data.diagnostics.funnel[0];
+function NextActionsWidget({ data, diagnostics }: { data: MonthlyResponse; diagnostics: MonthlyDiagnostics }) {
+  const fanCount = diagnostics.fansAtRisk.length;
+  const firstFunnel = diagnostics.funnel[0];
   const hasChemicalGap = data.chemicalShare < 35;
   const actions = [
     {
