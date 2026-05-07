@@ -27,7 +27,7 @@ const ROW_H = 843;
 const MAX_IMAGE_BYTES = 1024 * 1024;
 const COMMIT = process.argv.includes("--commit") || process.argv.includes("--confirm");
 const HELP = process.argv.includes("--help") || process.argv.includes("-h");
-const LAYOUT = getArg("layout") ?? "handoff6";
+const LAYOUT = getArg("layout") ?? "image6";
 const CONTACT_ACTION = getArg("contact-action") ?? "tel";
 
 // 2500 does not divide by 3. The middle hit area gets the extra pixel so all
@@ -71,13 +71,17 @@ Usage:
 
 Options:
   --image <path>            Required. PNG/JPEG, exactly 2500x1686, <= 1 MB.
-  --layout <name>           handoff6 | plan6 | legacy4. Default handoff6.
+  --layout <name>           image6 | handoff6 | plan6 | legacy4. Default image6.
   --contact-action <name>   tel | maps. Default tel.
   --commit                  Upload to LINE and set default. Without this, dry-run only.
   --confirm                 Alias of --commit.
   --help                    Print this help.
 
 Layouts:
+  image6:
+    立即預約 / 取消／改期 / 我的預約
+    服務項目 / 聯絡店家 / 匯款資訊
+
   handoff6:
     立即預約 / 聯絡電話 / 我的預約
     服務項目 / 取消／改期 / 匯款資訊
@@ -174,9 +178,9 @@ function validateImage(imagePath: string) {
   return image;
 }
 
-function assertLayout(layout: string): asserts layout is "handoff6" | "plan6" | "legacy4" {
-  if (layout !== "handoff6" && layout !== "plan6" && layout !== "legacy4") {
-    bail(`unsupported --layout ${layout}; expected handoff6, plan6, or legacy4`);
+function assertLayout(layout: string): asserts layout is "image6" | "handoff6" | "plan6" | "legacy4" {
+  if (layout !== "image6" && layout !== "handoff6" && layout !== "plan6" && layout !== "legacy4") {
+    bail(`unsupported --layout ${layout}; expected image6, handoff6, plan6, or legacy4`);
   }
 }
 
@@ -213,7 +217,7 @@ function buildRichMenu(params: {
   phone: string | null;
   address: string | null;
   businessName: string;
-  layout: "handoff6" | "plan6" | "legacy4";
+  layout: "image6" | "handoff6" | "plan6" | "legacy4";
   contactActionMode: "tel" | "maps";
 }): RichMenuBody {
   const liffBase = `https://liff.line.me/${params.liffId}`;
@@ -321,12 +325,43 @@ function buildRichMenu(params: {
     },
   ];
 
+  const image6Areas: RichMenuBody["areas"] = [
+    {
+      bounds: { x: COLS[0].x, y: 0, width: COLS[0].width, height: ROW_H },
+      action: common.booking,
+    },
+    {
+      bounds: { x: COLS[1].x, y: 0, width: COLS[1].width, height: ROW_H },
+      action: common.cancelReschedule,
+    },
+    {
+      bounds: { x: COLS[2].x, y: 0, width: COLS[2].width, height: ROW_H },
+      action: common.myBookings,
+    },
+    {
+      bounds: { x: COLS[0].x, y: ROW_H, width: COLS[0].width, height: ROW_H },
+      action: common.services,
+    },
+    {
+      bounds: { x: COLS[1].x, y: ROW_H, width: COLS[1].width, height: ROW_H },
+      action: contactStore,
+    },
+    {
+      bounds: { x: COLS[2].x, y: ROW_H, width: COLS[2].width, height: ROW_H },
+      action: common.payment,
+    },
+  ];
+
   return {
     size: { width: WIDTH, height: HEIGHT },
     selected: true,
     name: `barbershop-main-menu-v4-${params.layout}`,
     chatBarText: "選單",
-    areas: params.layout === "plan6" ? plan6Areas : handoff6Areas,
+    areas: params.layout === "image6"
+      ? image6Areas
+      : params.layout === "plan6"
+        ? plan6Areas
+        : handoff6Areas,
   };
 }
 
