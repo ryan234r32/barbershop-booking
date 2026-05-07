@@ -3,145 +3,173 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>1008 Hair Studio — Rich Menu</title>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet"/>
+<title>1008 Hair Studio — 6 格 Rich Menu</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
   :root {
-    --primary: #003d2b;
-    --primary-dark: #002519;
-    --surface: #fff8f1;
-    --surface-alt: #fbf3e6;
-    --surface-dark: #343028;
-    --divider: rgba(0, 61, 43, 0.08);
+    --forest: #003D2B;
+    --forest-dark: #00261B;
+    --cream: #FFF8F1;
+    --cream-soft: #F7EBDD;
+    --ink-soft: rgba(255, 248, 241, 0.68);
+    --green-soft: rgba(0, 61, 43, 0.62);
+    --line-light: rgba(255, 248, 241, 0.22);
+    --line-dark: rgba(0, 61, 43, 0.10);
   }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
+
   html, body {
     width: 100%;
     height: 100%;
-    background: var(--surface);
-    font-family: 'Manrope', 'Noto Sans TC', sans-serif;
-    -webkit-font-smoothing: antialiased;
+    background: var(--cream);
     overflow: hidden;
+    font-family: "Manrope", "Noto Sans TC", sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
+
   .grid {
     position: fixed;
-    top: 0; left: 0;
+    top: 0;
+    left: 0;
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
   }
+
   .cell {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    position: relative;
-    padding: 4%;
     text-align: center;
+    padding: 5.4%;
   }
-  .cell .icon {
-    font-family: 'Material Symbols Outlined';
-    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 48;
-    font-size: 12vmin;
+
+  .top {
+    background: var(--forest);
+    color: var(--cream);
+  }
+
+  .bottom {
+    background: var(--cream);
+    color: var(--forest);
+  }
+
+  .top + .top {
+    border-left: 2px solid var(--line-light);
+  }
+
+  .bottom {
+    border-top: 2px solid var(--line-dark);
+  }
+
+  .bottom + .bottom {
+    border-left: 2px solid var(--line-dark);
+  }
+
+  .icon {
+    font-family: "Material Symbols Outlined";
+    font-variation-settings: "FILL" 0, "wght" 350, "GRAD" 0, "opsz" 48;
+    font-size: 140px;
     line-height: 1;
-    margin-bottom: 3.2vmin;
+    margin-bottom: 36px;
   }
-  .cell .title {
-    font-family: 'Noto Sans TC', sans-serif;
-    font-weight: 700;
-    font-size: 6.2vmin;
-    letter-spacing: 0.08em;
-    line-height: 1.2;
-    margin-bottom: 1.6vmin;
+
+  .title {
+    font-family: "Noto Sans TC", sans-serif;
+    font-size: 92px;
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: 0;
+    white-space: nowrap;
   }
-  .cell .subtitle {
-    font-family: 'Manrope', sans-serif;
-    font-size: 2.2vmin;
-    letter-spacing: 0.28em;
+
+  .subtitle {
+    margin-top: 20px;
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
-    opacity: 0.55;
-    font-weight: 500;
   }
 
-  /* Top-left: BOOK NOW (active / primary) */
-  .cell.book {
-    background: var(--primary);
-    color: var(--surface);
-  }
-  /* Top-right: MY BOOKINGS */
-  .cell.my {
-    background: var(--surface-alt);
-    color: var(--primary);
-    border-left: 1px solid var(--divider);
-  }
-  /* Bottom-left: SERVICES */
-  .cell.services {
-    background: var(--surface-alt);
-    color: var(--primary);
-    border-top: 1px solid var(--divider);
-  }
-  /* Bottom-right: STORE INFO */
-  .cell.store {
-    background: var(--surface-dark);
-    color: var(--surface);
-    border-top: 1px solid var(--divider);
-    border-left: 1px solid var(--divider);
+  .top .subtitle { color: var(--ink-soft); }
+  .bottom .subtitle { color: var(--green-soft); }
+
+  .cell::after {
+    content: "";
+    position: absolute;
+    inset: 28px;
+    border-radius: 22px;
+    pointer-events: none;
   }
 
-  /* Aspect-ratio responsive tweaks for the wide/short (small) rich menu */
-  @media (min-aspect-ratio: 2/1) {
-    .cell .icon { font-size: 9vmin; margin-bottom: 2vmin; }
-    .cell .title { font-size: 4.6vmin; margin-bottom: 1vmin; }
-    .cell .subtitle { font-size: 1.8vmin; }
+  .top::after {
+    border: 2px solid rgba(255, 248, 241, 0.08);
+  }
+
+  .bottom::after {
+    border: 2px solid rgba(0, 61, 43, 0.06);
   }
 </style>
 </head>
 <body>
   <div class="grid">
-    <div class="cell book">
+    <div class="cell top">
       <span class="icon">calendar_month</span>
       <div class="title">立即預約</div>
-      <div class="subtitle">Book Now</div>
+      <div class="subtitle">Book</div>
     </div>
-    <div class="cell my">
+    <div class="cell top">
+      <span class="icon">call</span>
+      <div class="title">聯絡電話</div>
+      <div class="subtitle">Call</div>
+    </div>
+    <div class="cell top">
       <span class="icon">event_note</span>
       <div class="title">我的預約</div>
-      <div class="subtitle">My Bookings</div>
+      <div class="subtitle">Bookings</div>
     </div>
-    <div class="cell services">
+    <div class="cell bottom">
       <span class="icon">content_cut</span>
       <div class="title">服務項目</div>
       <div class="subtitle">Services</div>
     </div>
-    <div class="cell store">
-      <span class="icon">location_on</span>
-      <div class="title">門市資訊</div>
-      <div class="subtitle">Store Info</div>
+    <div class="cell bottom">
+      <span class="icon">event_repeat</span>
+      <div class="title">取消／改期</div>
+      <div class="subtitle">Change</div>
+    </div>
+    <div class="cell bottom">
+      <span class="icon">payments</span>
+      <div class="title">匯款資訊</div>
+      <div class="subtitle">Payment</div>
     </div>
   </div>
 <script>
   (function() {
     const params = new URLSearchParams(location.search);
-    const w = parseInt(params.get('w'), 10) || 2500;
-    const h = parseInt(params.get('h'), 10) || 1686;
-    const grid = document.querySelector('.grid');
-    grid.style.width = w + 'px';
-    grid.style.height = h + 'px';
-    // Scale typography off the shorter dimension (vmin substitute) so it
-    // stays consistent across window-vs-content-size discrepancies.
+    const w = parseInt(params.get("w"), 10) || 2500;
+    const h = parseInt(params.get("h"), 10) || 1686;
+    const grid = document.querySelector(".grid");
+    grid.style.width = w + "px";
+    grid.style.height = h + "px";
+
     const vmin = Math.min(w, h);
-    document.querySelectorAll('.cell .icon').forEach(el => {
-      el.style.fontSize = (vmin * 0.12) + 'px';
-      el.style.marginBottom = (vmin * 0.032) + 'px';
+    document.querySelectorAll(".icon").forEach((el) => {
+      el.style.fontSize = (vmin * 0.083) + "px";
+      el.style.marginBottom = (vmin * 0.021) + "px";
     });
-    const wide = (w / h) > 2;
-    document.querySelectorAll('.cell .title').forEach(el => {
-      el.style.fontSize = (vmin * (wide ? 0.092 : 0.062)) + 'px';
+    document.querySelectorAll(".title").forEach((el) => {
+      el.style.fontSize = (vmin * 0.0545) + "px";
     });
-    document.querySelectorAll('.cell .subtitle').forEach(el => {
-      el.style.fontSize = (vmin * (wide ? 0.036 : 0.022)) + 'px';
+    document.querySelectorAll(".subtitle").forEach((el) => {
+      el.style.fontSize = (vmin * 0.0202) + "px";
+      el.style.marginTop = (vmin * 0.0118) + "px";
     });
+    document.querySelectorAll(".cell::after");
   })();
 </script>
 </body>
