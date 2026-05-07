@@ -2,20 +2,38 @@
 
 import { memo, useMemo } from "react";
 import useSWR from "swr";
-import { BarChart3, Coins } from "lucide-react";
+import {
+  BarChart3,
+  CalendarPlus,
+  Coins,
+  MessageCircle,
+  Repeat2,
+  Scissors,
+  Sparkles,
+  Target,
+  TrendingDown,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { MCard } from "@/components/admin/reports/v3.6/m-card";
 import { MTag } from "@/components/admin/reports/v3.6/m-tag";
 import { DateStrip } from "@/components/admin/reports/v3.6/date-strip";
-import { KpiCard } from "@/components/admin/reports/v3.6/kpi-card";
 import { AlertBanner } from "@/components/admin/reports/v3.6/alert-banner";
-import { ThreeWayDecomposition } from "@/components/admin/reports/v3.6/three-way-decomposition";
 import { Sparkline } from "@/components/admin/reports/v3.6/sparkline";
 import { ProgressBar } from "@/components/admin/reports/v3.6/progress-bar";
 import { RfmCards, RfmSummary } from "@/components/admin/reports/v3.6/rfm-card";
 import { YoYBars } from "@/components/admin/reports/v3.6/yoy-bars";
 import { SectionDivider } from "@/components/admin/reports/v3.6/section-divider";
-import type { Alert, RfmGrid, YoYResult, MonthSpark, MonthlyTargetResult, PrebookRateResult } from "@/lib/reports/v3.6/aggregates";
+import type {
+  Alert,
+  RfmGrid,
+  YoYResult,
+  MonthSpark,
+  MonthlyTargetResult,
+  PrebookRateResult,
+  MonthlyDiagnostics,
+} from "@/lib/reports/v3.6/aggregates";
 
 interface MonthlyResponse {
   view: "monthly";
@@ -57,6 +75,7 @@ interface MonthlyResponse {
   yoy: YoYResult;
   momChangePct: number | null;
   yoyChangePct: number | null;
+  diagnostics: MonthlyDiagnostics;
 }
 
 const fetcher = (url: string) =>
@@ -158,207 +177,38 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
 
       {!empty && (
         <>
-          {/* ② Alert Banner */}
           <AlertBanner alerts={data.alerts} />
 
-          {/* ③ Hero: 三段拆解 + sparkline + target progress + summary */}
-          <MCard padding="lg">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div>
-                <p className="text-xs sm:text-sm tracking-wider text-[var(--color-text-muted)] uppercase">
-                  {data.range.label}營收
-                </p>
-                <p className="text-4xl sm:text-5xl font-bold tabular-nums text-[var(--color-text-primary)] mt-1.5">
-                  {revenue.toLocaleString()}
-                </p>
-                <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-                  {data.momChangePct !== null && (
-                    <MTag size="sm" tone={data.momChangePct >= 0 ? "success" : "danger"}>
-                      較上月 {data.momChangePct >= 0 ? "+" : ""}{data.momChangePct.toFixed(1)}%
-                    </MTag>
-                  )}
-                  {data.yoyChangePct !== null && (
-                    <MTag size="sm" tone={data.yoyChangePct >= 0 ? "success" : "danger"}>
-                      較去年同月 {data.yoyChangePct >= 0 ? "+" : ""}{data.yoyChangePct.toFixed(1)}%
-                    </MTag>
-                  )}
-                </div>
-              </div>
-            </div>
+          <MonthlyExecutiveSummary
+            data={data}
+            revenue={revenue}
+            customers={customers}
+            ticket={ticket}
+          />
 
-            <ThreeWayDecomposition customers={customers} ticket={ticket} revenue={revenue} />
+          <SignalGrid data={data} />
 
-            <div className="mt-4">
-              <p className="text-[11px] text-[var(--color-text-muted)] mb-1">過去 12 月走勢</p>
-              <Sparkline points={data.sparkline.map((s) => ({
-                label: s.label,
-                value: s.revenue,
-                isCurrent: s.isCurrent,
-                isPeak: s.isPeak,
-                isTrough: s.isTrough,
-              }))} />
-            </div>
+          <ComparisonTable data={data} />
 
-            {data.target.targetRevenue !== null && (
-              <div className="mt-4 pt-4 border-t border-[var(--color-brand)]/8">
-                <div className="flex items-baseline justify-between mb-1.5">
-                  <p className="text-xs font-semibold text-[var(--color-text-primary)]">
-                    本月目標達成率
-                  </p>
-                  <p className="text-base font-bold tabular-nums text-[var(--color-brand)]">
-                    {data.target.achievementRate.toFixed(1)}%
-                  </p>
-                </div>
-                <ProgressBar
-                  value={data.target.achievementRate}
-                  benchmark={data.target.paceExpectedRate}
-                  rightLabel={`目標 ${data.target.targetRevenue.toLocaleString()} · 進度線 ${data.target.paceExpectedRate.toFixed(0)}%`}
-                  tone={data.target.achievementRate >= data.target.paceExpectedRate ? "success" : "warning"}
-                />
-              </div>
-            )}
+          <MonthlyMoneyStrip
+            revenue={revenue}
+            expenseTotal={expenseTotal}
+            expenseFixed={expenseFixed}
+            expenseVariable={expenseVariable}
+            closedCount={closedDates.size}
+            daysInMonth={range.daysInMonth}
+          />
 
-            {/* Natural language summary */}
-            <p
-              className="text-sm text-[var(--color-text-body)] leading-relaxed mt-4 pt-4 border-t border-[var(--color-brand)]/8"
-              dangerouslySetInnerHTML={{ __html: renderMarkdownBold(data.summaryText) }}
-            />
-          </MCard>
-
-          {/* V3.7 §E — 支出 / 淨利 / 結帳天數 row.
-              `min-w-0` on each MCard so flex children can shrink instead of
-              forcing horizontal overflow on narrow phones. Numbers use
-              `whitespace-nowrap` to avoid mid-thousands wrapping; sublines wrap.
-              V3.9 a11y: labels were `text-[10px] uppercase` — failed Apple HIG
-              minimum readable size on phone. Bump to `text-xs font-semibold`
-              (12px) without uppercase for normal Chinese-character cadence. */}
-          <div className="grid grid-cols-3 gap-2">
-            <MCard padding="md">
-              <p className="text-xs sm:text-sm font-semibold text-[var(--color-text-muted)]">
-                本月支出
-              </p>
-              <p className="text-base sm:text-xl font-bold tabular-nums text-[var(--color-danger)] mt-1 whitespace-nowrap">
-                -{expenseTotal.toLocaleString()}
-              </p>
-              <p className="text-[11px] text-[var(--color-text-muted)] mt-1 tabular-nums leading-tight break-words">
-                固定 {expenseFixed.toLocaleString()}
-                <br />
-                變動 {expenseVariable.toLocaleString()}
-              </p>
-            </MCard>
-            <MCard padding="md">
-              <p className="text-xs sm:text-sm font-semibold text-[var(--color-text-muted)]">
-                本月淨利
-              </p>
-              <p
-                className="text-base sm:text-xl font-bold tabular-nums mt-1 whitespace-nowrap"
-                style={{
-                  color:
-                    revenue - expenseTotal >= 0
-                      ? "var(--color-brand)"
-                      : "var(--color-danger)",
-                }}
-              >
-                {(revenue - expenseTotal).toLocaleString()}
-              </p>
-              <p className="text-[11px] text-[var(--color-text-muted)] mt-1 leading-tight">
-                淨利率 {revenue > 0 ? (((revenue - expenseTotal) / revenue) * 100).toFixed(1) : "—"}%
-              </p>
-            </MCard>
-            <MCard padding="md">
-              <p className="text-xs sm:text-sm font-semibold text-[var(--color-text-muted)]">
-                結帳天數
-              </p>
-              <p className="text-base sm:text-xl font-bold tabular-nums text-[var(--color-text-primary)] mt-1 whitespace-nowrap">
-                {closedDates.size}
-                <span className="text-sm font-normal text-[var(--color-text-muted)]">
-                  /{range.daysInMonth}
-                </span>
-              </p>
-            </MCard>
-          </div>
-
-          {/* V3.7 §E — Close-status month grid */}
           <CloseStatusGrid
             period={period}
             daysInMonth={range.daysInMonth}
             closedDates={closedDates}
           />
 
-          {/* ④ KPI 2×2 grid */}
-          <div className="grid grid-cols-2 gap-3">
-            <KpiCard
-              label="新客 90 天回訪率"
-              primary={`${data.retention.retention90Days.toFixed(1)}%`}
-              status={statusForRetention(data.retention.retention90Days)}
-              benchmark={{
-                current: data.retention.retention90Days,
-                tiers: [
-                  { at: 40, label: "業界 40%" },
-                  { at: 65, label: "頂尖 65%" },
-                ],
-              }}
-            />
-            <KpiCard
-              label="離店再預約率"
-              primary={`${data.prebook.rate.toFixed(1)}%`}
-              secondary={`${data.prebook.prebookCount}/${data.prebook.completedCount} 筆`}
-              deltaPct={
-                data.prebookPrev.rate > 0
-                  ? Math.round((data.prebook.rate - data.prebookPrev.rate) * 10) / 10
-                  : null
-              }
-              comparisonLabel="上月"
-              status={statusForPrebook(data.prebook.rate)}
-              benchmark={{
-                current: data.prebook.rate,
-                tiers: [
-                  { at: 50, label: "警戒 50%" },
-                  { at: 70, label: "目標 70%" },
-                ],
-              }}
-            />
-            <KpiCard
-              label="月活躍客戶數"
-              primary={`${customers} 人`}
-              secondary={`新客 ${t.newCustomers} · 老客 ${customers - t.newCustomers}`}
-              deltaPct={
-                data.previousTotals.uniqueCustomers > 0
-                  ? Math.round(
-                      ((customers - data.previousTotals.uniqueCustomers) /
-                        data.previousTotals.uniqueCustomers) *
-                        1000,
-                    ) / 10
-                  : null
-              }
-              comparisonLabel={data.previousLabel}
-              status={statusForActive(customers)}
-            />
-            <KpiCard
-              label="染燙服務佔比"
-              primary={`${data.chemicalShare.toFixed(1)}%`}
-              deltaPct={
-                data.chemicalShareLastMonth > 0
-                  ? Math.round((data.chemicalShare - data.chemicalShareLastMonth) * 10) / 10
-                  : null
-              }
-              comparisonLabel="上月"
-              status={statusForChemical(data.chemicalShare)}
-              benchmark={{
-                current: data.chemicalShare,
-                tiers: [
-                  { at: 35, label: "目標 40%" },
-                  { at: 60, label: "頂尖 60%" },
-                ],
-              }}
-            />
-          </div>
-
-          {/* ⑤ 12 個月與去年同期對照 */}
           <SectionDivider
             number="01"
             title="過去 12 個月 vs 去年同期"
-            subtitle="點任一月份柱狀，看詳細數字 + 同期比"
+            subtitle="用同一套歷史預約資料計算；不是手填示意數字"
           >
             <MCard padding="md">
               <YoYBars
@@ -369,21 +219,35 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
             </MCard>
           </SectionDivider>
 
-          {/* ⑥ 服務組合 — V3.10 redesign：donut + 對比表（reference 業界 SaaS
-               ：Phorest / GlossGenius / Fresha 都用相同 hero pattern） */}
-          <SectionDivider number="02" title="服務組合佔營收" subtitle="各服務類別貢獻比例 + 客單均價 + vs 上月">
+          <SectionDivider number="02" title="服務組合與升級機會" subtitle="染燙營收、單數佔比與客戶長期價值">
             <ServiceMixWidget
               pie={data.servicePie}
               prevPie={data.prevServicePie ?? []}
               chemicalShare={data.chemicalShare}
               chemicalShareLast={data.chemicalShareLastMonth}
               totalRevenue={revenue}
+              serviceLtv={data.diagnostics.serviceLtv}
             />
           </SectionDivider>
 
-          {/* ⑦ 客戶結構（RFM） */}
+          <SectionDivider number="03" title="回訪轉換漏斗" subtitle={`${data.diagnostics.history.monthCount} 個月歷史顧客的第 1 到第 5 次回訪`}>
+            <FunnelWidget diagnostics={data.diagnostics} />
+          </SectionDivider>
+
+          <SectionDivider number="04" title="客戶集中度" subtitle="80/20 法則：先守住高價值熟客">
+            <ParetoWidget diagnostics={data.diagnostics} />
+          </SectionDivider>
+
+          <SectionDivider number="05" title="回訪間隔" subtitle="剪 / 染 / 燙依歷史實際間隔計算">
+            <ReturnIntervalsWidget diagnostics={data.diagnostics} />
+          </SectionDivider>
+
+          <SectionDivider number="06" title="本月待行動名單" subtitle="自動偵測鐵粉預警與沉睡客戶">
+            <ActionCustomersWidget diagnostics={data.diagnostics} />
+          </SectionDivider>
+
           <SectionDivider
-            number="03"
+            number="07"
             title="客戶結構（RFM 分群）"
             subtitle="按 Recency / Frequency / Monetary 三維分類"
             collapsible
@@ -395,7 +259,8 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
             </MCard>
           </SectionDivider>
 
-          {/* ⑧ Action footer */}
+          <NextActionsWidget data={data} />
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button
               onClick={() => window.print()}
@@ -412,6 +277,631 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
 }
 
 // ─── Sub-widgets ─────────────────────────────────────────────────────────
+
+function MonthlyExecutiveSummary({
+  data,
+  revenue,
+  customers,
+  ticket,
+}: {
+  data: MonthlyResponse;
+  revenue: number;
+  customers: number;
+  ticket: number;
+}) {
+  const retentionDanger = data.retention.retention90Days < 40;
+  const chemicalCountShare = serviceCountShare(data.servicePie, ["染", "燙", "漂"]);
+  const headline = retentionDanger
+    ? "新客第二次回訪，是本月最大破口"
+    : data.momChangePct !== null && data.momChangePct < 0
+      ? "營收回落，先看客量與染燙結構"
+      : "本月體質穩定，下一步拉高回訪密度";
+
+  return (
+    <MCard padding="lg" className="overflow-hidden">
+      <div className="flex flex-col gap-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <MTag tone="brand" size="sm">{data.range.label}月報</MTag>
+              <MTag tone="info" size="sm">
+                {data.diagnostics.history.monthCount} 個月 · {data.diagnostics.history.bookingCount.toLocaleString()} 筆歷史
+              </MTag>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold leading-tight text-[var(--color-text-primary)]">
+              {headline}
+            </h2>
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-[var(--color-brand)] text-[var(--color-bg)] p-4">
+          <p className="text-xs font-semibold opacity-70">本月總營收</p>
+          <div className="flex items-end justify-between gap-3 mt-1">
+            <p className="text-4xl font-bold tabular-nums leading-none whitespace-nowrap">
+              {revenue.toLocaleString()}
+            </p>
+            <div className="flex flex-col items-end gap-1 text-xs">
+              {data.momChangePct !== null && <DeltaPill value={data.momChangePct} label="上月" inverse />}
+              {data.yoyChangePct !== null && <DeltaPill value={data.yoyChangePct} label="去年" inverse />}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <HeroMiniStat label="單數" value={data.totals.bookings.toLocaleString()} />
+          <HeroMiniStat label="月活客戶" value={`${customers}`} suffix="人" />
+          <HeroMiniStat label="客單價" value={ticket.toLocaleString()} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <HeroMiniStat label="染燙營收佔比" value={`${data.chemicalShare.toFixed(1)}%`} tone={statusForChemical(data.chemicalShare)} />
+          <HeroMiniStat label="染燙單數佔比" value={`${chemicalCountShare.toFixed(1)}%`} tone={chemicalCountShare >= 18 ? "ok" : chemicalCountShare >= 15 ? "warning" : "danger"} />
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold text-[var(--color-text-muted)] mb-1.5">過去 12 月走勢</p>
+          <Sparkline points={data.sparkline.map((s) => ({
+            label: s.label,
+            value: s.revenue,
+            isCurrent: s.isCurrent,
+            isPeak: s.isPeak,
+            isTrough: s.isTrough,
+          }))} />
+        </div>
+
+        {data.target.targetRevenue !== null && (
+          <div className="pt-4 border-t border-[var(--color-brand)]/8">
+            <div className="flex items-baseline justify-between gap-3 mb-1.5">
+              <p className="text-sm font-semibold text-[var(--color-text-primary)]">本月目標達成率</p>
+              <p className="text-base font-bold tabular-nums text-[var(--color-brand)] whitespace-nowrap">
+                {data.target.achievementRate.toFixed(1)}%
+              </p>
+            </div>
+            <ProgressBar
+              value={data.target.achievementRate}
+              benchmark={data.target.paceExpectedRate}
+              rightLabel={`目標 ${data.target.targetRevenue.toLocaleString()} · 進度線 ${data.target.paceExpectedRate.toFixed(0)}%`}
+              tone={data.target.achievementRate >= data.target.paceExpectedRate ? "success" : "warning"}
+            />
+          </div>
+        )}
+
+        <p
+          className="text-sm text-[var(--color-text-body)] leading-relaxed pt-4 border-t border-[var(--color-brand)]/8"
+          dangerouslySetInnerHTML={{ __html: renderMarkdownBold(data.summaryText) }}
+        />
+      </div>
+    </MCard>
+  );
+}
+
+function HeroMiniStat({
+  label,
+  value,
+  suffix,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  suffix?: string;
+  tone?: "ok" | "warning" | "danger" | "neutral";
+}) {
+  const toneClass = {
+    ok: "text-[var(--color-success)]",
+    warning: "text-[var(--color-warning)]",
+    danger: "text-[var(--color-danger)]",
+    neutral: "text-[var(--color-text-primary)]",
+  }[tone];
+  return (
+    <div className="rounded-lg bg-[var(--color-surface)] px-3 py-2 min-w-0">
+      <p className="text-xs font-semibold text-[var(--color-text-muted)]">{label}</p>
+      <p className={`mt-1 text-xl font-bold tabular-nums leading-none whitespace-nowrap ${toneClass}`}>
+        {value}
+        {suffix && <span className="ml-0.5 text-xs font-medium text-[var(--color-text-muted)]">{suffix}</span>}
+      </p>
+    </div>
+  );
+}
+
+function SignalGrid({ data }: { data: MonthlyResponse }) {
+  const chemicalCountShare = serviceCountShare(data.servicePie, ["染", "燙", "漂"]);
+  const signals = [
+    {
+      label: "離店再預約率",
+      value: `${data.prebook.rate.toFixed(1)}%`,
+      note: `${data.prebook.prebookCount}/${data.prebook.completedCount} 筆 · 目標 50%+`,
+      status: statusForPrebook(data.prebook.rate),
+      icon: CalendarPlus,
+    },
+    {
+      label: "新客 90 天回訪",
+      value: `${data.retention.retention90Days.toFixed(1)}%`,
+      note: "低於 40% 就要補第二次預約腳本",
+      status: statusForRetention(data.retention.retention90Days),
+      icon: Repeat2,
+    },
+    {
+      label: "染燙單數佔比",
+      value: `${chemicalCountShare.toFixed(1)}%`,
+      note: "看進門客人是否被升級",
+      status: chemicalCountShare >= 18 ? "ok" : chemicalCountShare >= 15 ? "warning" : "danger",
+      icon: Sparkles,
+    },
+    {
+      label: "鐵粉預警",
+      value: `${data.diagnostics.fansAtRisk.length}`,
+      note: "超過個人習慣間隔 1.5 倍",
+      status: data.diagnostics.fansAtRisk.length === 0 ? "ok" : data.diagnostics.fansAtRisk.length <= 3 ? "warning" : "danger",
+      icon: Users,
+    },
+  ] as const;
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {signals.map((s) => {
+        const Icon = s.icon;
+        return (
+          <MCard key={s.label} padding="md" leftBand={statusBand(s.status)}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-[var(--color-text-muted)]">{s.label}</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-[var(--color-text-primary)] whitespace-nowrap">
+                  {s.value}
+                </p>
+              </div>
+              <Icon size={18} className="shrink-0 text-[var(--color-brand)]/70" aria-hidden />
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <StatusTag status={s.status} />
+            </div>
+            <p className="mt-2 text-[11px] leading-snug text-[var(--color-text-muted)]">{s.note}</p>
+          </MCard>
+        );
+      })}
+    </div>
+  );
+}
+
+function ComparisonTable({ data }: { data: MonthlyResponse }) {
+  const rows = [
+    {
+      label: "總營收",
+      now: data.totals.revenue,
+      prev: data.previousTotals.revenue,
+      yoy: data.yoyChangePct,
+      format: formatMoney,
+    },
+    {
+      label: "總單數",
+      now: data.totals.bookings,
+      prev: data.previousTotals.bookings,
+      format: (n: number) => n.toLocaleString(),
+    },
+    {
+      label: "客單價",
+      now: data.totals.arpu,
+      prev: data.previousTotals.arpu,
+      yoy: null,
+      format: formatMoney,
+    },
+    {
+      label: "月活客戶",
+      now: data.totals.uniqueCustomers,
+      prev: data.previousTotals.uniqueCustomers,
+      yoy: null,
+      format: (n: number) => n.toLocaleString(),
+    },
+    {
+      label: "新客數",
+      now: data.totals.newCustomers,
+      prev: data.previousTotals.newCustomers,
+      yoy: null,
+      format: (n: number) => n.toLocaleString(),
+    },
+    {
+      label: "染燙營收%",
+      now: data.chemicalShare,
+      prev: data.chemicalShareLastMonth,
+      yoy: null,
+      format: (n: number) => `${n.toFixed(1)}%`,
+      deltaIsPp: true,
+    },
+  ];
+
+  return (
+    <MCard padding="md">
+      <div className="flex items-baseline justify-between gap-3 mb-3">
+        <div>
+          <h3 className="text-base font-bold text-[var(--color-text-primary)]">同期比較</h3>
+          <p className="text-xs text-[var(--color-text-muted)]">本月、上月與去年同月的差異</p>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[360px] text-xs">
+          <thead>
+            <tr className="border-b border-[var(--color-brand)]/10 text-[var(--color-text-muted)]">
+              <th className="py-2 text-left font-semibold">指標</th>
+              <th className="py-2 text-right font-semibold">本月</th>
+              <th className="py-2 text-right font-semibold">{data.previousLabel}</th>
+              <th className="py-2 text-right font-semibold">變化</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const delta = r.prev > 0
+                ? r.deltaIsPp
+                  ? r.now - r.prev
+                  : ((r.now - r.prev) / r.prev) * 100
+                : null;
+              return (
+                <tr key={r.label} className="border-b border-[var(--color-brand)]/5 last:border-0">
+                  <td className="py-2.5 font-semibold text-[var(--color-text-primary)] whitespace-nowrap">{r.label}</td>
+                  <td className="py-2.5 text-right tabular-nums whitespace-nowrap">{r.format(r.now)}</td>
+                  <td className="py-2.5 text-right tabular-nums text-[var(--color-text-muted)] whitespace-nowrap">{r.format(r.prev)}</td>
+                  <td className="py-2.5 text-right tabular-nums whitespace-nowrap">
+                    {delta === null ? "—" : <DeltaText value={delta} suffix={r.deltaIsPp ? "pp" : "%"} />}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </MCard>
+  );
+}
+
+function MonthlyMoneyStrip({
+  revenue,
+  expenseTotal,
+  expenseFixed,
+  expenseVariable,
+  closedCount,
+  daysInMonth,
+}: {
+  revenue: number;
+  expenseTotal: number;
+  expenseFixed: number;
+  expenseVariable: number;
+  closedCount: number;
+  daysInMonth: number;
+}) {
+  const profit = revenue - expenseTotal;
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <MCard padding="md" className="min-w-0">
+        <p className="text-xs font-semibold text-[var(--color-text-muted)]">本月支出</p>
+        <p className="mt-1 text-base sm:text-xl font-bold tabular-nums text-[var(--color-danger)] whitespace-nowrap">
+          -{expenseTotal.toLocaleString()}
+        </p>
+        <p className="mt-1 text-[11px] leading-tight text-[var(--color-text-muted)] tabular-nums">
+          固定 {expenseFixed.toLocaleString()}
+          <br />
+          變動 {expenseVariable.toLocaleString()}
+        </p>
+      </MCard>
+      <MCard padding="md" className="min-w-0">
+        <p className="text-xs font-semibold text-[var(--color-text-muted)]">本月淨利</p>
+        <p
+          className="mt-1 text-base sm:text-xl font-bold tabular-nums whitespace-nowrap"
+          style={{ color: profit >= 0 ? "var(--color-brand)" : "var(--color-danger)" }}
+        >
+          {profit.toLocaleString()}
+        </p>
+        <p className="mt-1 text-[11px] leading-tight text-[var(--color-text-muted)]">
+          淨利率 {revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : "—"}%
+        </p>
+      </MCard>
+      <MCard padding="md" className="min-w-0">
+        <p className="text-xs font-semibold text-[var(--color-text-muted)]">結帳天數</p>
+        <p className="mt-1 text-base sm:text-xl font-bold tabular-nums text-[var(--color-text-primary)] whitespace-nowrap">
+          {closedCount}
+          <span className="text-sm font-normal text-[var(--color-text-muted)]">/{daysInMonth}</span>
+        </p>
+      </MCard>
+    </div>
+  );
+}
+
+function FunnelWidget({ diagnostics }: { diagnostics: MonthlyDiagnostics }) {
+  const maxRate = Math.max(100, ...diagnostics.funnel.map((s) => s.rate));
+  return (
+    <MCard padding="md">
+      <div className="flex items-start gap-3 rounded-lg bg-[var(--color-surface)] p-3 mb-4">
+        <Repeat2 size={18} className="mt-0.5 shrink-0 text-[var(--color-brand)]" aria-hidden />
+        <p className="text-sm leading-relaxed text-[var(--color-text-body)]">
+          第二次回訪是關鍵。只要客人跨過第 2 次，後面的第 3、4、5 次通常會自然變穩。
+        </p>
+      </div>
+      <div className="space-y-3">
+        {diagnostics.funnel.map((step, idx) => {
+          const danger = idx === 0 && step.rate < 45;
+          const tone = danger ? "danger" : step.rate >= 70 ? "ok" : "warning";
+          return (
+            <div key={`${step.fromVisit}-${step.toVisit}`}>
+              <div className="flex items-baseline justify-between gap-3 mb-1">
+                <p className="text-sm font-bold text-[var(--color-text-primary)]">
+                  第 {step.fromVisit} 次 <span className="text-[var(--color-text-muted)]">→</span> 第 {step.toVisit} 次
+                  {danger && <span className="ml-2 text-[10px] font-bold text-[var(--color-danger)] whitespace-nowrap">最大破口</span>}
+                </p>
+                <p className="text-base font-bold tabular-nums whitespace-nowrap" style={{ color: statusBand(tone) }}>
+                  {step.rate.toFixed(1)}%
+                </p>
+              </div>
+              <div className="h-6 rounded-md bg-[var(--color-surface)] overflow-hidden">
+                <div
+                  className="h-full rounded-md flex items-center px-2 text-[11px] font-semibold tabular-nums text-[var(--color-bg)] whitespace-nowrap"
+                  style={{
+                    width: `${Math.max(8, (step.rate / maxRate) * 100)}%`,
+                    background: statusBand(tone),
+                  }}
+                >
+                  {step.toCount}/{step.fromCount}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-4 rounded-lg border-l-[3px] border-[var(--color-brand)] bg-[var(--color-brand)]/8 px-3 py-2 text-xs leading-relaxed text-[var(--color-text-body)]">
+        每多救回 10 位新客的第二次回訪，後續通常會再沉澱成一批穩定熟客。下月策略應優先放在「第一次離店前先約下一次」。
+      </p>
+    </MCard>
+  );
+}
+
+function ParetoWidget({ diagnostics }: { diagnostics: MonthlyDiagnostics }) {
+  const top10 = diagnostics.pareto.find((p) => p.key === "top10");
+  return (
+    <MCard padding="md">
+      <div className="mb-4">
+        <p className="text-sm text-[var(--color-text-muted)]">歷史累計營收集中度</p>
+        <h3 className="mt-1 text-xl font-bold leading-tight text-[var(--color-text-primary)]">
+          {top10?.customerCount ?? 0} 位核心客戶，撐起 {top10?.revenueShare.toFixed(1) ?? "0.0"}% 營收
+        </h3>
+      </div>
+      <div className="space-y-3">
+        {diagnostics.pareto.map((tier) => (
+          <div key={tier.key}>
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                {tier.label}
+                <span className="ml-1 text-xs font-normal text-[var(--color-text-muted)] whitespace-nowrap">
+                  {tier.customerCount} 人
+                </span>
+              </p>
+              <p className="text-base font-bold tabular-nums text-[var(--color-brand)] whitespace-nowrap">
+                {tier.revenueShare.toFixed(1)}%
+              </p>
+            </div>
+            <div className="h-2 rounded-full bg-[var(--color-surface)] overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${Math.min(100, tier.revenueShare)}%`,
+                  background: tier.key === "rest80" ? "var(--color-text-muted)" : "var(--color-brand)",
+                  opacity: tier.key === "rest80" ? 0.45 : 0.9,
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 rounded-lg bg-[var(--color-danger)]/8 border-l-[3px] border-[var(--color-danger)] px-3 py-2 text-xs leading-relaxed text-[var(--color-text-body)]">
+        鐵粉預警不是 CRM 裝飾，是最高 ROI 的防守動作。失去一位高頻高消費客戶，通常要好幾位普通客才補得回來。
+      </p>
+    </MCard>
+  );
+}
+
+function ReturnIntervalsWidget({ diagnostics }: { diagnostics: MonthlyDiagnostics }) {
+  const iconByCat = {
+    剪: Scissors,
+    染: Sparkles,
+    燙: Sparkles,
+  } as const;
+  return (
+    <MCard padding="md">
+      <div className="space-y-4">
+        {diagnostics.intervals.map((item) => {
+          const Icon = iconByCat[item.category];
+          return (
+            <div key={item.category} className="border-b border-[var(--color-brand)]/8 last:border-0 last:pb-0 pb-4">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Icon size={17} className="shrink-0 text-[var(--color-brand)]" aria-hidden />
+                  <p className="text-sm font-bold text-[var(--color-text-primary)]">{serviceFullName(item.category)}</p>
+                  <StatusTag status={item.status} />
+                </div>
+                <p className="text-[11px] text-[var(--color-text-muted)] tabular-nums whitespace-nowrap">
+                  n={item.sampleSize}
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <IntervalStat label="中位" value={item.medianDays ? `${item.medianDays}天` : "—"} tone={item.status} />
+                <IntervalStat label="平均" value={item.avgDays ? `${item.avgDays}天` : "—"} tone={item.avgDays > item.targetDays * 1.5 ? "danger" : item.status} />
+                <IntervalStat label="目標" value={item.targetLabel} tone="neutral" />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-4 text-xs leading-relaxed text-[var(--color-text-muted)]">
+        中位數用來看「典型客人」，平均數用來抓「有人拖很久才回來」的尾端風險。
+      </p>
+    </MCard>
+  );
+}
+
+function IntervalStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "ok" | "warning" | "danger" | "neutral";
+}) {
+  const color = tone === "neutral" ? "var(--color-text-primary)" : statusBand(tone);
+  return (
+    <div className="rounded-lg bg-[var(--color-surface)] px-2 py-2 text-center min-w-0">
+      <p className="text-[11px] font-semibold text-[var(--color-text-muted)]">{label}</p>
+      <p className="mt-1 text-sm font-bold tabular-nums whitespace-nowrap" style={{ color }}>{value}</p>
+    </div>
+  );
+}
+
+function ActionCustomersWidget({ diagnostics }: { diagnostics: MonthlyDiagnostics }) {
+  return (
+    <div className="space-y-3">
+      <MCard padding="md">
+        <ActionListHeader
+          title="鐵粉預警"
+          count={diagnostics.fansAtRisk.length}
+          note="超過個人習慣間隔 1.5 倍"
+          tone="warning"
+        />
+        <CustomerActionRows rows={diagnostics.fansAtRisk} empty="目前沒有需要立即挽回的鐵粉。" primary />
+      </MCard>
+
+      <MCard padding="md">
+        <ActionListHeader
+          title="沉睡名單"
+          count={diagnostics.sleepers.length}
+          note="90-240 天未回訪且曾經回訪過"
+          tone="default"
+        />
+        <CustomerActionRows rows={diagnostics.sleepers} empty="目前沒有符合條件的沉睡客戶。" />
+      </MCard>
+    </div>
+  );
+}
+
+function ActionListHeader({
+  title,
+  count,
+  note,
+  tone,
+}: {
+  title: string;
+  count: number;
+  note: string;
+  tone: "warning" | "default";
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 mb-3">
+      <div>
+        <h3 className="text-base font-bold text-[var(--color-text-primary)]">{title}</h3>
+        <p className="text-xs text-[var(--color-text-muted)]">{note}</p>
+      </div>
+      <MTag tone={tone === "warning" ? "warning" : "default"} size="sm">{count} 人</MTag>
+    </div>
+  );
+}
+
+function CustomerActionRows({
+  rows,
+  empty,
+  primary = false,
+}: {
+  rows: MonthlyDiagnostics["fansAtRisk"];
+  empty: string;
+  primary?: boolean;
+}) {
+  if (rows.length === 0) {
+    return <p className="rounded-lg bg-[var(--color-surface)] p-3 text-sm text-[var(--color-text-muted)]">{empty}</p>;
+  }
+  return (
+    <div className="divide-y divide-[var(--color-brand)]/8">
+      {rows.map((row) => (
+        <div key={row.id} className="py-3 first:pt-0 last:pb-0 grid grid-cols-[34px_1fr_auto] items-center gap-3">
+          <div
+            className="w-[34px] h-[34px] rounded-full flex items-center justify-center text-sm font-bold"
+            style={{
+              background: primary ? "var(--color-danger)" : "var(--color-surface)",
+              color: primary ? "var(--color-bg)" : "var(--color-brand)",
+            }}
+          >
+            {row.initial}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-[var(--color-text-primary)] truncate">{row.displayName}</p>
+            <p className="text-[11px] leading-snug text-[var(--color-text-muted)] tabular-nums">
+              習慣 {row.expectedIntervalDays} 天回 · 已 {row.daysSinceVisit} 天未回 · 年消費 {row.annualSpend.toLocaleString()}
+            </p>
+          </div>
+          <button className="inline-flex items-center gap-1 rounded-md bg-[var(--color-brand)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-bg)] whitespace-nowrap">
+            <MessageCircle size={13} aria-hidden />
+            LINE
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function NextActionsWidget({ data }: { data: MonthlyResponse }) {
+  const fanCount = data.diagnostics.fansAtRisk.length;
+  const firstFunnel = data.diagnostics.funnel[0];
+  const hasChemicalGap = data.chemicalShare < 35;
+  const actions = [
+    {
+      priority: 1,
+      title: fanCount > 0 ? `立刻 LINE ${fanCount} 位鐵粉預警` : "本週檢查鐵粉名單",
+      due: "本週",
+      desc: fanCount > 0
+        ? "先處理已超過個人習慣間隔的高價值客戶。這比群發折扣更精準。"
+        : "目前沒有紅色鐵粉預警，但仍建議每週固定掃一次高價值客戶回訪狀態。",
+      icon: MessageCircle,
+      tone: "danger" as const,
+    },
+    {
+      priority: 2,
+      title: "啟動 Pre-book 結帳腳本",
+      due: "下週起",
+      desc: `目前第 1→2 次轉換 ${firstFunnel?.rate.toFixed(1) ?? "—"}%。離店前直接幫客人卡下一次，比事後召回更有效。`,
+      icon: CalendarPlus,
+      tone: "warning" as const,
+    },
+    {
+      priority: 3,
+      title: hasChemicalGap ? "設計染後補色 / 護髮回訪券" : "維持染燙升級節奏",
+      due: "月底前",
+      desc: hasChemicalGap
+        ? `染燙營收佔比 ${data.chemicalShare.toFixed(1)}%，距 35% 健康線還有 ${(35 - data.chemicalShare).toFixed(1)}pp。`
+        : "染燙佔比已接近健康線，接下來重點是穩定回訪而不是盲目折扣。",
+      icon: Target,
+      tone: "default" as const,
+    },
+  ];
+
+  return (
+    <MCard padding="lg" className="bg-[var(--color-brand)] text-[var(--color-bg)] border-[var(--color-brand)]">
+      <div className="mb-4">
+        <h3 className="text-xl font-bold">下月該做的 3 件事</h3>
+        <p className="mt-1 text-sm opacity-70">按預估 ROI 排序</p>
+      </div>
+      <div className="space-y-3">
+        {actions.map((action) => (
+          <div key={action.priority} className="rounded-lg bg-[var(--color-bg)]/8 border border-[var(--color-bg)]/12 p-3">
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 rounded-full bg-[var(--color-bg)] text-[var(--color-brand)] flex items-center justify-center text-sm font-bold tabular-nums shrink-0">
+                {action.priority}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold leading-snug">{action.title}</p>
+              </div>
+              <span className="rounded-md bg-[var(--color-bg)]/10 px-2 py-1 text-[10px] font-semibold opacity-80 whitespace-nowrap">
+                {action.due}
+              </span>
+            </div>
+            <p className="mt-2 pl-10 text-xs leading-relaxed opacity-75">{action.desc}</p>
+          </div>
+        ))}
+      </div>
+    </MCard>
+  );
+}
 
 /**
  * V3.10 ServiceMix redesign — donut + comparison table.
@@ -432,13 +922,13 @@ export function MonthlyView({ period, onPeriodChange }: MonthlyViewProps) {
  *   4. 染燙 actionable banner 保留 — 還是最重要的一句話。
  */
 const SERVICE_COLOR: Record<string, string> = {
-  剪: "#0F6E56", // brand 綠（最常被點選的服務）
-  染: "#7E22CE", // 紫（化學服務）
-  燙: "#BA7517", // 棕
-  漂: "#A32D2D", // 紅（高難度）
-  護: "#1D9E75", // 薄荷綠
+  剪: "#003D2B",
+  染: "#4A7C59",
+  燙: "#C88B3B",
+  漂: "#A84A3B",
+  護: "#6B8F71",
 };
-const FALLBACK_COLOR = "#5B6770"; // 灰 — 「其他」未知類別
+const FALLBACK_COLOR = "#5B6770";
 
 function colourFor(category: string): string {
   return SERVICE_COLOR[category] ?? FALLBACK_COLOR;
@@ -461,6 +951,7 @@ const ServiceMixWidget = memo(function ServiceMixWidget({
   chemicalShare,
   chemicalShareLast,
   totalRevenue,
+  serviceLtv,
 }: {
   pie: Array<{ category: string; count: number; revenue: number }>;
   /** Optional：舊 PWA / CDN cache 的 v1 response 沒這個欄位 */
@@ -468,6 +959,7 @@ const ServiceMixWidget = memo(function ServiceMixWidget({
   chemicalShare: number;
   chemicalShareLast: number;
   totalRevenue: number;
+  serviceLtv: MonthlyDiagnostics["serviceLtv"];
 }) {
   // V3.8 perf: useMemo so unrelated re-renders (expenses/closes useSWR
   // resolving at different ms) don't re-sort/re-reduce.
@@ -590,9 +1082,60 @@ const ServiceMixWidget = memo(function ServiceMixWidget({
           </p>
         </div>
       )}
+
+      <div className="mt-4 rounded-lg bg-[var(--color-surface)] p-3">
+        <div className="flex items-center gap-2 mb-3">
+          <Coins size={16} className="text-[var(--color-brand)]" aria-hidden />
+          <p className="text-sm font-bold text-[var(--color-text-primary)]">染燙客 vs 純剪客長期價值</p>
+        </div>
+        <div className="space-y-2">
+          <LtvBar
+            label={`染燙客 (${serviceLtv.chemicalCustomers})`}
+            value={serviceLtv.chemicalAvgSpend}
+            max={Math.max(serviceLtv.chemicalAvgSpend, serviceLtv.haircutOnlyAvgSpend, 1)}
+            accent="var(--color-brand)"
+          />
+          <LtvBar
+            label={`純剪客 (${serviceLtv.haircutOnlyCustomers})`}
+            value={serviceLtv.haircutOnlyAvgSpend}
+            max={Math.max(serviceLtv.chemicalAvgSpend, serviceLtv.haircutOnlyAvgSpend, 1)}
+            accent="var(--color-text-muted)"
+          />
+        </div>
+        <p className="mt-3 text-xs leading-relaxed text-[var(--color-text-muted)]">
+          {serviceLtv.multiplier
+            ? `歷史實算：染燙客平均累計消費約為純剪客 ${serviceLtv.multiplier.toFixed(1)} 倍。`
+            : "目前純剪客樣本不足，暫不計算倍數。"}
+          下月行動不應只追新客，也要把高頻純剪熟客自然升級到染 / 護。
+        </p>
+      </div>
     </MCard>
   );
 });
+
+function LtvBar({
+  label,
+  value,
+  max,
+  accent,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  accent: string;
+}) {
+  return (
+    <div className="grid grid-cols-[92px_1fr_auto] items-center gap-2 text-xs">
+      <span className="font-semibold text-[var(--color-text-muted)] truncate">{label}</span>
+      <div className="h-5 rounded-md bg-[var(--color-bg)] overflow-hidden">
+        <div className="h-full rounded-md" style={{ width: `${Math.max(6, (value / max) * 100)}%`, background: accent }} />
+      </div>
+      <span className="font-bold tabular-nums text-[var(--color-text-primary)] whitespace-nowrap">
+        {value.toLocaleString()}
+      </span>
+    </div>
+  );
+}
 
 /**
  * SVG donut showing service share. Center label = top category + its share.
@@ -896,6 +1439,92 @@ function CloseStatusGrid({
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
+type HealthStatus = "ok" | "warning" | "danger";
+
+function formatMoney(n: number): string {
+  return n.toLocaleString();
+}
+
+function statusBand(status: HealthStatus): string {
+  if (status === "ok") return "var(--color-success)";
+  if (status === "warning") return "var(--color-warning)";
+  return "var(--color-danger)";
+}
+
+function StatusTag({ status }: { status: HealthStatus }) {
+  const label = status === "ok" ? "綠燈" : status === "warning" ? "黃燈" : "紅燈";
+  return (
+    <MTag tone={status === "ok" ? "success" : status === "warning" ? "warning" : "danger"}>
+      {label}
+    </MTag>
+  );
+}
+
+function DeltaText({ value, suffix }: { value: number; suffix: string }) {
+  const positive = value > 0;
+  const neutral = value === 0;
+  return (
+    <span
+      className={
+        neutral
+          ? "text-[var(--color-text-muted)]"
+          : positive
+            ? "text-[var(--color-success)]"
+            : "text-[var(--color-danger)]"
+      }
+    >
+      {positive ? "↑" : value < 0 ? "↓" : "→"} {Math.abs(value).toFixed(1)}
+      {suffix}
+    </span>
+  );
+}
+
+function DeltaPill({
+  value,
+  label,
+  inverse = false,
+}: {
+  value: number;
+  label: string;
+  inverse?: boolean;
+}) {
+  const Icon = value >= 0 ? TrendingUp : TrendingDown;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums whitespace-nowrap ${
+        inverse
+          ? "bg-[var(--color-bg)]/12 text-[var(--color-bg)]"
+          : value >= 0
+            ? "bg-[var(--color-success)]/15 text-[var(--color-success)]"
+            : "bg-[var(--color-danger)]/12 text-[var(--color-danger)]"
+      }`}
+    >
+      <Icon size={12} aria-hidden />
+      {value >= 0 ? "+" : ""}
+      {value.toFixed(1)}% vs {label}
+    </span>
+  );
+}
+
+function serviceCountShare(
+  pie: Array<{ category: string; count: number }>,
+  categories: string[],
+): number {
+  const total = pie.reduce((sum, p) => sum + p.count, 0);
+  if (total === 0) return 0;
+  const count = pie
+    .filter((p) => categories.includes(p.category))
+    .reduce((sum, p) => sum + p.count, 0);
+  return Math.round((count / total) * 1000) / 10;
+}
+
+function serviceFullName(category: string): string {
+  if (category === "剪") return "剪髮";
+  if (category === "染") return "染髮";
+  if (category === "燙") return "燙髮";
+  return category;
+}
+
 function monthLabel(period: string): string {
   const m = parseInt(period.slice(5, 7), 10);
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
@@ -916,12 +1545,6 @@ function statusForRetention(v: number): "ok" | "warning" | "danger" {
 function statusForPrebook(v: number): "ok" | "warning" | "danger" {
   if (v >= 50) return "ok";
   if (v >= 30) return "warning";
-  return "danger";
-}
-
-function statusForActive(v: number): "ok" | "warning" | "danger" {
-  if (v >= 70) return "ok";
-  if (v >= 60) return "warning";
   return "danger";
 }
 

@@ -15,9 +15,43 @@ import { computeRange } from "../time-range";
 const TIMEZONE = "Asia/Taipei";
 const ACTIVE_STATUSES = ["CONFIRMED", "COMPLETED"] as const;
 const PAID_STATUSES = ["COMPLETED"] as const;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function isoDate(d: Date): string {
   return d.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+}
+
+function revenueAmount(b: {
+  service: { price: number };
+  payment: { amount: number; status: string } | null;
+}): number {
+  return b.payment?.amount && b.payment.status === "RECEIVED"
+    ? b.payment.amount
+    : b.service.price;
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? Math.round((sorted[mid - 1] + sorted[mid]) / 2)
+    : sorted[mid];
+}
+
+function avg(values: number[]): number {
+  if (values.length === 0) return 0;
+  return Math.round(values.reduce((sum, n) => sum + n, 0) / values.length);
+}
+
+function serviceCategory(name: string): string {
+  if (name.includes("剪") || name.includes("瀏海")) return "剪";
+  if (name.includes("漂")) return "漂";
+  if (name.includes("補染") || name.includes("染")) return "染";
+  if (name.includes("矯正") || name.includes("燙")) return "燙";
+  if (name.includes("護") || name.includes("頭皮")) return "護";
+  if (name.includes("洗")) return "洗";
+  return "其他";
 }
 
 /**
@@ -772,6 +806,291 @@ export function renderSummary(ctx: NarrativeContext): string {
   };
 
   return `💡 ${headline[narr]}。${causeText[cause]}。**行動建議**：${action}。`;
+}
+
+// ─── Monthly business diagnostics ───────────────────────────────────────
+//
+// These are history-wide metrics for the monthly strategy view. They read the
+// same Booking/User/Payment tables that historical Excel imports populate, so
+// the report reflects the 2024-2026 operating record instead of static mock
+// numbers.
+
+export interface MonthlyFunnelStep {
+  fromVisit: number;
+  toVisit: number;
+  fromCount: number;
+  toCount: number;
+  rate: number;
+}
+
+export interface MonthlyParetoTier {
+  key: "top10" | "top20" | "rest80";
+  label: string;
+  customerCount: number;
+  revenue: number;
+  revenueShare: number;
+}
+
+export interface MonthlyReturnInterval {
+  category: "剪" | "染" | "燙";
+  medianDays: number;
+  avgDays: number;
+  targetDays: number;
+  targetLabel: string;
+  sampleSize: number;
+  status: "ok" | "warning" | "danger";
+}
+
+export interface MonthlyActionCustomer {
+  id: string;
+  displayName: string;
+  initial: string;
+  visitCount: number;
+  annualSpend: number;
+  lastVisit: string;
+  daysSinceVisit: number;
+  expectedIntervalDays: number;
+  riskMultiplier: number;
+}
+
+export interface MonthlyDiagnostics {
+  history: {
+    fromIso: string | null;
+    toIso: string;
+    monthCount: number;
+    bookingCount: number;
+    customerCount: number;
+  };
+  funnel: MonthlyFunnelStep[];
+  pareto: MonthlyParetoTier[];
+  intervals: MonthlyReturnInterval[];
+  fansAtRisk: MonthlyActionCustomer[];
+  sleepers: MonthlyActionCustomer[];
+  serviceLtv: {
+    chemicalCustomers: number;
+    chemicalAvgSpend: number;
+    haircutOnlyCustomers: number;
+    haircutOnlyAvgSpend: number;
+    multiplier: number | null;
+  };
+}
+
+export async function computeMonthlyDiagnostics(
+  tenantId: string,
+  range: TimeRange,
+): Promise<MonthlyDiagnostics> {
+  const bookings = await prisma.booking.findMany({
+    where: {
+      tenantId,
+      date: { lte: range.to },
+      status: { in: [...ACTIVE_STATUSES] },
+    },
+    select: {
+      userId: true,
+      date: true,
+      startTime: true,
+      service: { select: { name: true, price: true } },
+      payment: { select: { amount: true, status: true } },
+      user: {
+        select: {
+          id: true,
+          displayName: true,
+          realName: true,
+        },
+      },
+    },
+    orderBy: [{ date: "asc" }, { startTime: "asc" }],
+  });
+
+  type Visit = { date: Date; category: string; amount: number };
+  type UserAcc = {
+    id: string;
+    displayName: string;
+    visits: Visit[];
+    spend: number;
+    annualSpend: number;
+    categories: Set<string>;
+  };
+
+  const byUser = new Map<string, UserAcc>();
+  const oneYearAgo = new Date(range.to.getTime() - 365 * DAY_MS);
+  let firstDate: Date | null = null;
+
+  for (const b of bookings) {
+    if (!firstDate || b.date.getTime() < firstDate.getTime()) firstDate = b.date;
+    const amount = revenueAmount(b);
+    const category = serviceCategory(b.service.name);
+    const name = b.user?.realName || b.user?.displayName || "未命名顧客";
+    const acc = byUser.get(b.userId) ?? {
+      id: b.user?.id ?? b.userId,
+      displayName: name,
+      visits: [],
+      spend: 0,
+      annualSpend: 0,
+      categories: new Set<string>(),
+    };
+    acc.visits.push({ date: b.date, category, amount });
+    acc.spend += amount;
+    if (b.date.getTime() >= oneYearAgo.getTime()) acc.annualSpend += amount;
+    acc.categories.add(category);
+    byUser.set(b.userId, acc);
+  }
+
+  const users = Array.from(byUser.values()).map((u) => ({
+    ...u,
+    visits: [...u.visits].sort((a, b) => a.date.getTime() - b.date.getTime()),
+  }));
+  const totalRevenue = users.reduce((sum, u) => sum + u.spend, 0);
+
+  const funnel: MonthlyFunnelStep[] = [1, 2, 3, 4].map((fromVisit) => {
+    const fromCount = users.filter((u) => u.visits.length >= fromVisit).length;
+    const toCount = users.filter((u) => u.visits.length >= fromVisit + 1).length;
+    return {
+      fromVisit,
+      toVisit: fromVisit + 1,
+      fromCount,
+      toCount,
+      rate: fromCount > 0 ? Math.round((toCount / fromCount) * 1000) / 10 : 0,
+    };
+  });
+
+  const sortedBySpend = [...users].sort((a, b) => b.spend - a.spend);
+  const top10Count = sortedBySpend.length > 0 ? Math.max(1, Math.ceil(sortedBySpend.length * 0.1)) : 0;
+  const top20Count = sortedBySpend.length > 0 ? Math.max(top10Count, Math.ceil(sortedBySpend.length * 0.2)) : 0;
+  const tierRevenue = (slice: UserAcc[]) => slice.reduce((sum, u) => sum + u.spend, 0);
+  const buildTier = (
+    key: MonthlyParetoTier["key"],
+    label: string,
+    slice: UserAcc[],
+  ): MonthlyParetoTier => {
+    const revenue = tierRevenue(slice);
+    return {
+      key,
+      label,
+      customerCount: slice.length,
+      revenue,
+      revenueShare: totalRevenue > 0 ? Math.round((revenue / totalRevenue) * 1000) / 10 : 0,
+    };
+  };
+  const pareto: MonthlyParetoTier[] = [
+    buildTier("top10", "前 10% 鐵粉", sortedBySpend.slice(0, top10Count)),
+    buildTier("top20", "前 20% 熟客主力", sortedBySpend.slice(0, top20Count)),
+    buildTier("rest80", "後 80% 普通客", sortedBySpend.slice(top20Count)),
+  ];
+
+  const intervalTargets: Array<{ category: "剪" | "染" | "燙"; targetDays: number; targetLabel: string }> = [
+    { category: "剪", targetDays: 50, targetLabel: "50 天" },
+    { category: "染", targetDays: 35, targetLabel: "35 天" },
+    { category: "燙", targetDays: 120, targetLabel: "90-120 天" },
+  ];
+  const intervals: MonthlyReturnInterval[] = intervalTargets.map(({ category, targetDays, targetLabel }) => {
+    const gaps: number[] = [];
+    for (const u of users) {
+      const visits = u.visits.filter((v) => v.category === category);
+      for (let i = 1; i < visits.length; i++) {
+        const gap = Math.round((visits[i].date.getTime() - visits[i - 1].date.getTime()) / DAY_MS);
+        if (gap > 0) gaps.push(gap);
+      }
+    }
+    const medianDays = median(gaps);
+    const avgDays = avg(gaps);
+    const status =
+      medianDays === 0 ? "warning" : medianDays <= targetDays ? "ok" : medianDays <= targetDays * 1.5 ? "warning" : "danger";
+    return {
+      category,
+      medianDays,
+      avgDays,
+      targetDays,
+      targetLabel,
+      sampleSize: gaps.length,
+      status,
+    };
+  });
+
+  const buildActionCustomer = (u: UserAcc): MonthlyActionCustomer | null => {
+    if (u.visits.length === 0) return null;
+    const gaps: number[] = [];
+    for (let i = 1; i < u.visits.length; i++) {
+      const gap = Math.round((u.visits[i].date.getTime() - u.visits[i - 1].date.getTime()) / DAY_MS);
+      if (gap > 0) gaps.push(gap);
+    }
+    const expected = median(gaps) || avg(gaps) || 45;
+    const last = u.visits[u.visits.length - 1].date;
+    const daysSince = Math.max(0, Math.round((range.to.getTime() - last.getTime()) / DAY_MS));
+    const riskMultiplier = expected > 0 ? Math.round((daysSince / expected) * 10) / 10 : 0;
+    const initial = [...u.displayName][0] ?? "?";
+    return {
+      id: u.id,
+      displayName: u.displayName,
+      initial,
+      visitCount: u.visits.length,
+      annualSpend: u.annualSpend,
+      lastVisit: isoDate(last),
+      daysSinceVisit: daysSince,
+      expectedIntervalDays: expected,
+      riskMultiplier,
+    };
+  };
+
+  const topSpendThreshold = sortedBySpend[top10Count - 1]?.spend ?? Number.POSITIVE_INFINITY;
+  const actionRows = users
+    .map(buildActionCustomer)
+    .filter((u): u is MonthlyActionCustomer => Boolean(u));
+  const fansAtRisk = actionRows
+    .filter((u) => {
+      const spend = byUser.get(u.id)?.spend ?? sortedBySpend.find((x) => x.id === u.id)?.spend ?? 0;
+      return u.visitCount >= 4 && spend >= topSpendThreshold && u.riskMultiplier >= 1.5;
+    })
+    .sort((a, b) => b.annualSpend - a.annualSpend || b.riskMultiplier - a.riskMultiplier)
+    .slice(0, 3);
+  const sleepers = actionRows
+    .filter((u) => u.visitCount >= 2 && u.daysSinceVisit >= 90 && u.daysSinceVisit < 240)
+    .sort((a, b) => b.annualSpend - a.annualSpend || b.daysSinceVisit - a.daysSinceVisit)
+    .slice(0, 5);
+
+  const chemicalUsers = users.filter((u) =>
+    ["染", "燙", "漂"].some((cat) => u.categories.has(cat)),
+  );
+  const haircutOnlyUsers = users.filter((u) => u.categories.size === 1 && u.categories.has("剪"));
+  const chemicalAvgSpend = chemicalUsers.length > 0
+    ? Math.round(chemicalUsers.reduce((sum, u) => sum + u.spend, 0) / chemicalUsers.length)
+    : 0;
+  const haircutOnlyAvgSpend = haircutOnlyUsers.length > 0
+    ? Math.round(haircutOnlyUsers.reduce((sum, u) => sum + u.spend, 0) / haircutOnlyUsers.length)
+    : 0;
+
+  const monthCount = firstDate
+    ? Math.max(
+        1,
+        (range.to.getUTCFullYear() - firstDate.getUTCFullYear()) * 12 +
+          (range.to.getUTCMonth() - firstDate.getUTCMonth()) +
+          1,
+      )
+    : 0;
+
+  return {
+    history: {
+      fromIso: firstDate ? isoDate(firstDate) : null,
+      toIso: range.toIso,
+      monthCount,
+      bookingCount: bookings.length,
+      customerCount: users.length,
+    },
+    funnel,
+    pareto,
+    intervals,
+    fansAtRisk,
+    sleepers,
+    serviceLtv: {
+      chemicalCustomers: chemicalUsers.length,
+      chemicalAvgSpend,
+      haircutOnlyCustomers: haircutOnlyUsers.length,
+      haircutOnlyAvgSpend,
+      multiplier: haircutOnlyAvgSpend > 0
+        ? Math.round((chemicalAvgSpend / haircutOnlyAvgSpend) * 10) / 10
+        : null,
+    },
+  };
 }
 
 // ─── Annual scenarios (V3.6 §7.4 修正：保守/持平/進取/自訂) ──────────────

@@ -45,6 +45,7 @@ import {
   computeAlerts,
   computeTrailingMetrics,
   computeMonthlySparkline,
+  computeMonthlyDiagnostics,
   computeAnnualHighlights,
   rangeForMonth,
   rangeForYear,
@@ -90,6 +91,7 @@ const buildMonthlyPayload = unstable_cache(
       trailing,
       prevServicePie,
       yoy12,
+      diagnostics,
     ] = await Promise.all([
       computeTotals(tenantId, range),
       computeTotals(tenantId, prev),
@@ -110,6 +112,7 @@ const buildMonthlyPayload = unstable_cache(
       // ~600ms because both queries hit the same Booking table independently.
       computeServicePie(tenantId, prev),
       computeYoYTrend(tenantId, yearForYoy),
+      computeMonthlyDiagnostics(tenantId, range),
     ]);
 
     const ctx: AlertContext = {
@@ -195,9 +198,10 @@ const buildMonthlyPayload = unstable_cache(
       yoy: yoy12,
       momChangePct,
       yoyChangePct,
+      diagnostics,
     };
   },
-  ["reports-monthly-v2"],
+  ["reports-monthly-v3"],
   { revalidate: CACHE_TTL_SECONDS, tags: ["reports"] },
 );
 
