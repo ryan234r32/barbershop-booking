@@ -50,6 +50,7 @@
     "prisma": "^7.5.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "react-qr-code": "^2.0.21",
     "serwist": "^9.5.7",
     "shadcn": "^4.6.0",
     "swr": "^2.4.1",
