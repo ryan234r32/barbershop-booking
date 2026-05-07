@@ -23,6 +23,7 @@
     "cleanup:dryrun": "npx tsx scripts/clean-test-data.ts",
     "cleanup:execute": "npx tsx scripts/clean-test-data.ts --commit",
     "reports:snapshot": "npx tsx scripts/generate-reports-snapshot.ts",
+    "rich-menu:upload": "npx tsx scripts/upload-rich-menu.ts",
     "prepare": "husky"
   },
   "dependencies": {
