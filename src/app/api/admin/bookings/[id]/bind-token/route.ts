@@ -45,9 +45,18 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
     // OA basic ID（例：@1008hair）— 客人掃 QR 後 LINE 會自動加好友 + 開對話、
     // 預填 token 訊息。沒設 env 則回 fallback 文字版（讓老闆口頭報 token）。
-    const oaBasicId = process.env.LINE_OA_BASIC_ID;
+    //
+    // ⚠️ LINE URL scheme 文件範例用「字面 @」(https://line.me/R/oaMessage/@linedevelopers/?Hi)
+    // 不能把 @ encode 成 %40 — 否則 LINE 會 strip 找不到該帳號顯示「找不到該用戶」。
+    // 我們允許 env 含或不含 @，內部正規化 → 一律 prepend 字面 @。
+    const oaBasicIdRaw = process.env.LINE_OA_BASIC_ID;
+    const oaBasicId = oaBasicIdRaw
+      ? oaBasicIdRaw.startsWith("@")
+        ? oaBasicIdRaw
+        : `@${oaBasicIdRaw}`
+      : null;
     const qrUrl = oaBasicId
-      ? `https://line.me/R/oaMessage/${encodeURIComponent(oaBasicId)}/?${encodeURIComponent(token)}`
+      ? `https://line.me/R/oaMessage/${oaBasicId}/?${encodeURIComponent(token)}`
       : null;
 
     return Response.json({
