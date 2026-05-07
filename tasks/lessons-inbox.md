@@ -176,3 +176,31 @@ work，但 vaul 對 fullscreen 處理沒測完整。
 - expense-entry-sheet.tsx + daily-close-sheet.tsx 加 explicit positioning + width 100vw + transform none
 - 留一個 LIST：未來再加 fullscreen sheet 直接 copy 這個 pattern，**不要**重新發明 inset-0
 
+
+---
+
+## 2026-05-06 · 多 session 平行開動同檔 → stash 衝突
+
+**情境**：昨天（5/5）我在做 docs PR (#93)，同時用戶在另一個 session
+改 `expense-entry-sheet.tsx` + `fullscreen-modal.tsx`。docs PR 流程
+裡我 stash 了用戶的 WIP，commit + push 完之後 `git stash pop` 在
+另一個 branch（`fix/v3.7-modal-no-horizontal-scroll`）上發生衝突 —
+因為那個 branch 對同檔有不同改動。最後 stash@{0} 還在 stack 但
+working tree 是亂的，我手動 restore 才清乾淨。
+
+**根本原因**：多個 session 並行修同一份檔，沒有 worktree 隔離，stash
++ branch hop 會在 pop 時 merge 到「current branch 的版本」而不是
+「stash 起源的 main 的版本」。
+
+**通則候選（升格時討論）**：
+- **永遠**用 `git worktree add` 隔離 parallel sessions（CLAUDE.md
+  已建議過 `.claude/worktrees/`，但實際沒養成習慣）
+- session 開始前先 `git status` 看是否有別人的 WIP，有的話
+  worktree 而不是 stash
+- stash 跨 branch 不安全 → 同 branch 內才 pop
+
+**暫存修法**：碰到衝突時用 `git checkout --theirs <file>` +
+`git restore <file>` 清掉，stash 還在 stack 可重 pop
+
+**待 /triage 升格**：是否要寫進 CLAUDE.md「平行作業」段落、
+或加一個 pre-session script 檢查 WIP
