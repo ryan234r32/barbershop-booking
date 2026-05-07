@@ -19,7 +19,8 @@ export const createBookingSchema = z.object({
   realName: z.string().optional(),
   displayName: z.string().optional(),
   phone: z.string().optional(),
-  birthday: z.string().optional(), // "MM-DD" format
+  birthday: z.string().optional(), // "YYYY-MM-DD" format from LIFF/admin profile gate
+  gender: z.enum(["MALE", "FEMALE", "OTHER", "PREFER_NOT_TO_SAY"]).optional(),
   source: z.enum(["LIFF", "PHONE", "WALK_IN"]).optional(),
 });
 

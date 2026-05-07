@@ -221,12 +221,13 @@ export async function POST(request: NextRequest) {
     //     in the name field overwrites the real customer's displayName.
     if (
       !useExistingCustomer &&
-      (input.realName || input.displayName || input.phone || input.birthday)
+      (input.realName || input.displayName || input.phone || input.birthday || input.gender)
     ) {
       const profileUpdate: Record<string, unknown> = {};
       if (input.realName) profileUpdate.realName = input.realName;
       if (input.displayName) profileUpdate.displayName = input.displayName;
       if (input.phone) profileUpdate.phone = input.phone;
+      if (input.gender) profileUpdate.gender = input.gender;
       if (input.birthday) {
         // birthday comes as "YYYY-MM-DD" from frontend (western year)
         const [year, month, day] = input.birthday.split("-").map(Number);
@@ -294,6 +295,16 @@ export async function POST(request: NextRequest) {
         },
         include: {
           service: true,
+          // Phase 6 P1: include profile-completeness fields so the admin
+          // post-creation "順便補登" prompt can decide whether to fire.
+          user: {
+            select: {
+              id: true,
+              phone: true,
+              gender: true,
+              birthday: true,
+            },
+          },
           // Only safe, client-visible tenant fields — never include lineAccessToken,
           // lineChannelSecret, or bankAccountNumber in API responses.
           tenant: {

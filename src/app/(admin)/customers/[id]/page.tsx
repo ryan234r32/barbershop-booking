@@ -256,6 +256,28 @@ export default function CustomerDetailPage({
         </span>
       </div>
 
+      {/* Phase 6 P2: completeness banner — direct affordance to fill the gap. */}
+      {!editingProfile &&
+        (!customer.phone || !customer.gender || !customer.birthday) && (
+          <button
+            type="button"
+            onClick={() => setEditingProfile(true)}
+            className="w-full mb-3 px-3 py-2.5 rounded-lg bg-[var(--color-warning)]/10 text-[var(--color-warning)] text-xs font-medium flex items-center justify-between"
+          >
+            <span>
+              此顧客缺：
+              {[
+                !customer.phone && "手機",
+                !customer.gender && "性別",
+                !customer.birthday && "生日",
+              ]
+                .filter(Boolean)
+                .join("、")}
+            </span>
+            <span className="font-semibold">點此補登 →</span>
+          </button>
+        )}
+
       {/* Profile Card — 基本資料 */}
       <div className="bg-[var(--color-surface)] rounded-xl p-4 mb-3">
         <div className="flex items-center justify-between mb-2">

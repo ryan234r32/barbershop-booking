@@ -12,11 +12,21 @@ interface Customer {
   displayName: string | null;
   realName: string | null;
   phone: string | null;
+  gender: "MALE" | "FEMALE" | "OTHER" | "PREFER_NOT_TO_SAY" | null;
+  birthday: string | null;
   segment: string;
   isVip: boolean;
   totalVisits: number;
   lastVisitAt: string | null;
   violationCount: number;
+}
+
+function missingFields(c: Pick<Customer, "phone" | "gender" | "birthday">): string[] {
+  const missing: string[] = [];
+  if (!c.phone) missing.push("手機");
+  if (!c.gender) missing.push("性別");
+  if (!c.birthday) missing.push("生日");
+  return missing;
 }
 
 const SEGMENTS = [
@@ -63,6 +73,7 @@ export default function CustomersPage() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [segment, setSegment] = useState("");
+  const [showOnlyIncomplete, setShowOnlyIncomplete] = useState(false);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -73,6 +84,7 @@ export default function CustomersPage() {
   const params = new URLSearchParams();
   if (debouncedSearch) params.set("search", debouncedSearch);
   if (segment) params.set("segment", segment);
+  if (showOnlyIncomplete) params.set("incomplete", "1");
   params.set("page", page.toString());
 
   // keepPreviousData: when search/segment/page changes the SWR key, the previous
@@ -126,6 +138,8 @@ export default function CustomersPage() {
           setSearch={setSearchInput}
           segment={segment}
           setSegment={setSegment}
+          showOnlyIncomplete={showOnlyIncomplete}
+          setShowOnlyIncomplete={setShowOnlyIncomplete}
           page={page}
           setPage={setPage}
           customers={customers}
@@ -142,6 +156,8 @@ interface ListViewProps {
   setSearch: (v: string) => void;
   segment: string;
   setSegment: (v: string) => void;
+  showOnlyIncomplete: boolean;
+  setShowOnlyIncomplete: (v: boolean) => void;
   page: number;
   setPage: (v: number) => void;
   customers: Customer[];
@@ -149,7 +165,7 @@ interface ListViewProps {
   totalPages: number;
 }
 
-function ListView({ search, setSearch, segment, setSegment, page, setPage, customers, isLoading, totalPages }: ListViewProps) {
+function ListView({ search, setSearch, segment, setSegment, showOnlyIncomplete, setShowOnlyIncomplete, page, setPage, customers, isLoading, totalPages }: ListViewProps) {
   return (
     <>
       {/* Search */}
@@ -180,6 +196,21 @@ function ListView({ search, setSearch, segment, setSegment, page, setPage, custo
         ))}
       </div>
 
+      {/* Incomplete-data toggle — Phase 6 P0: surfaces customers missing
+          phone/gender/birthday so admin can fill the gaps in-store. */}
+      <button
+        type="button"
+        onClick={() => { setShowOnlyIncomplete(!showOnlyIncomplete); setPage(1); }}
+        className={`w-full mb-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-2 ${
+          showOnlyIncomplete
+            ? "bg-[var(--color-warning)]/15 text-[var(--color-warning)]"
+            : "bg-[var(--color-surface)] text-[var(--color-text-body)]"
+        }`}
+      >
+        <span className={`w-1.5 h-1.5 rounded-full ${showOnlyIncomplete ? "bg-[var(--color-warning)]" : "bg-[var(--color-text-muted)]"}`} />
+        {showOnlyIncomplete ? "目前只顯示缺資料的顧客（點此關閉）" : "只看缺資料的顧客"}
+      </button>
+
       {/* List */}
       {isLoading ? (
         <div className="py-12 text-center">
@@ -189,33 +220,47 @@ function ListView({ search, setSearch, segment, setSegment, page, setPage, custo
         <p className="py-12 text-center text-sm text-[var(--color-text-muted)]">沒有找到顧客</p>
       ) : (
         <div className="space-y-0.5">
-          {customers.map((c) => (
-            <Link
-              key={c.id}
-              href={`/customers/${c.id}`}
-              className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[var(--color-surface)] transition-colors"
-            >
-              {/* Avatar */}
-              <div className="w-10 h-10 rounded-full bg-[var(--color-surface)] flex items-center justify-center text-sm font-semibold text-[var(--color-brand)] shrink-0">
-                {(c.displayName || c.realName || "?")[0]}
-              </div>
+          {customers.map((c) => {
+            const missing = missingFields(c);
+            return (
+              <Link
+                key={c.id}
+                href={`/customers/${c.id}`}
+                className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[var(--color-surface)] transition-colors"
+              >
+                {/* Avatar */}
+                <div className="relative shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-[var(--color-surface)] flex items-center justify-center text-sm font-semibold text-[var(--color-brand)]">
+                    {(c.displayName || c.realName || "?")[0]}
+                  </div>
+                  {missing.length > 0 && (
+                    <span
+                      className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[var(--color-warning)] border-2 border-[var(--color-bg)]"
+                      title={`缺：${missing.join(" / ")}`}
+                    />
+                  )}
+                </div>
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-semibold text-[var(--color-text-primary)] truncate">
-                  {c.displayName || c.realName || "未知"}
-                </p>
-                <p className="text-xs text-[var(--color-text-muted)]">
-                  {c.totalVisits} 次 · 上次 {relativeTime(c.lastVisitAt)}
-                </p>
-              </div>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[15px] font-semibold text-[var(--color-text-primary)] truncate">
+                    {c.displayName || c.realName || "未知"}
+                  </p>
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    {c.totalVisits} 次 · 上次 {relativeTime(c.lastVisitAt)}
+                    {missing.length > 0 && (
+                      <span className="ml-1 text-[var(--color-warning)]">· 缺 {missing.join("/")}</span>
+                    )}
+                  </p>
+                </div>
 
-              {/* Segment badge */}
-              <span className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-medium tracking-wider ${SEGMENT_STYLE[c.segment] || SEGMENT_STYLE.NEW}`}>
-                {SEGMENT_LABEL[c.segment] || c.segment}
-              </span>
-            </Link>
-          ))}
+                {/* Segment badge */}
+                <span className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-medium tracking-wider ${SEGMENT_STYLE[c.segment] || SEGMENT_STYLE.NEW}`}>
+                  {SEGMENT_LABEL[c.segment] || c.segment}
+                </span>
+              </Link>
+            );
+          })}
         </div>
       )}
 
