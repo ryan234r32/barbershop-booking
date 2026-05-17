@@ -59,9 +59,13 @@ interface BookingForCheckout {
   updatedAt?: string;
   service: { name: string; price: number; slotsNeeded: number };
   user: {
+    /** V3.7 Tier 1.8 — used by 設為熟客 PATCH /api/customers/[id]/discount path */
+    id?: string;
     displayName: string | null;
     /** "manual-..." prefix → walk-in 客人尚未綁 LINE，BANK_TRANSFER 時跳 QR 流程 */
     lineUserId: string;
+    /** V3.7 Tier 1.8 — 熟客自動帶折扣 (NULL = 一般客) */
+    defaultDiscount?: number | null;
   };
 }
 
@@ -101,11 +105,18 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
   const showWalkinOptions = method === "BANK_TRANSFER" && isWalkin;
 
   // Reset on open/close so a previous checkout doesn't leak state.
+  // V3.7 Tier 1.8: 若客戶有 defaultDiscount (熟客)，自動帶入 serviceAmount =
+  // service.price - defaultDiscount → 老闆 1-tap 結帳不用每次調折扣。
   useEffect(() => {
     if (open && booking) {
       setStep("review");
       setMethod("CASH");
-      setServiceAmount("");
+      const discount = booking.user.defaultDiscount;
+      if (typeof discount === "number" && discount > 0) {
+        setServiceAmount(Math.max(0, booking.service.price - discount));
+      } else {
+        setServiceAmount("");
+      }
       setProducts([]);
       setNotes("");
       setLoading(false);
@@ -367,6 +378,17 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
                       );
                     })}
                   </div>
+                  {/* V3.7 Tier 1.8 — 熟客自動帶折扣設定 + 顯示。
+                      熟客身分由「設為熟客」按鈕建立 (折扣金額存 User.defaultDiscount)，
+                      下次該客戶來結帳時自動帶入 serviceAmount = 原價 - defaultDiscount。 */}
+                  {booking.user.id && (
+                    <LoyaltyDiscountControl
+                      userId={booking.user.id}
+                      customerName={booking.user.displayName ?? "客人"}
+                      currentDiscount={booking.user.defaultDiscount ?? null}
+                      servicePrice={booking.service.price}
+                    />
+                  )}
                 </div>
 
                 {/* Products (free text — see ProductLine docstring at top) */}
@@ -683,5 +705,150 @@ function BindLineQrOverlay({
         </button>
       </div>
     </div>
+  );
+}
+
+
+/**
+ * V3.7 Tier 1.8 — 熟客折扣設定 inline UI。
+ *
+ * 兩種狀態：
+ *   - 已是熟客 (currentDiscount > 0): 顯示「熟客 -NN」chip + ✕ 取消按鈕
+ *   - 一般客 (currentDiscount = null): 顯示「設為熟客」button → 點開 inline input → 存
+ *
+ * Side effect: PATCH /api/customers/[id] (defaultDiscount field) → next 結帳 auto-fill。
+ * 不刷新本次 booking 的 serviceAmount (老闆可能已手動調)。
+ */
+function LoyaltyDiscountControl({
+  userId,
+  customerName,
+  currentDiscount,
+  servicePrice,
+}: {
+  userId: string;
+  customerName: string;
+  currentDiscount: number | null;
+  servicePrice: number;
+}) {
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [draftAmount, setDraftAmount] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+  // Optimistic local mirror so the chip flips immediately on save.
+  const [localDiscount, setLocalDiscount] = useState<number | null>(currentDiscount);
+
+  // Re-sync when prop changes (different booking opened).
+  useEffect(() => {
+    setLocalDiscount(currentDiscount);
+    setEditing(false);
+    setDraftAmount("");
+  }, [currentDiscount, userId]);
+
+  const save = async (next: number | null) => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/customers/${userId}`, {
+        method: "PATCH",
+        headers: { ...adminHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ defaultDiscount: next }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      setLocalDiscount(next);
+      setEditing(false);
+      setDraftAmount("");
+      toast({
+        type: "success",
+        message: next === null ? "已取消熟客身分" : `已設為熟客 -${next}`,
+      });
+    } catch (err) {
+      toast({
+        type: "error",
+        message: err instanceof Error ? err.message : "儲存失敗",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // State 1: 已是熟客
+  if (localDiscount !== null && localDiscount > 0 && !editing) {
+    return (
+      <div className="flex items-center gap-2 mt-3 px-3 py-2 rounded-lg bg-[var(--color-success)]/10 border border-[var(--color-success)]/30">
+        <span className="text-sm font-semibold text-[var(--color-success)]">
+          ⭐ 熟客 −NT${localDiscount}
+        </span>
+        <span className="text-[11px] text-[var(--color-text-muted)] flex-1">
+          {customerName} 下次自動帶入
+        </span>
+        <button
+          type="button"
+          onClick={() => save(null)}
+          disabled={saving}
+          className="text-xs font-medium text-[var(--color-text-muted)] hover:text-[var(--color-danger)] disabled:opacity-50"
+          aria-label="取消熟客身分"
+        >
+          取消
+        </button>
+      </div>
+    );
+  }
+
+  // State 2: 編輯中
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 mt-3 px-3 py-2 rounded-lg bg-[var(--color-surface)]/60 border border-[var(--color-brand)]/30">
+        <span className="text-xs text-[var(--color-text-muted)] shrink-0">折扣 NT$</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          autoFocus
+          value={draftAmount}
+          onChange={(e) => setDraftAmount(e.target.value)}
+          placeholder="100"
+          className="flex-1 bg-transparent border-b border-[var(--color-brand)] py-1 text-sm font-semibold text-[var(--color-text-body)] outline-none tabular-nums"
+          aria-label="熟客折扣金額"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            const n = Number(draftAmount);
+            if (!Number.isFinite(n) || n <= 0 || n > servicePrice) {
+              toast({ type: "error", message: `金額須 1-${servicePrice} 之間` });
+              return;
+            }
+            save(Math.floor(n));
+          }}
+          disabled={saving || draftAmount === ""}
+          className="px-3 py-1.5 rounded-md bg-[var(--color-brand)] text-[var(--color-bg)] text-xs font-semibold disabled:opacity-50"
+        >
+          {saving ? "儲存中" : "儲存"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setEditing(false);
+            setDraftAmount("");
+          }}
+          disabled={saving}
+          className="px-2 py-1 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  // State 3: 一般客 — 顯示「設為熟客」button
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="inline-flex items-center gap-1.5 mt-3 min-h-[36px] px-3 rounded-md text-xs font-medium text-[var(--color-text-muted)] hover:text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 transition-colors"
+    >
+      ⭐ 設為熟客（下次自動帶折扣）
+    </button>
   );
 }

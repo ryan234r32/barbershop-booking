@@ -164,7 +164,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const body = await request.json();
 
     // Only allow these fields to be updated
-    const allowed = ["realName", "phone", "email", "gender", "notes", "tags", "isVip", "bookingRestricted", "violationCount", "birthday"];
+    const allowed = ["realName", "phone", "email", "gender", "notes", "tags", "isVip", "bookingRestricted", "violationCount", "birthday", "defaultDiscount"];
     const data: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in body) data[key] = body[key];
@@ -181,6 +181,26 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         data.birthday = null;
         data.birthdayMonth = null;
         data.birthdayDay = null;
+      }
+    }
+
+    // V3.7 Tier 1.8 — 熟客折扣設定自動戳 audit fields。
+    // null → 清除熟客身分；正整數 → 設定/更新折扣金額。
+    if ("defaultDiscount" in body) {
+      const v = body.defaultDiscount;
+      if (v === null || v === 0) {
+        data.defaultDiscount = null;
+        data.discountSetAt = null;
+        data.discountSetBy = null;
+      } else if (typeof v === "number" && v > 0 && v <= 10000) {
+        data.defaultDiscount = Math.floor(v);
+        data.discountSetAt = new Date();
+        data.discountSetBy = admin.adminId;
+      } else {
+        return Response.json(
+          { error: "defaultDiscount 須為 1-10000 的整數或 null" },
+          { status: 400 },
+        );
       }
     }
 

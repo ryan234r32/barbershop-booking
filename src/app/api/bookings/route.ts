@@ -69,7 +69,8 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           service: { select: { name: true, duration: true, price: true, slotsNeeded: true } },
-          user: { select: { id: true, displayName: true, lineUserId: true, phone: true, segment: true, totalVisits: true, notes: true, lastVisitAt: true } },
+          // V3.7 Tier 1.8 — defaultDiscount 加進 list → CheckoutFullPage 開時自動帶熟客折扣
+          user: { select: { id: true, displayName: true, lineUserId: true, phone: true, segment: true, totalVisits: true, notes: true, lastVisitAt: true, defaultDiscount: true } },
           payment: { select: { status: true, method: true, transferLastFive: true } },
         },
         orderBy: [{ date: "asc" }, { startTime: "asc" }],

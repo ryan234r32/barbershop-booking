@@ -30,7 +30,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       where: { id },
       include: {
         service: true,
-        user: { select: { displayName: true, lineUserId: true, phone: true, realName: true } },
+        // V3.7 Tier 1.8 — 加 id + defaultDiscount → CheckoutFullPage 自動帶熟客折扣
+        user: { select: { id: true, displayName: true, lineUserId: true, phone: true, realName: true, defaultDiscount: true } },
         payment: true,
         cancellation: true,
         tenant: {

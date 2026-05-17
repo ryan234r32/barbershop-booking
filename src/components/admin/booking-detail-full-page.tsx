@@ -42,6 +42,9 @@ interface BookingUser {
   totalVisits: number;
   notes: string | null;
   lastVisitAt: string | null;
+  /** V3.7 Tier 1.8 — 熟客自動帶折扣 (NULL = 一般客)。
+   *  CheckoutFullPage 進入時若 > 0，serviceAmount 自動 = price - defaultDiscount。 */
+  defaultDiscount?: number | null;
 }
 
 export interface BookingDetail {
