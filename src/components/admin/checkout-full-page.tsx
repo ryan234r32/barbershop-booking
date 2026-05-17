@@ -305,23 +305,21 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
                 <p className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider mb-2">
                   服務項目
                 </p>
-                <div className="rounded-lg border border-[var(--color-surface)] mb-3">
-                  <div className="flex items-center justify-between px-4 py-3">
+                {/* V3.7 Tier 0.4 (autoplan consensus D-A + D-I + user 5/17):
+                    服務 chip inline 顯示（拿掉 <details> 三角形），
+                    quick-tile 折扣 5 個（-100 / -200 / 9折 / 85折 / 自訂）讓老闆 1-tap 改價，
+                    加購 row button 加大方便濕手點。原 details "調整服務金額" 整段砍掉。 */}
+                <div className="rounded-lg border border-[var(--color-surface)] mb-3 px-4 py-3">
+                  <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-[var(--color-text-primary)]">
                       {booking.service.name}
                     </span>
                     <span className="text-sm font-medium text-[var(--color-text-primary)] tabular-nums">
-                      NT${serviceTotal.toLocaleString()}
+                      原價 NT${booking.service.price.toLocaleString()}
                     </span>
                   </div>
-                </div>
-
-                {/* Service amount override */}
-                <details className="mb-5">
-                  <summary className="text-xs text-[var(--color-text-muted)] cursor-pointer select-none">
-                    調整服務金額（折扣 / 加價）
-                  </summary>
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="flex items-center gap-2 pt-2 border-t border-[var(--color-surface)]/50">
+                    <span className="text-xs text-[var(--color-text-muted)] shrink-0">實收</span>
                     <span className="text-xs text-[var(--color-text-muted)]">NT$</span>
                     <input
                       type="number"
@@ -336,12 +334,44 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
                           if (Number.isFinite(n) && n >= 0) setServiceAmount(Math.floor(n));
                         }
                       }}
-                      className="flex-1 border-b border-[var(--color-brand)] bg-transparent py-1.5 text-sm text-[var(--color-text-body)] outline-none"
+                      className="flex-1 border-b border-[var(--color-brand)] bg-transparent py-2 text-base font-semibold text-[var(--color-text-body)] outline-none tabular-nums"
+                      aria-label="實收金額"
                     />
                   </div>
-                </details>
+                  {/* Quick-tile 折扣（autoplan D-I：5 個常用，1 tap = 改價）*/}
+                  <div className="grid grid-cols-5 gap-1.5 mt-3">
+                    {[
+                      { label: "原價", calc: (p: number) => p },
+                      { label: "-100", calc: (p: number) => Math.max(0, p - 100) },
+                      { label: "-200", calc: (p: number) => Math.max(0, p - 200) },
+                      { label: "9折", calc: (p: number) => Math.round(p * 0.9) },
+                      { label: "85折", calc: (p: number) => Math.round(p * 0.85) },
+                    ].map((tile) => {
+                      const next = tile.calc(booking.service.price);
+                      const active = serviceAmount === next || (tile.label === "原價" && serviceAmount === "");
+                      return (
+                        <button
+                          key={tile.label}
+                          type="button"
+                          onClick={() => setServiceAmount(tile.label === "原價" ? "" : next)}
+                          className={`min-h-[44px] rounded-md text-xs font-semibold tabular-nums transition-colors ${
+                            active
+                              ? "bg-[var(--color-brand)] text-[var(--color-bg)]"
+                              : "bg-[var(--color-surface)] text-[var(--color-text-body)] hover:bg-[var(--color-brand)]/15"
+                          }`}
+                          aria-label={`折扣 ${tile.label}`}
+                          aria-pressed={active}
+                        >
+                          {tile.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
                 {/* Products (free text — see ProductLine docstring at top) */}
+                {/* V3.7 Tier 0.4 (autoplan D-I): 加購 button 從 text-xs 升到 min-h-[44px]
+                    符合 touch target；inline 大按鈕避免老闆濕手摸不到。 */}
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider">
                     加購商品
@@ -349,9 +379,9 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
                   <button
                     type="button"
                     onClick={addProduct}
-                    className="flex items-center gap-1 text-xs text-[var(--color-brand)] hover:opacity-80 transition-opacity"
+                    className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-md bg-[var(--color-brand)]/10 text-[var(--color-brand)] text-sm font-semibold hover:bg-[var(--color-brand)]/20 transition-colors"
                   >
-                    <Plus size={14} />
+                    <Plus size={16} />
                     新增商品
                   </button>
                 </div>
@@ -534,14 +564,17 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
             />
           )}
 
-          {/* Sticky footer with total + primary action */}
+          {/* Sticky footer with total + primary action.
+              V3.7 Tier 0.4 (autoplan consensus D-A): 應付金額 XXL 是老闆現場第一個要看到的，
+              字級 text-3xl + 標籤「應付」加大；按鈕 destructive 改 h-16 (64pt) 符合 D-I 64pt
+              destructive 規範。濕手 + 剪髮中 一 tap 即收。*/}
           <div
             className="px-5 pt-3 border-t border-[var(--color-surface)] bg-[var(--color-bg)] flex-shrink-0"
             style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
           >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-[var(--color-text-muted)]">合計</span>
-              <span className="text-lg font-bold text-[var(--color-text-primary)]">
+            <div className="flex items-baseline justify-between mb-3">
+              <span className="text-sm font-medium text-[var(--color-text-muted)]">應付</span>
+              <span className="text-3xl font-bold text-[var(--color-text-primary)] tabular-nums leading-none">
                 NT${finalAmount.toLocaleString()}
               </span>
             </div>
@@ -551,7 +584,7 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
                 else handleSubmit();
               }}
               disabled={loading}
-              className="w-full py-3 bg-[var(--color-brand)] text-[var(--color-bg)] font-semibold rounded-lg text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="w-full h-16 bg-[var(--color-brand)] text-[var(--color-bg)] font-semibold rounded-lg text-base hover:opacity-90 active:opacity-80 transition-opacity disabled:opacity-50"
             >
               {loading
                 ? "處理中..."

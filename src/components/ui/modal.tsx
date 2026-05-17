@@ -10,11 +10,16 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, children }: ModalProps) {
-  // Lock body scroll when modal is open
+  // Lock body scroll when modal is open. Snapshot-restore (not blank-restore)
+  // so nested modals don't clobber each other's locks — see v3.7 plan Tier 0.1 bug1.
+  // Without this, sequence (FullscreenModal opens → Modal opens → Modal closes
+  // → FullscreenModal closes → restores to "hidden") leaves the page un-scrollable
+  // on iPhone PWA until app is force-quit and reopened.
   useEffect(() => {
     if (isOpen) {
+      const prev = document.body.style.overflow;
       document.body.style.overflow = "hidden";
-      return () => { document.body.style.overflow = ""; };
+      return () => { document.body.style.overflow = prev; };
     }
   }, [isOpen]);
 

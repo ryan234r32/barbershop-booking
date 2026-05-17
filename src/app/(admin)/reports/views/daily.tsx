@@ -56,7 +56,10 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
     fetcher,
     { revalidateOnFocus: false, keepPreviousData: true, dedupingInterval: 3000 },
   );
-  const [filter, setFilter] = useState<"all" | "pending" | "warning">("all");
+  // V3.7 Tier 0.5 (autoplan consensus D-B): default to "pending" so 老闆 20:30
+  // 對帳時直接看到待動作的，不用 hunt through 30 張卡。empty pending → render
+  // friendly success state instead of generic "無資料".
+  const [filter, setFilter] = useState<"all" | "pending" | "warning">("pending");
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [expenseSheetOpen, setExpenseSheetOpen] = useState(false);
   const [closeSheetOpen, setCloseSheetOpen] = useState(false);
@@ -102,9 +105,20 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
   }, [data, optimisticSettled]);
 
   const filteredRows = useMemo(() => {
-    if (filter === "all") return decoratedRows;
-    if (filter === "pending") return decoratedRows.filter((r) => r.settledAt == null);
-    return decoratedRows.filter((r) => r.isWarning);
+    // V3.7 Tier 0.5 (autoplan consensus D-C): 異常排前 — within any filter view,
+    // bubble warnings (already-served-but-unsettled / amount mismatch / missing
+    // last5) above the rest so 老闆 sees what needs action first.
+    const sortWarningsFirst = (rows: DailyBookingRow[]) =>
+      [...rows].sort((a, b) => {
+        const aw = a.isWarning ? 0 : 1;
+        const bw = b.isWarning ? 0 : 1;
+        if (aw !== bw) return aw - bw;
+        return a.startTime.localeCompare(b.startTime);
+      });
+
+    if (filter === "all") return sortWarningsFirst(decoratedRows);
+    if (filter === "pending") return sortWarningsFirst(decoratedRows.filter((r) => r.settledAt == null));
+    return sortWarningsFirst(decoratedRows.filter((r) => r.isWarning));
   }, [decoratedRows, filter]);
 
   // Effective pending count after optimistic toggles
@@ -354,7 +368,19 @@ export function DailyView({ date, onDateChange }: DailyViewProps) {
         </div>
 
         {filteredRows.length === 0 ? (
-          <p className="text-center text-xs text-[var(--color-text-muted)] py-6">無資料</p>
+          /* V3.7 Tier 0.5: friendly empty state — pending filter w/ zero
+             pending = success; warning filter w/ zero = no issues; all = no data */
+          filter === "pending" && d.rows.length > 0 ? (
+            <p className="text-center text-sm font-medium text-[var(--color-success)] py-6">
+              ✅ 今日對帳全部完成
+            </p>
+          ) : filter === "warning" && d.rows.length > 0 ? (
+            <p className="text-center text-sm text-[var(--color-text-muted)] py-6">
+              無異常項目
+            </p>
+          ) : (
+            <p className="text-center text-xs text-[var(--color-text-muted)] py-6">無資料</p>
+          )
         ) : (
           <div className="space-y-1.5">
             {filteredRows.map((r) => (
@@ -878,12 +904,17 @@ function BookingRow({
       ? "warning"
       : "pending";
 
+  // V3.7 Tier 0.5 (autoplan consensus D-B): left color rail for at-a-glance
+  // status. 老闆掃 30 張卡時，眼睛先掃左邊 4px 條看誰需要動作。
+  //   green  = 已對帳（淡背景 + 綠 rail）
+  //   amber  = 異常（警示背景 + 橘 rail，最顯眼）
+  //   brand  = 待對帳（中性背景 + 品牌色 rail）
   const baseBg =
     variant === "confirmed"
-      ? "bg-[var(--color-surface)]/40"
+      ? "bg-[var(--color-surface)]/40 border-l-4 border-l-[var(--color-success)]/60"
       : variant === "warning"
-        ? "bg-[var(--color-warning)]/8 border border-[var(--color-warning)]/25"
-        : "bg-[var(--color-bg)] border border-[var(--color-brand)]/8";
+        ? "bg-[var(--color-warning)]/8 border border-[var(--color-warning)]/25 border-l-4 border-l-[var(--color-warning)]"
+        : "bg-[var(--color-bg)] border border-[var(--color-brand)]/8 border-l-4 border-l-[var(--color-brand)]";
 
   // V3.8: 老闆反映「應該是分現場和轉帳，而不是 LINE」— 拿掉 source badge
   // (LIFF/PHONE/WALK_IN/ADMIN)，只保留 payment method pill (現金/轉帳·12345)。

@@ -195,6 +195,16 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [booking?.id]);
 
+  // Reset sub-state when modal opens or a different booking is selected.
+  // Without this the X button (or programmatic close) leaves subState stuck on
+  // "reschedule"/"notes", so reopening shows the wrong form. See v3.7 plan Tier 0.1 bug2.
+  useEffect(() => {
+    if (open) {
+      setSubState("detail");
+      setNoteText("");
+    }
+  }, [open, booking?.id]);
+
   const view = liveBooking ?? booking;
 
   // Lazy-fetch customer summary (KPIs + recent bookings) only while the sheet
@@ -443,7 +453,7 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
             {/* Header bar with X close */}
             <div className="flex items-center justify-between px-5 pb-2 flex-shrink-0">
               <button
-                onClick={() => onOpenChange(false)}
+                onClick={handleClose}
                 aria-label="關閉"
                 className="w-9 h-9 -ml-2 rounded-full flex items-center justify-center text-[var(--color-text-body)] hover:bg-[var(--color-surface)] transition-colors"
               >
