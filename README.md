@@ -13,16 +13,20 @@
 - 即時儀表板 + 今日時程
 - 行事曆視圖（日/週）
 - 顧客 CRM（自動分群：NEW→REGULAR→VIP→AT_RISK→LAPSED）
-- 營運分析 + 熱力圖 + CSV 匯出
-- 服務項目管理 + 營業時間設定
+- 三視角報表（每日 / 每月 / 每年） + 對帳工作流（color rail + 異常排前）
+- 結帳工作流（quick-tile 折扣 + 加購商品 + 熟客自動帶折扣）
+- 集中支出總覽（月份切換 + 即時搜尋 + 分類 filter）
+- 染/燙/漂諮詢自動引導（LINE 關鍵字 → Flex Message）
+- 服務項目管理 + 營業時間 + 公休提醒（30/60 天內未設月份 banner）
 
 ### 系統功能
-- LINE Bot Webhook（關鍵字回覆 + Quick Reply）
+- LINE Bot Webhook（關鍵字回覆 + Quick Reply + 染燙漂自動諮詢 Flex）
 - Rich Menu 底部選單
 - 自動提醒通知（24h + 1h）
-- 智慧時段推薦
+- 智慧時段推薦（晚段優先 — 老闆早段陪家人）
 - 取消政策 + 違規追蹤
 - Redis 分散式鎖防重複預約
+- 月初公休提醒 cron（每月 1 號推 LINE 提醒設下下月公休）
 
 ## Tech Stack
 

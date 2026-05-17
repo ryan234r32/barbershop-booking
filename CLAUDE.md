@@ -103,21 +103,56 @@ Body-supplied `lineUserId` is **ignored** — caller identity always comes from 
 - 防騷擾：cooldown 7d / 全店每日 50 則上限 / 09-21 時間窗 / 死忠客排除（軟提醒+折扣，召回券例外） / 客戶 opt-out 開關
 - ⚠️ Demo 前 6 題 B1-B6 須老闆確認（plan §14.8），尤其折扣金額 + 燙髮樣本太少（n=8）要不要啟用
 
+### V3.7 Pre-Launch Readiness (2026-05-17/18)
+本版回應 5/7 老闆 demo 反饋 + autoplan consensus（Claude Opus 4.7 + Codex GPT-5.5 雙審）。
+Plan 詳見 `docs/v3.7-pre-launch-readiness-plan.md` (§0a Autoplan Consensus Override 優先)。
+
+Demo 修復 (Tier 0.1):
+- 3 bug 同根因修：`booking-detail-full-page.tsx` useEffect reset subState on open/booking change；`ui/modal.tsx` body overflow 改 snapshot-restore（修 iPhone PWA 偶爾滑不下去 race）
+
+UI 重做 (Tier 0.4/0.5):
+- `checkout-full-page.tsx` 拆 `<details>` 三角形 inline 化 + 5 quick-tile 折扣（原價/-100/-200/9折/85折）+ XXL 應付金額 + 64pt 結帳 button + 44pt 加購 button
+- `reports/views/daily.tsx` 對帳卡：default filter 改 `pending` + 異常 (isWarning) 排前 + color rail (綠/橘/品牌色) + friendly empty state
+
+服務多選 schema (Tier 0.2):
+- 新 `BookingService` model：1 booking → many services（保留 legacy `Booking.serviceId` dual-read/dual-write 過渡期）
+- `scripts/backfill-booking-services.ts` idempotent + AuditLog；2026-05-17 跑完 2811 筆 0 errors
+- POST `/api/bookings` + consultation convert-to-booking 都 nested-create `services[0]`
+- ⚠️ Phase 4-5 dual-read 尚未做（無多服務 UI 所以無功能影響，未來真做多選 UI 才需要）
+
+新功能:
+- Tier 1.3: `ClosureReminderBanner` 在 /more 頁顯示 `GET /api/admin/closure-status` 找出 30-60 天內未設公休的月份
+- Tier 1.4: admin 手動預約支援 `HH:30` (validation regex `/^\d{2}:(00|30)$/`)；LIFF call 仍只能 `HH:00` (server-side 攔)
+- Tier 1.5: `/(admin)/expenses` 集中支出頁（月份切換 + 即時搜尋 notes/category + 分類 chip filter）+「支出總覽」入口加進 /more
+- Tier 1.7 schema: `CouponType` enum 加 `A_9OFF` / `B_FEEDBACK_8OFF` / `C_CONTROL`（用既有 Coupon model 不重建）+ 新 `Feedback` model (NPS + satisfied + improvement + upgradedToB)
+- Tier 1.8: `User.defaultDiscount` 熟客自動帶折扣；`LoyaltyDiscountControl` inline UI 3 狀態（一般客 → 設為熟客 → 已是熟客 chip）；checkout 開啟時 auto-fill `serviceAmount = max(0, price - defaultDiscount)`
+- Tier 1.9: `smart-suggest.ts` 改晚段優先（早段 max(0, 5-(h-11)) → 晚段 max(0, h-13)），tie-break 改 latest
+- Tier 1.10: `/api/cron/closure-reminder-monthly` 每月 1 日 20:00 Taipei push admin LINE 提醒設下下月公休
+
+清理:
+- /more menu 移除「抽獎」入口（routes + DB 保留待清理）
+- vitest.config exclude `**/.claude/**` 修 git worktree 跑重複 test bug
+
 ### Cron Jobs (vercel.json, times in UTC → +8 for Taipei)
 - `/api/cron/reminders` — hourly, sends pending notification records via LINE
 - `/api/cron/cleanup` — 19:00 UTC (3AM Taipei), maintenance tasks
 - `/api/cron/at-risk` — Sunday 20:00 UTC (Monday 4AM Taipei), CRM segmentation
 - `/api/cron/weekly-report` — Sunday 22:00 UTC (Monday 6AM Taipei), push weekly report to admin
 - `/api/cron/daily-settlement` — 12:30 UTC (20:30 Taipei), push daily settlement summary to admin
+- `/api/cron/ecpay-sweeper` — 03:00 UTC (11AM Taipei), ECPay reconciliation
 - `/api/cron/coupon-expiry-reminder` — 02:00 UTC (10AM Taipei), coupon expiry pings
+- `/api/cron/recurring-expenses` — 16:30 UTC (00:30 Taipei), generate recurring expense rows
+- `/api/cron/health-check` — 01:00 UTC (9AM Taipei), DB + Redis health probe
 - `/api/cron/retention-push` — V3.6 §14.4: 02:00 UTC (10AM Taipei), 三段服務分群推播
+- `/api/cron/closure-reminder-monthly` — V3.7 Tier 1.10: 每月 1 日 12:00 UTC (20:00 Taipei), 推 LINE 提醒設下下月公休
 
 ## Key Conventions
 - **犯錯當下**：小坑/一次性事件 → `/lesson {內容}` 丟進 `tasks/lessons-inbox.md`；明顯通則（「永遠要 X」「X 時必須 Y」）→ 直接加一行到本段 `Key Conventions`。Inbox 每週日 `/triage` 審核升格。
 - **訪談問題自動累積**：當對話中出現「要問老闆」、「待老闆確認」、「跟老闆 confirm」等語意的未解問題時，**自動 Append** 到 `docs/interview-questions/pending-after-interview-{N}.md`（N = 當前最新訪談次數）。不要堆在對話中等使用者整理。分類放到 A~H 某個對應區塊；找不到對應分類就放「其他」。
 - **訪談檔放入 docs/ 時自動輪替**：當使用者放入新的 `第N次老闆訪談-*.md` 或 `第N次老闆訪談逐字稿-*.md` 到 `docs/` 時，立刻執行 `python3 scripts/rotate-interview-questions.py` — 它會把舊的 pending 改名為 resolved 並建立下一階段的 pending 檔。然後比對新訪談檔內容，標註舊 pending 裡哪些問題已經解掉、哪些還沒答到。
 - All dates use **Asia/Taipei** timezone — always use `nowTaipei()` for current time
-- Slot times are always `"HH:00"` format (hourly slots)
+- Slot times are `"HH:00"` for LIFF customers, `"HH:00"` or `"HH:30"` for admin manual booking only (V3.7 Tier 1.4). Server enforces — LIFF can't bypass via HH:30 payload.
+- **服務多選** (V3.7 Tier 0.2 過渡期): legacy `Booking.serviceId` 仍是 source of truth；新 `BookingService[]` 是 dual-write destination. 寫入時 nested-create services[0] mirror serviceId. 讀取目前仍走 `booking.service.X`. 未來真要做多選 UI 時 dual-read prefer `services[]` fallback `service`.
 - `tenantId` is on every table and every DB query (multi-tenant)
 - Use `getAdminFromCookie(request)` for admin-only endpoints — takes `NextRequest` param; checks cookie first, falls back to `Authorization: Bearer`
 - Use `requireBookingAuth(request)` for endpoints that create/modify bookings or customer data — accepts both admin JWT and LIFF ID token, never trusts body-supplied user IDs
