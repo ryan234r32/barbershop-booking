@@ -44,6 +44,7 @@ model Tenant {
   messages              Message[]
   consultationRequests  ConsultationRequest[]
   coupons               Coupon[]
+  feedbacks             Feedback[]  /// V3.7 Tier 1.7
   expenses              Expense[]
   expenseRecurringRules ExpenseRecurringRule[]
   dailyCloseSnapshots   DailyCloseSnapshot[]
@@ -193,6 +194,7 @@ model User {
   messages             Message[]
   consultationRequests ConsultationRequest[]
   coupons              Coupon[]
+  feedbacks            Feedback[]  /// V3.7 Tier 1.7
 
   @@unique([tenantId, lineUserId])
   @@index([tenantId, segment])
@@ -340,6 +342,8 @@ model Booking {
   /// (singular). 詳見 docs/v3.7-pre-launch-readiness-plan.md §0a E-A。
   /// Backfill script: scripts/backfill-booking-services.ts。
   services                  BookingService[]
+  /// V3.7 Tier 1.7 — 客戶結帳完成後可選填 NPS + 2 開放題
+  feedback                  Feedback?
 
   @@index([tenantId, date, status])
   @@index([tenantId, userId])
@@ -708,9 +712,46 @@ model Coupon {
   @@map("coupons")
 }
 
+/// V3.7 Tier 1.7 (autoplan E-I) — 新客 B 組 (B_FEEDBACK_8OFF) 填問卷 → 升 8 折。
+/// 也支援所有客戶 NPS 持續追蹤（業界 retention 標準指標）。
+/// Linked 1:1 with booking (filed AFTER 結帳完成)。
+model Feedback {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  userId    String   @map("user_id")
+  bookingId String   @unique @map("booking_id") // 一次預約一份回饋
+
+  /// NPS：0-10「您願意推薦給朋友的程度？」業界標準 retention 指標。
+  nps Int?
+
+  /// 自由文字：「今天剪髮最滿意的地方？」(訪談 §九 老闆認可的問題 1)
+  satisfied String?
+  /// 自由文字：「最可能需要改善的地方？」(問題 2)
+  improvement String?
+
+  /// 是否觸發了 B 組券升級（填完 = true → 自動發 B_FEEDBACK_8OFF）
+  upgradedToB Boolean @default(false) @map("upgraded_to_b")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([nps]) // for monthly NPS aggregation
+  @@map("feedbacks")
+}
+
 enum CouponType {
   STRATEGY_A_30D_95OFF
   STRATEGY_B_45D_95OFF
+  /// V3.7 Tier 1.7 (autoplan F2/E-I) — 新增 A/B/C 對照組券種。
+  /// 第一次剪完當下發券；A 50% / B 30% / C 20%（對照組不發 → 用 CouponInstance
+  /// 留 issued log 但 type 不發實體券）。詳見 docs/v3.7-pre-launch-readiness-plan.md §0a E-I。
+  A_9OFF
+  B_FEEDBACK_8OFF
+  C_CONTROL
   MANUAL
   CAMPAIGN
 }
