@@ -170,7 +170,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 1c. Validate startTime + slotsNeeded fits within business hours
+    // 1c. Validate startTime + slotsNeeded fits within business hours.
+    // V3.7 Tier 1.4 §0a E-E: HH:30 是 admin-only — Zod allows /^\d{2}:(00|30)$/
+    // 但若 LIFF call 送 HH:30 在此路徑攔下（避免顧客端 bypass）。
+    if (auth.type === "liff" && input.startTime.endsWith(":30")) {
+      throw new AppError("LIFF 預約僅支援整點時段", 400, "INVALID_START_TIME");
+    }
     const startHour = parseTimeToHour(input.startTime);
     const openHour = parseTimeToHour(DEFAULT_BUSINESS_HOURS.startTime);
     const closeHour = parseTimeToHour(DEFAULT_BUSINESS_HOURS.endTime);

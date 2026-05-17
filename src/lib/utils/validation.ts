@@ -4,7 +4,11 @@ export const createBookingSchema = z.object({
   tenantId: z.string().uuid().optional(),
   serviceId: z.string().uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  startTime: z.string().regex(/^\d{2}:00$/),
+  // V3.7 Tier 1.4 §0a E-E: admin 手動預約可用 HH:30（染燙漂常需 2.5/4.5hr），
+  // 顧客 LIFF 仍維持 HH:00。Server-side 路徑 check auth.type === "admin"
+  // 才接受 HH:30；LIFF call 即使送 HH:30 也會被 bookings/route.ts 攔下。
+  // (slot 模型仍 1hr 為單位，HH:30 純粹是允許 start time 偏移半小時。)
+  startTime: z.string().regex(/^\d{2}:(00|30)$/),
   // lineUserId is no longer accepted from the body — it is derived from the
   // authenticated caller (admin cookie or LIFF ID token). See booking-auth.ts.
   // Kept optional here for backwards compatibility with old clients; ignored.

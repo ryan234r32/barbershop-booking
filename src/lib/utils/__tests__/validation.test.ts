@@ -60,12 +60,25 @@ describe("createBookingSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects non-hourly startTime", () => {
+  // V3.7 Tier 1.4 §0a E-E: HH:30 是 admin-only start time（schema 允許，
+  // 但 bookings/route.ts 在 auth.type === "liff" 時會 400 攔下）。
+  // 故 schema 允許 HH:00 和 HH:30，其他 minute 仍拒絕。
+  it("accepts HH:30 startTime at schema level (admin path enforces auth)", () => {
     const result = createBookingSchema.safeParse({
       ...validBooking,
       startTime: "14:30",
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects non-half-hour startTime (e.g. 14:15 / 14:45)", () => {
+    for (const bad of ["14:15", "14:45", "14:05", "14:59"]) {
+      const result = createBookingSchema.safeParse({
+        ...validBooking,
+        startTime: bad,
+      });
+      expect(result.success, `should reject ${bad}`).toBe(false);
+    }
   });
 
   it("rejects startTime without zero-padding", () => {

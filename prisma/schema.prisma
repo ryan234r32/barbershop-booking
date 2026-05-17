@@ -176,6 +176,14 @@ model User {
   /// 此旗標**不影響**預約確認 / 提醒等交易性 LINE 推播。
   marketingOptOut Boolean @default(false) @map("marketing_opt_out")
 
+  /// V3.7 Tier 1.8 — 熟客自動帶折扣金額（NT$；正值 = 結帳時自動扣）。
+  /// NULL = 一般客（無自動折扣）。Admin 在結帳頁點「設為熟客」按鈕設定。
+  /// 老闆規則：「我自己扣這樣自己記得」彈性比較大 — 故 ad-hoc 金額，
+  /// 非階梯式會員價（V3 範圍不做複雜會員等級）。詳見訪談 §六 折扣處理。
+  defaultDiscount   Int?      @map("default_discount")
+  discountSetAt     DateTime? @map("discount_set_at")
+  discountSetBy     String?   @map("discount_set_by")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
