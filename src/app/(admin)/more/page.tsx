@@ -12,10 +12,13 @@ import {
   LogOut,
   ChevronRight,
   Lock,
+  Wallet,
 } from "lucide-react";
 
 // V3.8 consolidation: 老闆指定主選單 4 個（行事曆/報表/顧客/訊息）+ 更多。
+// V3.7 Tier 1.5: 加「支出總覽」入口（集中支出頁 + 搜尋）。
 const MENU_ITEMS = [
+  { href: "/expenses", label: "支出總覽", icon: Wallet },
   { href: "/lottery", label: "抽獎", icon: Gift },
   { href: "/campaigns", label: "行銷推播", icon: Megaphone },
   { href: "/coupons", label: "優惠券", icon: Ticket },
