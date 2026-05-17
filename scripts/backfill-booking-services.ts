@@ -31,11 +31,18 @@
  */
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const EXECUTED_BY = process.env.EXECUTED_BY ?? "unknown";
 
-const prisma = new PrismaClient();
+// Prisma 7 needs the adapter explicitly (matches src/lib/prisma.ts pattern).
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  console.error("[backfill] DATABASE_URL missing in env");
+  process.exit(1);
+}
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
 interface BackfillResult {
   totalBookings: number;
