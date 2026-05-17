@@ -4,15 +4,18 @@ import { parseTimeToHour } from "@/lib/utils/time";
 /**
  * Smart slot suggestion engine.
  *
- * Strategy: recommend slots that consolidate the barber's schedule,
- * prioritizing times adjacent to existing bookings to keep free blocks
- * contiguous. If no existing bookings, recommend earliest slots.
+ * V3.7 Tier 1.9 (autoplan + 訪談 §11) — Strategy CHANGED:
+ *   舊版偏好 EARLY slots（11-13 點 +5 bonus）。
+ *   新版偏好 LATE slots — 老闆希望早段陪家人，引導客人約晚段 (16+)。
  *
  * Rules:
- * 1. Slots immediately after an existing booking → highest priority
- * 2. Slots immediately before an existing booking → second priority
- * 3. Earliest available → third priority (to front-load the day)
+ * 1. Slots immediately after an existing booking → highest priority (+10)
+ *    (合併排班，讓老闆連續忙完一段)
+ * 2. Slots immediately before an existing booking → second priority (+8)
+ * 3. LATER in the day → slight bonus（取代舊的 early bonus）
+ *    18:00 = +5, 17:00 = +4, 16:00 = +3, 15:00 = +2, 14:00 = +1, ≤13:00 = 0
  * 4. Mark up to 2 recommended slots
+ * 5. Tie-break: LATER start time wins (反映「晚段優先」原則)
  */
 export function rankAndRecommendSlots(
   available: AvailableSlot[],
@@ -41,16 +44,17 @@ export function rankAndRecommendSlots(
       score += 8;
     }
 
-    // Earlier in the day → slight bonus (max +5 for 11:00)
-    score += Math.max(0, 5 - (startH - 11));
+    // V3.7 Tier 1.9: LATER in the day → slight bonus.
+    // 18:00 = max(0, 18-13) = 5; 13:00 = 0; 11:00 = 0.
+    score += Math.max(0, startH - 13);
 
     return { slot, score };
   });
 
-  // Sort by score descending, then by start time ascending for ties
+  // V3.7 Tier 1.9: Sort by score desc, ties broken by LATER start time.
   scored.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
-    return a.slot.startTime.localeCompare(b.slot.startTime);
+    return b.slot.startTime.localeCompare(a.slot.startTime);
   });
 
   // Reset all recommendations
