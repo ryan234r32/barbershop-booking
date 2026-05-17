@@ -108,6 +108,17 @@ export async function POST(
           source: "ADMIN",
           notes: data.notes ?? `從諮詢請求轉換 (consultation:${id})`,
           adminAcknowledgedAt: new Date(),
+          // V3.7 Tier 0.2 dual-write — mirror legacy serviceId into BookingService[0].
+          services: {
+            create: [
+              {
+                serviceId: service.id,
+                order: 0,
+                price: service.price,
+                durationMin: service.duration,
+              },
+            ],
+          },
         },
         include: {
           tenant: {

@@ -276,6 +276,10 @@ export async function POST(request: NextRequest) {
       const endTime = addHours(input.startTime, service.slotsNeeded);
 
       // 7. Create booking
+      // V3.7 Tier 0.2 §0a E-A — Dual-write: legacy Booking.serviceId 仍是主路徑
+      // (避免打到既有 reports/retention-push/checkout 邏輯)，同時寫入
+      // BookingService 過渡表，讓未來 multi-service UI 切換時資料已就位。
+      // Read path 後續會切到 prefer services[] fallback service singleton.
       const booking = await prisma.booking.create({
         data: {
           tenantId,
@@ -285,6 +289,19 @@ export async function POST(request: NextRequest) {
           startTime: input.startTime,
           endTime,
           slotsOccupied: service.slotsNeeded,
+          // V3.7 Tier 0.2 dual-write: nested create order=0 mirror legacy serviceId.
+          // 同 transaction → 不會 race；child 帶入時 parent updatedAt 也會 bump
+          // (Prisma create with nested write 一起 commit, 滿足 OCC §0a E-B 需求).
+          services: {
+            create: [
+              {
+                serviceId: input.serviceId,
+                order: 0,
+                price: service.price,
+                durationMin: service.duration,
+              },
+            ],
+          },
           // LIFF calls are always "LIFF" regardless of what client sends; admin may
           // choose PHONE or WALK_IN (default WALK_IN if omitted).
           source: auth.type === "liff" ? "LIFF" : (input.source || "WALK_IN"),
