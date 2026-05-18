@@ -6,24 +6,37 @@ import { errorResponse } from "@/lib/utils/errors";
 const querySchema = z.object({
   tenantId: z.string().uuid().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
-  serviceId: z.string().uuid("serviceId must be a valid UUID"),
+  // V3.7 Tier 0.2 — accept either single `serviceId` (legacy) or csv `serviceIds`
+  // (multi-service path). One of them must be present.
+  serviceId: z.string().uuid("serviceId must be a valid UUID").optional(),
+  serviceIds: z
+    .string()
+    .regex(/^[0-9a-fA-F-]{36}(,[0-9a-fA-F-]{36})*$/, "serviceIds must be a comma-separated list of UUIDs")
+    .optional(),
 });
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
-    // Zod throws on invalid input — errorResponse turns that into 400 with field-level issues.
     const params = querySchema.parse({
       tenantId: searchParams.get("tenantId") || undefined,
       date: searchParams.get("date"),
-      serviceId: searchParams.get("serviceId"),
+      serviceId: searchParams.get("serviceId") || undefined,
+      serviceIds: searchParams.get("serviceIds") || undefined,
     });
+    if (!params.serviceId && !params.serviceIds) {
+      return Response.json(
+        { error: "serviceId or serviceIds is required" },
+        { status: 400 },
+      );
+    }
     const tenantId = params.tenantId || process.env.DEFAULT_TENANT_ID!;
 
     const slots = await getAvailableSlots({
       tenantId,
       date: params.date,
       serviceId: params.serviceId,
+      serviceIds: params.serviceIds ? params.serviceIds.split(",") : undefined,
     });
     return Response.json({ slots });
   } catch (error) {

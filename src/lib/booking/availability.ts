@@ -17,17 +17,23 @@ export interface AvailableSlot {
 export async function getAvailableSlots(params: {
   tenantId: string;
   date: string; // "YYYY-MM-DD"
-  serviceId: string;
+  /** Single-service path (legacy). One of serviceId / serviceIds must be set. */
+  serviceId?: string;
+  /** V3.7 Tier 0.2 multi-service path: slotsNeeded = sum across all services. */
+  serviceIds?: string[];
 }): Promise<AvailableSlot[]> {
-  const { tenantId, date, serviceId } = params;
+  const { tenantId, date } = params;
   const dateObj = new Date(date + "T00:00:00.000Z");
 
-  // 1. Get service to know how many consecutive slots needed
-  const service = await prisma.service.findUnique({
-    where: { id: serviceId },
-    select: { slotsNeeded: true },
+  // 1. Resolve total slotsNeeded across one or more services.
+  const ids = params.serviceIds && params.serviceIds.length ? params.serviceIds : params.serviceId ? [params.serviceId] : [];
+  if (!ids.length) return [];
+  const services = await prisma.service.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, slotsNeeded: true },
   });
-  if (!service) return [];
+  if (services.length !== ids.length) return [];
+  const slotsNeeded = services.reduce((sum, s) => sum + s.slotsNeeded, 0);
 
   // 2. Check if this date is a holiday
   const holiday = await prisma.holiday.findUnique({
@@ -69,8 +75,7 @@ export async function getAvailableSlots(params: {
     }
   }
 
-  // 7. Find available start times for the requested service
-  const slotsNeeded = service.slotsNeeded;
+  // 7. Find available start times for the requested service(s)
   const available: AvailableSlot[] = [];
 
   // 2026-04-30: 過濾已過時段（只在 date === 今天時生效）。

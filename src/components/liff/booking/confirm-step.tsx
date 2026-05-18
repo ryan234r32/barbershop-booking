@@ -9,6 +9,7 @@ export function ConfirmStep({
   policyAgreed,
   onPolicyAgreedChange,
   serviceName,
+  services,
   date,
   startTime,
   price,
@@ -18,6 +19,8 @@ export function ConfirmStep({
   policyAgreed: boolean;
   onPolicyAgreedChange: (v: boolean) => void;
   serviceName?: string;
+  /** V3.7 Tier 0.2 — multi-service chip display. Falls back to serviceName when absent. */
+  services?: Array<{ name: string; price: number }>;
   date?: string;
   startTime?: string;
   price?: number;
@@ -35,32 +38,67 @@ export function ConfirmStep({
       </h2>
 
       {/* Booking summary card */}
-      {serviceName && (
+      {(serviceName || (services && services.length > 0)) && (
         <div className="bg-[#E8F1EC] rounded-xl p-4 mb-6">
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-[#003D2B]/60">服務</span>
-              <span className="text-sm font-medium text-[#003D2B]">{serviceName}</span>
+          {services && services.length > 1 ? (
+            <div className="space-y-2.5">
+              <div className="text-sm text-[#003D2B]/60">已選服務</div>
+              <div className="flex flex-wrap gap-1.5">
+                {services.map((s, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white text-[#003D2B] text-[12px] font-medium border border-[#003D2B]/10"
+                  >
+                    {s.name}
+                    <span className="text-[#003D2B]/50 text-[11px]">NT${s.price.toLocaleString()}</span>
+                  </span>
+                ))}
+              </div>
+              {date && (
+                <div className="flex justify-between items-center pt-1.5">
+                  <span className="text-sm text-[#003D2B]/60">日期</span>
+                  <span className="text-sm font-medium text-[#003D2B]">{date}</span>
+                </div>
+              )}
+              {startTime && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-[#003D2B]/60">時間</span>
+                  <span className="text-sm font-medium text-[#003D2B]">{startTime}</span>
+                </div>
+              )}
+              {price != null && (
+                <div className="flex justify-between items-center pt-1.5 border-t border-[#003D2B]/10">
+                  <span className="text-sm text-[#003D2B]/60">合計</span>
+                  <span className="text-sm font-bold text-[#003D2B]">NT${price.toLocaleString()}</span>
+                </div>
+              )}
             </div>
-            {date && (
+          ) : (
+            <div className="space-y-1.5">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-[#003D2B]/60">日期</span>
-                <span className="text-sm font-medium text-[#003D2B]">{date}</span>
+                <span className="text-sm text-[#003D2B]/60">服務</span>
+                <span className="text-sm font-medium text-[#003D2B]">{serviceName}</span>
               </div>
-            )}
-            {startTime && (
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-[#003D2B]/60">時間</span>
-                <span className="text-sm font-medium text-[#003D2B]">{startTime}</span>
-              </div>
-            )}
-            {price != null && (
-              <div className="flex justify-between items-center pt-1.5 border-t border-[#003D2B]/10">
-                <span className="text-sm text-[#003D2B]/60">預估金額</span>
-                <span className="text-sm font-bold text-[#003D2B]">NT${price.toLocaleString()}</span>
-              </div>
-            )}
-          </div>
+              {date && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-[#003D2B]/60">日期</span>
+                  <span className="text-sm font-medium text-[#003D2B]">{date}</span>
+                </div>
+              )}
+              {startTime && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-[#003D2B]/60">時間</span>
+                  <span className="text-sm font-medium text-[#003D2B]">{startTime}</span>
+                </div>
+              )}
+              {price != null && (
+                <div className="flex justify-between items-center pt-1.5 border-t border-[#003D2B]/10">
+                  <span className="text-sm text-[#003D2B]/60">預估金額</span>
+                  <span className="text-sm font-bold text-[#003D2B]">NT${price.toLocaleString()}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

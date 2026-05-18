@@ -30,6 +30,7 @@ import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { CheckoutFullPage } from "./checkout-full-page";
 import type { PaymentMethod } from "./checkout-full-page";
 import { FullscreenModal } from "./fullscreen-modal";
+import { BookingServicesEditor } from "./booking-services-editor";
 
 interface BookingUser {
   id: string;
@@ -484,6 +485,7 @@ export function BookingDetailFullPage({ booking, open, onOpenChange, onAction }:
                   onOpenCheckout={() => setCheckoutOpen(true)}
                   onOpenReschedule={handleOpenReschedule}
                   onCancel={handleCancel}
+                  onAction={onAction}
                 />
               )}
 
@@ -537,6 +539,7 @@ function DetailView({
   onOpenCheckout,
   onOpenReschedule,
   onCancel,
+  onAction,
 }: {
   booking: BookingDetail;
   customerData: CustomerSummary | undefined;
@@ -549,6 +552,9 @@ function DetailView({
   onOpenCheckout: () => void;
   onOpenReschedule: () => void;
   onCancel: () => void;
+  /** Parent refresh callback — pass-through so BookingServicesEditor can
+   *  poke the calendar after add/remove succeeds (V3.7 Tier 0.2). */
+  onAction: () => void;
 }) {
   const showCheckout = currentSegment === "checked_in";
   const stats = customerData?.stats;
@@ -635,6 +641,11 @@ function DetailView({
           </div>
         </div>
       </div>
+
+      {/* V3.7 Tier 0.2 — multi-service chip list + 加服務 button. Shows BookingService
+          rows from /api/bookings/[id]; falls back to legacy single service.name
+          when the booking pre-dates the dual-write transition. */}
+      <BookingServicesEditor bookingId={booking.id} onChange={onAction} />
 
       {/* Status segment — only when booking is in an actionable state.
           Each state has its own colour so the current state is unmistakable

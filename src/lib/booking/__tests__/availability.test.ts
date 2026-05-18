@@ -6,13 +6,17 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const serviceFindUnique = vi.fn();
+const serviceFindMany = vi.fn();
 const holidayFindUnique = vi.fn();
 const businessHoursFindUnique = vi.fn();
 const bookingFindMany = vi.fn();
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    service: { findUnique: (...a: unknown[]) => serviceFindUnique(...a) },
+    service: {
+      findUnique: (...a: unknown[]) => serviceFindUnique(...a),
+      findMany: (...a: unknown[]) => serviceFindMany(...a),
+    },
     holiday: { findUnique: (...a: unknown[]) => holidayFindUnique(...a) },
     businessHours: { findUnique: (...a: unknown[]) => businessHoursFindUnique(...a) },
     booking: { findMany: (...a: unknown[]) => bookingFindMany(...a) },
@@ -33,6 +37,9 @@ import { getAvailableSlots } from "../availability";
 describe("getAvailableSlots — past-hour filter (today only)", () => {
   beforeEach(() => {
     serviceFindUnique.mockResolvedValue({ slotsNeeded: 1 });
+    // V3.7 Tier 0.2: getAvailableSlots now uses findMany (sums slotsNeeded
+    // across one or more services). Default = haircut-like single service.
+    serviceFindMany.mockResolvedValue([{ id: "s-haircut", slotsNeeded: 1 }]);
     holidayFindUnique.mockResolvedValue(null);
     businessHoursFindUnique.mockResolvedValue({
       isOpen: true,
@@ -71,6 +78,7 @@ describe("getAvailableSlots — past-hour filter (today only)", () => {
 
   it("today multi-slot service (perm 3 slots): only allows starts where startHour > currentHour", async () => {
     serviceFindUnique.mockResolvedValue({ slotsNeeded: 3 });
+    serviceFindMany.mockResolvedValue([{ id: "s-perm", slotsNeeded: 3 }]);
     const slots = await getAvailableSlots({
       tenantId: "t1",
       date: "2026-04-30",

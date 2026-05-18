@@ -1,0 +1,129 @@
+/**
+ * V3.7 Tier 0.2 — Admin manually adds an extra service to an existing booking.
+ *
+ * Records the addition in BookingService[] only. Does NOT auto-extend
+ * `slotsOccupied` / `endTime`: that would race with neighbouring bookings, and
+ * the owner already knows whether they have time. Checkout amounts stay manual
+ * (CheckoutFullPage has its own input). The added row shows up in admin views
+ * as a chip + future reporting feeds.
+ *
+ * Admin-only. Cross-tenant safe via adminUser.tenantId. OCC: bumps
+ * `Booking.updatedAt` in the same transaction (BookingService is a child →
+ * Prisma doesn't propagate the parent updatedAt automatically — §0a E-B).
+ */
+
+import { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getAdminFromCookie } from "@/lib/auth/jwt";
+import { errorResponse, UnauthorizedError, AppError } from "@/lib/utils/errors";
+import { addBookingServiceSchema } from "@/lib/utils/validation";
+import { invalidateReportsCache } from "@/lib/cache/invalidate";
+
+type RouteParams = { params: Promise<{ id: string }> };
+
+export async function POST(request: NextRequest, { params }: RouteParams) {
+  try {
+    const admin = await getAdminFromCookie(request);
+    if (!admin) throw new UnauthorizedError();
+
+    const { id } = await params;
+    const body = await request.json();
+    const input = addBookingServiceSchema.parse(body);
+
+    const booking = await prisma.booking.findFirst({
+      where: { id, tenantId: admin.tenantId },
+      select: { id: true, status: true, services: { select: { order: true } } },
+    });
+    if (!booking) {
+      return Response.json({ error: "Booking not found" }, { status: 404 });
+    }
+    if (booking.status === "CANCELLED" || booking.status === "CANCELLED_BY_ADMIN" || booking.status === "NO_SHOW") {
+      throw new AppError("已取消或爽約的預約不能加服務", 400, "invalid_state");
+    }
+
+    const service = await prisma.service.findFirst({
+      where: { id: input.serviceId, tenantId: admin.tenantId },
+      select: { id: true, name: true, price: true, duration: true },
+    });
+    if (!service) {
+      return Response.json({ error: "Service not found" }, { status: 404 });
+    }
+
+    const nextOrder = (booking.services.reduce((max, s) => Math.max(max, s.order), -1) + 1) || 1;
+
+    const created = await prisma.$transaction(async (tx) => {
+      const row = await tx.bookingService.create({
+        data: {
+          bookingId: id,
+          serviceId: service.id,
+          order: nextOrder,
+          price: service.price,
+          durationMin: service.duration,
+        },
+      });
+      // OCC: bump parent updatedAt — Prisma does NOT propagate from child.
+      await tx.booking.update({
+        where: { id },
+        data: { updatedAt: new Date() },
+      });
+      return row;
+    });
+
+    invalidateReportsCache();
+
+    return Response.json({
+      ok: true,
+      bookingService: {
+        id: created.id,
+        serviceId: service.id,
+        name: service.name,
+        price: service.price,
+        durationMin: service.duration,
+        order: created.order,
+      },
+    });
+  } catch (err) {
+    return errorResponse(err);
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  try {
+    const admin = await getAdminFromCookie(request);
+    if (!admin) throw new UnauthorizedError();
+
+    const { id } = await params;
+    const { searchParams } = request.nextUrl;
+    const bookingServiceId = searchParams.get("bookingServiceId");
+    if (!bookingServiceId) {
+      return Response.json({ error: "bookingServiceId is required" }, { status: 400 });
+    }
+
+    // Only allow deleting non-primary (order > 0) rows — primary mirrors
+    // legacy `Booking.serviceId` which the rest of the codebase still reads.
+    const row = await prisma.bookingService.findFirst({
+      where: {
+        id: bookingServiceId,
+        bookingId: id,
+        booking: { tenantId: admin.tenantId },
+      },
+      select: { id: true, order: true },
+    });
+    if (!row) {
+      return Response.json({ error: "BookingService not found" }, { status: 404 });
+    }
+    if (row.order === 0) {
+      throw new AppError("不能刪除主服務（請改用改期/取消預約）", 400, "primary_service");
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.bookingService.delete({ where: { id: bookingServiceId } });
+      await tx.booking.update({ where: { id }, data: { updatedAt: new Date() } });
+    });
+
+    invalidateReportsCache();
+    return Response.json({ ok: true });
+  } catch (err) {
+    return errorResponse(err);
+  }
+}

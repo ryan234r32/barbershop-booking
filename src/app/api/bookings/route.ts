@@ -110,13 +110,35 @@ export async function POST(request: NextRequest) {
         ? `manual-${auth.adminId}-${randomUUID()}`
         : auth.lineUserId;
 
-    // 1. Get service details
-    const service = await prisma.service.findUnique({
-      where: { id: input.serviceId },
+    // 1. Resolve service(s). V3.7 Tier 0.2 — accept either `serviceIds` (multi)
+    // or legacy `serviceId` (single, upgraded to a 1-element array). The first
+    // entry is the "primary" service that maps to legacy `Booking.serviceId`
+    // for dual-write compatibility. Aggregate slotsNeeded / duration / price
+    // come from summing across the picked services.
+    const serviceIds: string[] =
+      input.serviceIds && input.serviceIds.length
+        ? input.serviceIds
+        : input.serviceId
+        ? [input.serviceId]
+        : [];
+    if (!serviceIds.length) {
+      return Response.json({ error: "serviceId or serviceIds is required" }, { status: 400 });
+    }
+    const serviceRows = await prisma.service.findMany({
+      where: { id: { in: serviceIds }, tenantId },
     });
-    if (!service) {
+    if (serviceRows.length !== serviceIds.length) {
       return Response.json({ error: "Service not found" }, { status: 404 });
     }
+    // Preserve client-supplied order (matters for BookingService.order + 主服務 selection).
+    const serviceById = new Map(serviceRows.map((s) => [s.id, s]));
+    const services = serviceIds.map((id) => serviceById.get(id)!);
+    const primaryService = services[0];
+    const totalSlots = services.reduce((sum, s) => sum + s.slotsNeeded, 0);
+    const totalPrice = services.reduce((sum, s) => sum + s.price, 0);
+    const combinedName = services.length > 1
+      ? services.map((s) => s.name).join(" + ")
+      : primaryService.name;
 
     // 1b. Validate date is not in the past (Taipei timezone).
     // Uses todayInTaipei() — direct Date → toLocaleDateString — instead of
@@ -180,7 +202,7 @@ export async function POST(request: NextRequest) {
     const startHour = parseTimeToHour(input.startTime);
     const openHour = parseTimeToHour(DEFAULT_BUSINESS_HOURS.startTime);
     const closeHour = parseTimeToHour(DEFAULT_BUSINESS_HOURS.endTime);
-    if (startHour < openHour || startHour + service.slotsNeeded > closeHour) {
+    if (startHour < openHour || startHour + totalSlots > closeHour) {
       throw new AppError(
         `預約時段須在營業時間內（${DEFAULT_BUSINESS_HOURS.startTime}–${DEFAULT_BUSINESS_HOURS.endTime}）`,
         400,
@@ -271,42 +293,36 @@ export async function POST(request: NextRequest) {
         tenantId,
         date: dateObj,
         startTime: input.startTime,
-        slotsNeeded: service.slotsNeeded,
+        slotsNeeded: totalSlots,
       });
 
       if (!available) {
         throw new SlotUnavailableError();
       }
 
-      // 6. Calculate end time
-      const endTime = addHours(input.startTime, service.slotsNeeded);
+      // 6. Calculate end time using aggregate slots across all selected services.
+      const endTime = addHours(input.startTime, totalSlots);
 
       // 7. Create booking
       // V3.7 Tier 0.2 §0a E-A — Dual-write: legacy Booking.serviceId 仍是主路徑
-      // (避免打到既有 reports/retention-push/checkout 邏輯)，同時寫入
-      // BookingService 過渡表，讓未來 multi-service UI 切換時資料已就位。
-      // Read path 後續會切到 prefer services[] fallback service singleton.
+      // (primary = serviceIds[0])，同時寫入 BookingService 過渡表的全部服務。
+      // 同 transaction → child + parent updatedAt 一起 commit（OCC §0a E-B）。
       const booking = await prisma.booking.create({
         data: {
           tenantId,
           userId: user.id,
-          serviceId: input.serviceId,
+          serviceId: primaryService.id,
           date: dateObj,
           startTime: input.startTime,
           endTime,
-          slotsOccupied: service.slotsNeeded,
-          // V3.7 Tier 0.2 dual-write: nested create order=0 mirror legacy serviceId.
-          // 同 transaction → 不會 race；child 帶入時 parent updatedAt 也會 bump
-          // (Prisma create with nested write 一起 commit, 滿足 OCC §0a E-B 需求).
+          slotsOccupied: totalSlots,
           services: {
-            create: [
-              {
-                serviceId: input.serviceId,
-                order: 0,
-                price: service.price,
-                durationMin: service.duration,
-              },
-            ],
+            create: services.map((s, idx) => ({
+              serviceId: s.id,
+              order: idx,
+              price: s.price,
+              durationMin: s.duration,
+            })),
           },
           // LIFF calls are always "LIFF" regardless of what client sends; admin may
           // choose PHONE or WALK_IN (default WALK_IN if omitted).
@@ -365,13 +381,13 @@ export async function POST(request: NextRequest) {
             ? `https://liff.line.me/${booking.tenant.liffId}`
             : undefined;
           const message = bookingConfirmationMessage({
-            serviceName: service.name,
+            serviceName: combinedName,
             date: input.date,
             startTime: input.startTime,
             endTime,
             shopName: booking.tenant.businessName,
             shopAddress: booking.tenant.address || undefined,
-            price: service.price,
+            price: totalPrice,
             bookingId: booking.id,
             liffBaseUrl,
           });
@@ -390,11 +406,11 @@ export async function POST(request: NextRequest) {
           tenantId,
           bookingId: booking.id,
           displayName: user.displayName || input.displayName || "未知顧客",
-          serviceName: service.name,
+          serviceName: combinedName,
           date: input.date,
           startTime: input.startTime,
           endTime,
-          price: service.price,
+          price: totalPrice,
         });
       } catch (err) {
         logger.error("Failed to notify admin (new booking)", err, "bookings");
