@@ -170,6 +170,48 @@ export function abbreviateService(name: string): string {
 }
 
 /**
+ * V3.7 Tier 0.2 — preferred display label for a booking's services.
+ *
+ * Prefers `services[]` (the new dual-write source of truth, sorted by order):
+ *   - 1 service  → "男性剪髮"
+ *   - 2 services → "男性剪髮 + 補染"
+ *   - 3+ services → "男性剪髮 + 補染 + 染髮" (joined with separator)
+ *
+ * Falls back to legacy `service.name` when services[] is empty (pre-backfill
+ * bookings imported before V3.7 Tier 0.2 backfill ran).
+ *
+ * The compact form (`compact: true`) uses abbreviations + "/": "剪/染/護" — good
+ * for tight calendar cells (week/day view). Default = full names.
+ */
+export function getBookingServicesLabel(
+  booking: Pick<Booking, "service" | "services">,
+  opts: { compact?: boolean; separator?: string } = {},
+): string {
+  const sep = opts.separator ?? " + ";
+  const rows = booking.services && booking.services.length > 0 ? booking.services : null;
+  if (rows) {
+    const names = rows.map((r) => r.service.name);
+    if (opts.compact) return names.map(abbreviateService).join("/");
+    return names.join(sep);
+  }
+  // Legacy fallback — pre-backfill booking without BookingService rows.
+  return opts.compact ? abbreviateService(booking.service.name) : booking.service.name;
+}
+
+/**
+ * Sum of services[] prices, falling back to legacy service.price. Calendar
+ * cells / detail summary use this so multi-service bookings show correct total.
+ */
+export function getBookingServicesTotalPrice(
+  booking: Pick<Booking, "service" | "services">,
+): number {
+  if (booking.services && booking.services.length > 0) {
+    return booking.services.reduce((sum, r) => sum + r.price, 0);
+  }
+  return booking.service.price;
+}
+
+/**
  * Truncate the customer name for compact display:
  *   ≤3 chars → keep
  *   >3 chars → first 3 + "…"

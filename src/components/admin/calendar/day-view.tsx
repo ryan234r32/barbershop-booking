@@ -20,10 +20,10 @@ import { HorizontalDateStrip } from "./horizontal-date-strip";
 import { useAutoFit } from "./use-auto-fit";
 import {
   HOURS,
-  abbreviateService,
   buildBookingIndex,
   cardBgClass,
   formatDate,
+  getBookingServicesLabel,
   indexBookingAtSlot,
   indexBookingsForDate,
   indexIsSlotOccupied,
@@ -382,7 +382,7 @@ function DayViewBase({
             <div>
               <p className="text-sm font-semibold text-[var(--color-text-primary)]">
                 {nearEndList.length === 1
-                  ? `${nearEndList[0].user.displayName || "顧客"} ${nearEndList[0].service.name} 即將結束`
+                  ? `${nearEndList[0].user.displayName || "顧客"} ${getBookingServicesLabel(nearEndList[0])} 即將結束`
                   : `${nearEndList.length} 筆預約即將結束`}
               </p>
             </div>
@@ -456,7 +456,7 @@ function DayViewBase({
                     }}
                     onClick={() => onOpenBookingDetail(booking)}
                     className={`relative rounded-lg px-2 py-1.5 h-full cursor-grab active:cursor-grabbing transition-all hover:opacity-90 flex flex-col gap-0.5 overflow-hidden ${cardBgClass(booking)} ${draggedBooking?.id === booking.id ? "opacity-40 ring-2 ring-[var(--color-brand)]" : ""}`}
-                    title={`${booking.startTime}-${booking.endTime} ${booking.service.name} · ${booking.user.displayName || "顧客"}${isPaid(booking) ? " (已付款)" : ""}`}
+                    title={`${booking.startTime}-${booking.endTime} ${getBookingServicesLabel(booking)} · ${booking.user.displayName || "顧客"}${isPaid(booking) ? " (已付款)" : ""}`}
                   >
                     {!booking.adminAcknowledgedAt && (
                       <span
@@ -493,7 +493,7 @@ function DayViewBase({
                     {/* Line 2: service prefix + customer name + segment badge (B3 pattern) */}
                     <div className="flex items-center justify-between gap-1.5 min-h-0">
                       <p className="font-semibold text-[var(--color-text-primary)] text-[13px] leading-tight truncate flex-1">
-                        <span className="opacity-65 mr-1">{abbreviateService(booking.service.name)}</span>
+                        <span className="opacity-65 mr-1">{getBookingServicesLabel(booking, { compact: true })}</span>
                         {booking.user.displayName || "顧客"}
                       </p>
                       <SegmentBadge segment={booking.user.segment} />
@@ -502,7 +502,7 @@ function DayViewBase({
                     {/* Line 3 (multi-slot only): full service name pill */}
                     {booking.slotsOccupied > 1 && (
                       <span className="mt-auto inline-block self-start px-1.5 py-0.5 rounded bg-[var(--color-bg)]/60 text-[var(--color-text-body)] text-[11px] font-medium leading-none truncate max-w-full">
-                        {booking.service.name}
+                        {getBookingServicesLabel(booking)}
                       </span>
                     )}
                   </div>

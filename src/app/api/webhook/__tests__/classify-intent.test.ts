@@ -3,6 +3,12 @@ import { classifyIntent, type KeywordIntent } from "../classify-intent";
 
 describe("classifyIntent — table-driven keyword routing", () => {
   const cases: Array<{ input: string; expected: KeywordIntent; note?: string }> = [
+    // FAQ (Rich Menu help entry)
+    { input: "常見問題", expected: "faq" },
+    { input: "FAQ", expected: "faq" },
+    { input: "需要協助", expected: "faq" },
+    { input: "我想留言給店家", expected: "leave-message" },
+
     // my-bookings (highest priority — must beat "booking")
     { input: "我的預約", expected: "my-bookings" },
     { input: "查詢我的預約", expected: "my-bookings" },
@@ -32,6 +38,7 @@ describe("classifyIntent — table-driven keyword routing", () => {
 
     // service inquiry — color
     { input: "染", expected: "service-inquiry-color", note: "exact single-char trigger" },
+    { input: "染髮", expected: "service-inquiry-color", note: "5/18 老闆 repro — bare 染髮 必須觸發" },
     { input: "想染", expected: "service-inquiry-color" },
     { input: "我想染頭髮", expected: "service-inquiry-color" },
     { input: "染髮多少錢", expected: "service-inquiry-color", note: "service inquiry beats pricing — 染髮非固定價，需照片報價" },

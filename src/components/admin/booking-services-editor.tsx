@@ -34,6 +34,7 @@ interface ServiceLite {
 }
 
 interface BookingShape {
+  serviceId?: string;
   services?: BookingServiceRow[];
   service?: { name: string; price: number };
 }
@@ -158,7 +159,13 @@ export function BookingServicesEditor({
 
       {pickerOpen && (
         <ServicePicker
-          excludeIds={rows.map((r) => r.serviceId)}
+          /* Codex review P2 — pre-backfill bookings have empty services[] but
+             a legacy booking.serviceId. Exclude that too so the owner can't
+             accidentally duplicate the primary service as an add-on. */
+          excludeIds={[
+            ...(booking?.serviceId ? [booking.serviceId] : []),
+            ...rows.map((r) => r.serviceId),
+          ]}
           onCancel={() => setPickerOpen(false)}
           onPick={addService}
           submitting={submitting}

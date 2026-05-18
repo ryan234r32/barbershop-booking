@@ -588,41 +588,46 @@ describe("serviceInquiryFlexMessage", () => {
     shopName: "測試店",
   };
 
-  it("perm: title says 想燙嗎？", () => {
+  it("perm: title says 燙髮諮詢 (V3.7 P2 — 不再用「想燙嗎」)", () => {
     const msg = serviceInquiryFlexMessage({ ...baseParams, serviceType: "perm" });
     const bodyStr = JSON.stringify(msg.contents);
-    expect(bodyStr).toContain("想燙嗎？");
-    expect(msg.altText).toContain("燙");
+    expect(bodyStr).toContain("燙髮諮詢");
+    expect(bodyStr).not.toContain("想燙嗎");
+    expect(msg.altText).toContain("燙髮諮詢");
   });
 
-  it("color: title says 想染嗎？", () => {
+  it("color: title says 染髮諮詢 (V3.7 P2)", () => {
     const msg = serviceInquiryFlexMessage({ ...baseParams, serviceType: "color" });
     const bodyStr = JSON.stringify(msg.contents);
-    expect(bodyStr).toContain("想染嗎？");
-    expect(msg.altText).toContain("染");
+    expect(bodyStr).toContain("染髮諮詢");
+    expect(bodyStr).not.toContain("想染嗎");
+    expect(msg.altText).toContain("染髮諮詢");
   });
 
-  it("asks for the 3 photos admin needs (現況 / 目標色 / 呈現方式) — V3.7 audit", () => {
+  it("header reads 報價前請傳一下照片 (V3.7 P2)", () => {
     const msg = serviceInquiryFlexMessage({ ...baseParams, serviceType: "color" });
     const bodyStr = JSON.stringify(msg.contents);
-    expect(bodyStr).toContain("A.");
-    expect(bodyStr).toContain("B.");
-    expect(bodyStr).toContain("C.");
+    expect(bodyStr).toContain("報價前請傳一下照片");
+  });
+
+  it("asks for the 3 numbered photos (現況 / 目標色 / 呈現方式)", () => {
+    const msg = serviceInquiryFlexMessage({ ...baseParams, serviceType: "color" });
+    const bodyStr = JSON.stringify(msg.contents);
     expect(bodyStr).toContain("現況照");
     expect(bodyStr).toContain("目標色");
     expect(bodyStr).toContain("呈現方式");
   });
 
-  it("color variant lists 挑染／刷染／整頭染 examples for 呈現方式 — V3.7 audit", () => {
+  it("color variant lists 挑染／刷染／整頭染 examples for 呈現方式", () => {
     const msg = serviceInquiryFlexMessage({ ...baseParams, serviceType: "color" });
     const bodyStr = JSON.stringify(msg.contents);
     expect(bodyStr).toContain("挑染");
   });
 
-  it("includes shop name in subtitle", () => {
+  it("trailer reads 老闆會親自回覆", () => {
     const msg = serviceInquiryFlexMessage({ ...baseParams, serviceType: "color" });
     const bodyStr = JSON.stringify(msg.contents);
-    expect(bodyStr).toContain("測試店");
+    expect(bodyStr).toContain("老闆會親自回覆");
   });
 
   it("does NOT include 先預約看看 CTA — owner wants 諮詢→手動排程 (V3.7 audit)", () => {

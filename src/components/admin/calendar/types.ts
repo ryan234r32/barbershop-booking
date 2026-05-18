@@ -5,6 +5,21 @@
 
 export type CalendarView = "day" | "week" | "month";
 
+/**
+ * V3.7 Tier 0.2 — multi-service expansion. `services[]` 是新 source of truth
+ * (依 order asc 排序，order=0 為 primary)；`service` 仍保留為 legacy primary
+ * 給 BookingDetailFullPage 結帳邏輯使用。getBookingServicesLabel() 會自動 prefer
+ * services[] 拼出「剪 + 染 + 護」這種 chip 摘要，empty 才 fallback service.name。
+ */
+export interface BookingServiceItem {
+  id: string;
+  order: number;
+  price: number;
+  durationMin: number;
+  serviceId: string;
+  service: { id: string; name: string };
+}
+
 export interface Booking {
   id: string;
   date: string;
@@ -13,6 +28,7 @@ export interface Booking {
   status: string;
   slotsOccupied: number;
   service: { name: string; price: number; slotsNeeded: number };
+  services?: BookingServiceItem[];
   user: {
     id: string;
     displayName: string | null;

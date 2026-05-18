@@ -2958,149 +2958,243 @@ export function birthdayMessage(params: {
 }
 
 /**
- * Service inquiry Flex card — replies to keyword 「燙」/「染」 (PRD-v3 §7, V3.7 audit).
+ * Service inquiry Flex card — replies to keyword 「燙」/「染」 (V3.7 P2 rewrite).
  *
- * 漂髮 (bleach) is intentionally NOT routed here. Perm/color: ask the 3 photos
- * admin needs (A/B/C), then admin handles via LINE chat. Footer 「先預約看看」
- * was removed (V3.7 audit) because owner wants 諮詢 → 手動排程，not self-book first.
+ * 5/18 老闆 feedback：拿掉「想染嗎？」、「報價前」這種推銷話術，直接「報價前
+ * 請傳一下照片」+「老闆會親自回覆，再幫您手動排程」就好。視覺也要好看一點：
+ * brand 色 header bar / 編號 chip / icon emoji。
  */
 export function serviceInquiryFlexMessage(params: {
   serviceType: "perm" | "color";
   liffBaseUrl: string;
   shopName: string;
 }): FlexMessage {
-  const { serviceType, shopName } = params;
+  const { serviceType } = params;
   const isPerm = serviceType === "perm";
-  const verbLabel = isPerm ? "燙" : "染";
 
   const bubble: FlexBubble = {
     type: "bubble",
+    size: "kilo",
     header: {
       type: "box",
       layout: "vertical",
       contents: [
         {
           type: "text",
-          text: `想${verbLabel}嗎？`,
+          text: `${isPerm ? "燙髮" : "染髮"}諮詢`,
           weight: "bold",
           size: "xl",
-          color: "#003D2B",
+          color: "#FFF8F1",
         },
         {
           type: "text",
-          text: `${shopName}為您報價前，請傳以下照片：`,
+          text: "報價前請傳一下照片",
           size: "sm",
-          color: "#809A8E",
+          color: "#FFF8F1",
           margin: "sm",
-          wrap: true,
+          weight: "bold",
         },
       ],
-      backgroundColor: "#F3ECE4",
-      paddingAll: "lg",
+      backgroundColor: "#003D2B",
+      paddingAll: "xl",
+      paddingBottom: "lg",
     },
     body: {
       type: "box",
       layout: "vertical",
-      spacing: "md",
+      spacing: "lg",
       contents: [
-        infoRow("A.", "現況照（目前頭髮）"),
-        infoRow("B.", `目標色照（想要的成品色，可從 IG／Pinterest 找參考）`),
-        infoRow("C.", isPerm
-          ? "呈現方式照（整頭、局部、特殊造型等）"
-          : "呈現方式照（挑染、刷染、整頭染等）"),
+        photoRow("1", "📷", "現況照", "目前頭髮樣子"),
+        photoRow("2", "✨", "目標色照", "想要的成品色（IG／Pinterest 截圖也行）"),
+        photoRow(
+          "3",
+          isPerm ? "💁" : "🎨",
+          "呈現方式照",
+          isPerm ? "整頭／局部／特殊造型" : "挑染／刷染／整頭染",
+        ),
         {
           type: "separator",
-          margin: "lg",
+          margin: "md",
+          color: "#003D2B",
         },
         {
-          type: "text",
-          text: "📸 直接傳照片到這個對話框，老闆收到後會親自回覆評估時數與報價，再幫您手動排程。",
-          size: "xs",
-          color: "#809A8E",
-          wrap: true,
-          margin: "md",
+          type: "box",
+          layout: "vertical",
+          spacing: "xs",
+          contents: [
+            {
+              type: "text",
+              text: "老闆會親自回覆",
+              size: "sm",
+              weight: "bold",
+              color: "#003D2B",
+            },
+            {
+              type: "text",
+              text: "確認時數＋費用後，幫您手動排程進行事曆",
+              size: "xs",
+              color: "#809A8E",
+              wrap: true,
+            },
+          ],
+          paddingTop: "sm",
         },
       ],
-      paddingAll: "lg",
+      paddingAll: "xl",
+      backgroundColor: "#FFF8F1",
+    },
+    styles: {
+      body: { backgroundColor: "#FFF8F1" },
     },
   };
 
   return {
     type: "flex",
-    altText: `想${verbLabel}嗎？請提供：現況照、目標色照、呈現方式照`,
+    altText: `${isPerm ? "燙髮" : "染髮"}諮詢：請傳現況照、目標色照、呈現方式照，老闆會親自回覆`,
     contents: bubble,
   };
 }
 
 /**
- * 漂髮諮詢 Flex card — replies to keyword 「漂」 (PRD-v3 §3, V3.7 audit).
+ * 漂髮諮詢 Flex card — replies to keyword 「漂」 (V3.7 P2 rewrite).
  *
- * Bleach is high-judgement: outcome depends on hair condition + history.
- * V3.7 audit: removed LIFF form button — owner prefers replying inline in LINE
- * chat (matches their habit; LIFF /consultation is being deprecated). Ask the
- * 3 photos inline and let the customer just reply with them in the chat.
+ * Bleach is high-judgement (條件依髮況 + 歷史). Same visual language as 染/燙
+ * Flex (V3.7 P2 design unify)；warm 副本就好，不再推「填表單」(LIFF
+ * /consultation 廢中).
  */
-export function bleachConsultationFlexMessage(params: {
+export function bleachConsultationFlexMessage(_params: {
   liffBaseUrl: string;
   consultationLiffUrl: string;
   shopName: string;
 }): FlexMessage {
-  const { shopName } = params;
-
   const bubble: FlexBubble = {
     type: "bubble",
+    size: "kilo",
     header: {
       type: "box",
       layout: "vertical",
       contents: [
         {
           type: "text",
-          text: "想漂髮嗎？",
+          text: "漂髮諮詢",
           weight: "bold",
           size: "xl",
-          color: "#003D2B",
+          color: "#FFF8F1",
         },
         {
           type: "text",
-          text: `${shopName}會先確認髮況再報價，請傳以下照片：`,
+          text: "報價前請傳一下照片",
           size: "sm",
-          color: "#809A8E",
+          color: "#FFF8F1",
           margin: "sm",
-          wrap: true,
+          weight: "bold",
         },
       ],
-      backgroundColor: "#F3ECE4",
-      paddingAll: "lg",
+      backgroundColor: "#003D2B",
+      paddingAll: "xl",
+      paddingBottom: "lg",
     },
     body: {
       type: "box",
       layout: "vertical",
-      spacing: "md",
+      spacing: "lg",
       contents: [
-        infoRow("A.", "現況照（目前頭髮）"),
-        infoRow("B.", "目標色照（想要的成品色，可從 IG／Pinterest 找參考）"),
-        infoRow("C.", "呈現方式照（挑染、刷染、整頭等）"),
+        photoRow("1", "📷", "現況照", "目前頭髮樣子（顏色 / 長度）"),
+        photoRow("2", "✨", "目標色照", "想要的成品色（IG／Pinterest 截圖也行）"),
+        photoRow("3", "🎨", "呈現方式照", "挑染／刷染／整頭"),
         {
           type: "separator",
-          margin: "lg",
+          margin: "md",
+          color: "#003D2B",
         },
         {
-          type: "text",
-          text: "📸 直接傳照片到這個對話框，老闆收到後會親自確認次數、總時數與費用，再幫您手動排程。",
-          size: "xs",
-          color: "#809A8E",
-          wrap: true,
-          margin: "md",
+          type: "box",
+          layout: "vertical",
+          spacing: "xs",
+          contents: [
+            {
+              type: "text",
+              text: "老闆會親自回覆",
+              size: "sm",
+              weight: "bold",
+              color: "#003D2B",
+            },
+            {
+              type: "text",
+              text: "確認次數＋時數＋費用後，幫您手動排程進行事曆",
+              size: "xs",
+              color: "#809A8E",
+              wrap: true,
+            },
+          ],
+          paddingTop: "sm",
         },
       ],
-      paddingAll: "lg",
+      paddingAll: "xl",
+      backgroundColor: "#FFF8F1",
+    },
+    styles: {
+      body: { backgroundColor: "#FFF8F1" },
     },
   };
 
   return {
     type: "flex",
-    altText: `想漂髮嗎？請傳：現況照、目標色照、呈現方式照`,
+    altText: `漂髮諮詢：請傳現況照、目標色照、呈現方式照，老闆會親自回覆`,
     contents: bubble,
+  };
+}
+
+/** V3.7 P2 — numbered photo row used by perm / color / bleach inquiry cards. */
+function photoRow(num: string, emoji: string, title: string, sub: string) {
+  return {
+    type: "box" as const,
+    layout: "horizontal" as const,
+    spacing: "md" as const,
+    contents: [
+      {
+        type: "box" as const,
+        layout: "vertical" as const,
+        contents: [
+          {
+            type: "text" as const,
+            text: num,
+            size: "xl" as const,
+            weight: "bold" as const,
+            color: "#003D2B",
+            align: "center" as const,
+          },
+        ],
+        width: "28px",
+        height: "28px",
+        backgroundColor: "#F3ECE4",
+        cornerRadius: "14px",
+        justifyContent: "center" as const,
+        flex: 0,
+      },
+      {
+        type: "box" as const,
+        layout: "vertical" as const,
+        spacing: "xs" as const,
+        contents: [
+          {
+            type: "text" as const,
+            text: `${emoji} ${title}`,
+            size: "sm" as const,
+            weight: "bold" as const,
+            color: "#003D2B",
+          },
+          {
+            type: "text" as const,
+            text: sub,
+            size: "xs" as const,
+            color: "#809A8E",
+            wrap: true,
+          },
+        ],
+        flex: 1,
+      },
+    ],
   };
 }
 

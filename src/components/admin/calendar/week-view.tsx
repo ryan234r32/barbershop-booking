@@ -19,10 +19,10 @@ import { useAutoFit } from "./use-auto-fit";
 import {
   HOURS,
   WEEKDAYS,
-  abbreviateService,
   buildBookingIndex,
   chipClassForStatus,
   formatDate,
+  getBookingServicesLabel,
   indexBookingAtSlot,
   indexIsSlotOccupied,
   isPaid,
@@ -252,9 +252,9 @@ function WeekViewBase({
                       fullName,
                       compact ? 2 : 3,
                     );
-                    const serviceAbbr = abbreviateService(booking.service.name);
+                    const serviceAbbr = getBookingServicesLabel(booking, { compact: true });
                     const isDragging = draggedBooking?.id === booking.id;
-                    const tooltip = `${booking.startTime.slice(0, 5)} ${booking.service.name} · ${fullName}${paid ? " (已付款)" : ""}`;
+                    const tooltip = `${booking.startTime.slice(0, 5)} ${getBookingServicesLabel(booking)} · ${fullName}${paid ? " (已付款)" : ""}`;
                     return (
                       <td
                         key={dateStr + hour}

@@ -69,6 +69,19 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           service: { select: { name: true, duration: true, price: true, slotsNeeded: true } },
+          // V3.7 Tier 0.2 — multi-service expansion. 老闆行事曆要看到完整服務組合
+          // (剪+染+護)，不能只顯示 primary。orderBy 確保顯示順序一致。
+          services: {
+            orderBy: { order: "asc" },
+            select: {
+              id: true,
+              order: true,
+              price: true,
+              durationMin: true,
+              serviceId: true,
+              service: { select: { id: true, name: true } },
+            },
+          },
           // V3.7 Tier 1.8 — defaultDiscount 加進 list → CheckoutFullPage 開時自動帶熟客折扣
           user: { select: { id: true, displayName: true, lineUserId: true, phone: true, segment: true, totalVisits: true, notes: true, lastVisitAt: true, defaultDiscount: true } },
           payment: { select: { status: true, method: true, transferLastFive: true } },

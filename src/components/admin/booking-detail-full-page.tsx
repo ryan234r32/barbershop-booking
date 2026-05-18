@@ -60,6 +60,17 @@ export interface BookingDetail {
   /// OCC token — server returns this on every read; we send it back on writes.
   updatedAt?: string;
   service: { name: string; price: number; slotsNeeded: number };
+  /** V3.7 Tier 0.2 — full BookingService[] for multi-service bookings. When set,
+   *  customer summary card uses joined names + total price; falls back to single
+   *  `service` when empty (pre-backfill rows). */
+  services?: Array<{
+    id: string;
+    order: number;
+    price: number;
+    durationMin: number;
+    serviceId: string;
+    service: { id: string; name: string };
+  }>;
   user: BookingUser;
 }
 
@@ -591,8 +602,12 @@ function DetailView({
                 </span>
               )}
             </div>
+            {/* V3.7 Tier 0.2 — multi-service combined display. 老闆要看到完整
+                組合（剪+染+護），不能只顯示 primary。 */}
             <p className="text-sm text-[var(--color-text-body)]">
-              {booking.service.name} · NT${booking.service.price.toLocaleString()}
+              {booking.services && booking.services.length > 0
+                ? `${booking.services.map((r) => r.service.name).join(" + ")} · NT$${booking.services.reduce((sum, r) => sum + r.price, 0).toLocaleString()}`
+                : `${booking.service.name} · NT$${booking.service.price.toLocaleString()}`}
             </p>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
               {booking.startTime} — {booking.endTime}
@@ -844,7 +859,9 @@ function NotesView({
         </div>
         <h2 className="text-base font-bold text-[var(--color-text-primary)]">預約已完成！</h2>
         <p className="text-sm text-[var(--color-text-body)]">
-          {booking.user.displayName} — {booking.service.name}
+          {booking.user.displayName} — {booking.services && booking.services.length > 0
+            ? booking.services.map((r) => r.service.name).join(" + ")
+            : booking.service.name}
         </p>
       </div>
 
@@ -904,7 +921,9 @@ function RescheduleView({
   return (
     <>
       <p className="text-xs text-[var(--color-text-muted)] mb-4">
-        {booking.user.displayName} · {booking.service.name} · {booking.service.slotsNeeded} 小時
+        {booking.user.displayName} · {booking.services && booking.services.length > 0
+          ? booking.services.map((r) => r.service.name).join(" + ")
+          : booking.service.name} · {booking.service.slotsNeeded} 小時
       </p>
 
       <div className="mb-3">

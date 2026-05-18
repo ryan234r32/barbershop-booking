@@ -9,7 +9,7 @@
  */
 
 import React, { memo } from "react";
-import { WEEKDAYS, abbreviateService, chipClassForStatus } from "./utils";
+import { WEEKDAYS, chipClassForStatus, getBookingServicesLabel } from "./utils";
 import type { Booking, MonthlySummary } from "./types";
 
 interface Props {
@@ -143,8 +143,8 @@ function MonthViewBase({
                   <div className="flex-1 flex flex-col gap-0.5 items-start w-full">
                     {visibleChips.map((b) => {
                       const chipColor = chipClassForStatus(b);
-                      const svc = b.service.name;
-                      const svcAbbr = abbreviateService(svc);
+                      const svc = getBookingServicesLabel(b);
+                      const svcAbbr = getBookingServicesLabel(b, { compact: true });
                       return (
                         <div
                           key={b.id}

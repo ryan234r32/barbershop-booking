@@ -32,13 +32,30 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const booking = await prisma.booking.findFirst({
       where: { id, tenantId: admin.tenantId },
-      select: { id: true, status: true, services: { select: { order: true } } },
+      select: {
+        id: true,
+        status: true,
+        serviceId: true,
+        services: { select: { order: true, serviceId: true } },
+      },
     });
     if (!booking) {
       return Response.json({ error: "Booking not found" }, { status: 404 });
     }
     if (booking.status === "CANCELLED" || booking.status === "CANCELLED_BY_ADMIN" || booking.status === "NO_SHOW") {
       throw new AppError("已取消或爽約的預約不能加服務", 400, "invalid_state");
+    }
+
+    /* Codex review fix: reject duplicates server-side so a buggy/old client
+       can't poison BookingService[] with the same service twice (would skew
+       reporting + create confusing chip duplicates in admin UI). Includes the
+       legacy primary `serviceId` so pre-backfill bookings stay clean. */
+    const alreadyHaveSet = new Set<string>([
+      booking.serviceId,
+      ...booking.services.map((s) => s.serviceId),
+    ]);
+    if (alreadyHaveSet.has(input.serviceId)) {
+      throw new AppError("此服務已在此預約中，請改加其他服務", 400, "duplicate_service");
     }
 
     const service = await prisma.service.findFirst({

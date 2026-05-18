@@ -31,11 +31,11 @@ describe("Keyword reply Flex Messages", () => {
 
   describe("pricingCarouselMessage", () => {
     const services = [
-      { id: "svc-1", name: "男性剪髮", price: 1000, duration: 60, description: "洗髮 · 精修剪裁 · 造型完成", imageUrl: null },
-      { id: "svc-2", name: "女性剪髮", price: 1100, duration: 60, description: "洗髮 · 剪裁設計 · 吹整造型", imageUrl: null },
-      { id: "svc-3", name: "染髮", price: 2600, duration: 180, description: "全頭染色，打造專屬髮色", imageUrl: null },
-      { id: "svc-4", name: "溫塑燙", price: 4000, duration: 180, description: "溫感塑型，打造自然捲度", imageUrl: null },
-      { id: "svc-5", name: "結構式護髮", price: 2200, duration: 60, description: "深層修護，重建髮絲結構", imageUrl: null },
+      { id: "svc-1", name: "男性剪髮", price: 1100, duration: 60, description: "洗髮 · 精修剪裁 · 造型完成", imageUrl: null },
+      { id: "svc-2", name: "女性剪髮", price: 1200, duration: 60, description: "洗髮 · 剪裁設計 · 吹整造型", imageUrl: null },
+      { id: "svc-3", name: "染髮", price: 2600, duration: 120, description: "全頭染色（過胸 / 過腰加價）", imageUrl: null },
+      { id: "svc-4", name: "溫塑燙", price: 4200, duration: 240, description: "溫感塑型（過胸 / 過腰加價）", imageUrl: null },
+      { id: "svc-5", name: "護髮", price: 1600, duration: 60, description: "綁定染或燙的優惠價", imageUrl: null },
     ];
 
     it("returns a Flex Carousel", () => {
