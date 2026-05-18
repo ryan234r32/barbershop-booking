@@ -81,7 +81,9 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
   const [source, setSource] = useState<"PHONE" | "WALK_IN">("PHONE");
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
-  const [serviceId, setServiceId] = useState("");
+  // V3.7 P0 multi-service (5/18 老闆反饋): admin 新增預約應該能一次選多個服務
+  // (剪 + 染 + 護)，總時數 = sum slotsNeeded。不再限定 1hr。
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [isTest, setIsTest] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -95,14 +97,26 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
   const { toast } = useToast();
 
   const { data: servicesData } = useSWR("/api/services", fetcher);
+  // Show ALL services regardless of duration. Multi-select; total time auto-computed.
   const allServices: Service[] = servicesData?.services || [];
-  const services = allServices.filter((s) => s.slotsNeeded === duration);
+  // Stable display order = catalog order from API (already sortOrder asc server-side).
+  const selectedServices = selectedServiceIds
+    .map((id) => allServices.find((s) => s.id === id))
+    .filter((s): s is Service => !!s);
+  const totalSlots = selectedServices.reduce((sum, s) => sum + s.slotsNeeded, 0);
+  const totalPrice = selectedServices.reduce((sum, s) => sum + s.price, 0);
+  const totalDuration = selectedServices.reduce((sum, s) => sum + s.duration, 0);
 
+  // Reset stale selections when sheet closes / reopens for a different slot.
   useEffect(() => {
-    if (serviceId && !services.some((s) => s.id === serviceId)) {
-      setServiceId("");
-    }
-  }, [duration, services, serviceId]);
+    if (!open) setSelectedServiceIds([]);
+  }, [open]);
+
+  const toggleService = (id: string) => {
+    setSelectedServiceIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
 
   // (FullscreenModal handles body scroll lock + ESC; nothing extra needed here.)
 
@@ -157,8 +171,8 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
   };
 
   const handleSubmit = async () => {
-    if (!customerName.trim() || !serviceId) {
-      toast({ type: "error", message: "請填寫客人姓名和選擇服務" });
+    if (!customerName.trim() || selectedServiceIds.length === 0) {
+      toast({ type: "error", message: "請填寫客人姓名和選擇至少一個服務" });
       return;
     }
     setLoading(true);
@@ -176,7 +190,8 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
           customerId: boundCustomer?.id,
           displayName: customerName.trim(),
           phone: phone.trim() || undefined,
-          serviceId,
+          // V3.7 P0 multi-service — send full array; server sums slotsNeeded / price.
+          serviceIds: selectedServiceIds,
           date,
           startTime: time,
           source,
@@ -192,7 +207,7 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
       onCreated();
       setCustomerName("");
       setPhone("");
-      setServiceId("");
+      setSelectedServiceIds([]);
       setNotes("");
       setBoundCustomer(null);
       setIsTest(false);
@@ -223,9 +238,12 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
 
   const dateObj = new Date(date + "T00:00:00+08:00");
   const startHour = parseInt(time.split(":")[0]);
-  const endTime = `${String(startHour + duration).padStart(2, "0")}:00`;
-  const dateDisplay = duration > 1
-    ? `${dateObj.getMonth() + 1}/${dateObj.getDate()} (${WEEKDAYS[dateObj.getDay()]}) ${time} — ${endTime}（${duration} 小時）`
+  // Effective slots: if user has picked services, use sum; else hint from props
+  // (default duration=1 just for the "starting at" header before any pick).
+  const effectiveSlots = totalSlots || duration;
+  const endTime = `${String(startHour + effectiveSlots).padStart(2, "0")}:00`;
+  const dateDisplay = effectiveSlots > 1
+    ? `${dateObj.getMonth() + 1}/${dateObj.getDate()} (${WEEKDAYS[dateObj.getDay()]}) ${time} — ${endTime}（${effectiveSlots} 小時）`
     : `${dateObj.getMonth() + 1}/${dateObj.getDate()} (${WEEKDAYS[dateObj.getDay()]}) ${time}（1 小時）`;
 
   const segmentLabels: Record<string, string> = {
@@ -322,28 +340,57 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
           />
         </div>
 
-        {/* Service */}
+        {/* Service multi-select (V3.7 P0 — 老闆 5/18 反饋) */}
         <div className="mb-3">
-          <label className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider block mb-1">
-            選擇服務（{duration} 小時）
-          </label>
-          {services.length === 0 ? (
-            <p className="text-xs text-[var(--color-danger)] py-2">
-              沒有符合 {duration} 小時的服務，請調整時長。
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider">
+              選擇服務（可複選）
+            </label>
+            {selectedServiceIds.length > 0 && (
+              <span className="text-[11px] font-semibold text-[var(--color-brand)] tabular-nums">
+                共 {totalSlots} 小時 · NT${totalPrice.toLocaleString()}
+              </span>
+            )}
+          </div>
+          {allServices.length === 0 ? (
+            <p className="text-xs text-[var(--color-text-muted)] py-2">
+              載入服務中…
             </p>
           ) : (
-            <select
-              value={serviceId}
-              onChange={(e) => setServiceId(e.target.value)}
-              className="w-full border-b border-[var(--color-brand)] bg-transparent py-2 text-sm text-[var(--color-text-body)] outline-none"
-            >
-              <option value="">請選擇</option>
-              {services.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} · {s.duration}分 · NT${s.price.toLocaleString()}
-                </option>
-              ))}
-            </select>
+            <div className="grid grid-cols-2 gap-1.5">
+              {allServices.map((s) => {
+                const checked = selectedServiceIds.includes(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => toggleService(s.id)}
+                    className={`relative text-left px-3 py-2.5 rounded-lg border-2 transition-all ${
+                      checked
+                        ? "bg-[var(--color-brand)]/10 border-[var(--color-brand)]"
+                        : "bg-white border-[var(--color-text-muted)]/15 hover:border-[var(--color-text-muted)]/30"
+                    }`}
+                  >
+                    {checked && (
+                      <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[var(--color-brand)] text-white text-[10px] inline-flex items-center justify-center font-bold">
+                        ✓
+                      </span>
+                    )}
+                    <div className="text-[13px] font-medium text-[var(--color-text-primary)] pr-5 truncate">
+                      {s.name}
+                    </div>
+                    <div className="text-[11px] text-[var(--color-text-muted)] mt-0.5 tabular-nums">
+                      {s.slotsNeeded} 小時 · NT${s.price.toLocaleString()}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {selectedServices.length > 1 && (
+            <p className="text-[11px] text-[var(--color-text-muted)] mt-2">
+              {selectedServices.map((s) => s.name).join(" + ")}（{totalDuration} 分）
+            </p>
           )}
         </div>
 

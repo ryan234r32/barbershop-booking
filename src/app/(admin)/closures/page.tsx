@@ -24,6 +24,16 @@ interface Holiday {
   reason: string | null;
 }
 
+interface ClosureConflict {
+  id: string;
+  startTime: string;
+  endTime: string;
+  customerName: string;
+  customerPhone: string | null;
+  customerLineUserId: string;
+  serviceName: string;
+}
+
 interface BusinessConfig {
   closedWeekdays: number[];
 }
@@ -203,12 +213,12 @@ function ClosureModal({
   const headerDate = new Date(date + "T00:00:00+08:00");
   const dateLabel = `${headerDate.getMonth() + 1}/${headerDate.getDate()} (${WEEKDAY_LABELS[headerDate.getDay()]})`;
 
-  const save = async () => {
+  /** V3.7 P2 (5/18 老闆反饋) — 衝突預約清單。第一次按儲存若 server 回 422
+   *  + requiresConfirmation，先 show 衝突 modal；客戶確認後再帶 force=true. */
+  const [conflicts, setConflicts] = useState<ClosureConflict[] | null>(null);
+
+  const performSave = async (force: boolean) => {
     if (submitting) return;
-    if (mode === "partial" && startHour >= endHour) {
-      toast({ type: "error", message: "結束時間必須晚於開始時間" });
-      return;
-    }
     setSubmitting(true);
     try {
       const body: Record<string, unknown> = { date };
@@ -217,22 +227,36 @@ function ClosureModal({
         body.endTime = `${endHour.toString().padStart(2, "0")}:00`;
       }
       if (reason.trim()) body.reason = reason.trim();
+      if (force) body.force = true;
       const res = await fetch("/api/admin/holidays", {
         method: "POST",
         headers: adminHeaders(),
         body: JSON.stringify(body),
       });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 422 && data?.requiresConfirmation) {
+        setConflicts(data.conflicts || []);
+        return;
+      }
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "儲存失敗");
+        throw new Error(data?.error || "儲存失敗");
       }
       toast({ type: "success", message: existing ? "已更新公休" : "已設為公休" });
+      setConflicts(null);
       onSaved();
     } catch (err) {
       toast({ type: "error", message: err instanceof Error ? err.message : "儲存失敗" });
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const save = async () => {
+    if (mode === "partial" && startHour >= endHour) {
+      toast({ type: "error", message: "結束時間必須晚於開始時間" });
+      return;
+    }
+    await performSave(false);
   };
 
   const remove = async () => {
@@ -361,6 +385,62 @@ function ClosureModal({
             </button>
           )}
         </div>
+
+        {/* V3.7 P2 conflict warning — server 偵測到該日期有現有預約，先讓
+            老闆 review (改期 / 致電 / 強制設) 再儲存。 */}
+        {conflicts && conflicts.length > 0 && (
+          <div className="mt-5 rounded-xl bg-[var(--color-danger)]/8 border border-[var(--color-danger)]/40 p-3.5">
+            <div className="flex items-start gap-2 mb-2">
+              <span className="text-[var(--color-danger)] mt-px">⚠️</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-[var(--color-danger)]">
+                  此日期已有 {conflicts.length} 筆預約衝突
+                </p>
+                <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
+                  建議先通知客人改期或取消，再設定公休
+                </p>
+              </div>
+            </div>
+            <ul className="space-y-1.5 mb-3">
+              {conflicts.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex items-center justify-between bg-white rounded-lg px-2.5 py-2 text-[12px]"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-[var(--color-text-primary)] truncate">
+                      {c.startTime.slice(0, 5)} {c.customerName}
+                    </div>
+                    <div className="text-[11px] text-[var(--color-text-muted)] truncate">
+                      {c.serviceName}
+                      {c.customerPhone ? ` · ${c.customerPhone}` : ""}
+                    </div>
+                  </div>
+                  {c.customerLineUserId.startsWith("U") && (
+                    <span className="text-[10px] text-[var(--color-brand)] bg-[var(--color-brand)]/10 px-1.5 py-0.5 rounded">
+                      LINE
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setConflicts(null)}
+                className="flex-1 h-10 rounded-lg bg-white border border-[var(--color-text-muted)]/20 text-sm font-medium text-[var(--color-text-body)]"
+              >
+                先處理客人
+              </button>
+              <button
+                onClick={() => performSave(true)}
+                disabled={submitting}
+                className="flex-1 h-10 rounded-lg bg-[var(--color-danger)] text-white text-sm font-semibold disabled:opacity-50"
+              >
+                強制設定公休
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

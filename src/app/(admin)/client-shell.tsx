@@ -30,6 +30,16 @@ function useGlobalScrollLockSafetyNet() {
   useEffect(() => {
     document.body.style.overflow = "";
     document.body.style.overflowX = "";
+    // 5/18 老闆 repro：bottom tab bar 跑到 viewport 中間。Modal/Sheet 元件
+    // 有時 leak `position: fixed` 在 body 上（防背景滾動），fixed body
+    // 會打斷 child `position: fixed` 對 viewport 的錨定 → tab bar 變成相對
+    // body 而非 viewport。每次路由切換都把這幾個 leak-prone props 清掉。
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.left = "";
+    document.body.style.right = "";
+    document.body.style.width = "";
+    document.body.style.height = "";
     document.documentElement.style.overflow = "";
     document.documentElement.style.overflowX = "";
   }, [pathname]);

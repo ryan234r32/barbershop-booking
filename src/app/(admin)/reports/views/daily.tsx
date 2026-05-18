@@ -9,7 +9,7 @@ import { DateStrip } from "@/components/admin/reports/v3.6/date-strip";
 import { NewBookingSheet } from "@/components/admin/new-booking-sheet";
 import { ExpenseEntrySheet } from "@/components/admin/expense-entry-sheet";
 import { DailyCloseSheet } from "@/components/admin/daily-close-sheet";
-import { CATEGORY_LABELS, type ExpenseCategory } from "@/lib/expenses/categories";
+import { getCategoryLabel, isPredefinedCategory } from "@/lib/expenses/categories";
 import type { DailyView, DailyBookingRow } from "@/lib/reports/v3.6/aggregates";
 import { ADMIN_MAX_ADVANCE_DAYS } from "@/lib/utils/constants";
 
@@ -17,7 +17,8 @@ interface ExpenseRowData {
   id: string;
   date: string;
   amount: number;
-  category: ExpenseCategory;
+  /** V3.7 P1-4 — 自訂分類後 category 是 free-text string，不再限定 enum。 */
+  category: string;
   type: "FIXED" | "VARIABLE";
   paidMethod: "CASH" | "BANK_TRANSFER";
   notes: string | null;
@@ -762,15 +763,21 @@ function ExpenseRow({
     if (res.ok) onDeleted();
     else alert("刪除失敗");
   };
-  // V3.7 — 「其他」 類別把使用者填的品項放在 notes 開頭（以 ` · ` 分隔）。
-  // 顯示時把 customItem 提到主標題，剩餘 notes 放副標。
-  const isOther = expense.category === "other";
-  let primaryLabel: string = CATEGORY_LABELS[expense.category];
+  // V3.7 P1-4 — 顯示優先序：
+  // 1. enum 預設值 → 中文 label (e.g. "marketing" → "行銷推廣")
+  // 2. 自訂 free-text → 原樣顯示 (e.g. "保時捷保養")
+  // 3. legacy "other" + notes 開頭品項 → 提到主標題 (舊資料兼容)
+  const isPredefined = isPredefinedCategory(expense.category);
+  const isLegacyOther = expense.category === "other";
+  let primaryLabel: string = getCategoryLabel(expense.category);
   let subNote = expense.notes;
-  if (isOther && expense.notes) {
+  if (isLegacyOther && expense.notes) {
     const parts = expense.notes.split(" · ");
     primaryLabel = parts[0];
     subNote = parts.length > 1 ? parts.slice(1).join(" · ") : null;
+  } else if (!isPredefined && !primaryLabel) {
+    // Safety net: completely empty category → "未分類" 而不是空白 row
+    primaryLabel = "未分類";
   }
   return (
     <div className="flex items-center gap-3 py-2 px-1 border-b border-[var(--color-surface)] last:border-b-0">

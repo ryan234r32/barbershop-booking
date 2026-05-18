@@ -43,7 +43,13 @@ export function AdminTabBar() {
     //   active:bg-...  = 點下去有視覺回饋（之前無反饋，老闆以為沒點到）
     //   flex-1 取代 w-full = 每個 cell 真的等寬，不會某個 tab 被擠小
     //   <Link prefetch> 已是 Next.js default，但顯式宣告以保險
-    <nav className="fixed bottom-0 left-0 right-0 z-40 lg:hidden border-t border-[var(--color-surface)] bg-[var(--color-bg)] safe-area-bottom">
+    <nav
+      /* 5/18 老闆 repro：tab bar 捲動時跑掉位置（iOS PWA + body 殘留 position:fixed
+         的常見副作用）。translate3d + isolation 強制 own compositing layer，讓
+         viewport 錨定不受 body transform 干擾。 */
+      style={{ transform: "translate3d(0, 0, 0)", isolation: "isolate" }}
+      className="fixed bottom-0 left-0 right-0 z-40 lg:hidden border-t border-[var(--color-surface)] bg-[var(--color-bg)] safe-area-bottom"
+    >
       <div className="flex items-stretch h-16">
         {TABS.map((tab) => {
           const isActive =
