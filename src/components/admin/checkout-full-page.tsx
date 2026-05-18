@@ -117,7 +117,9 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
       } else {
         setServiceAmount("");
       }
-      setProducts([]);
+      // V3.7 Tier 0.1.D — 預設展開 1 空 row（老闆要求「不用點新增商品」）
+      // 空 row 在 handleSubmit filter 時自動忽略（p.name.trim() && price > 0 才算數）
+      setProducts([newProductLine()]);
       setNotes("");
       setLoading(false);
       setWalkinOption("invite");
@@ -391,57 +393,51 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
                   )}
                 </div>
 
-                {/* Products (free text — see ProductLine docstring at top) */}
-                {/* V3.7 Tier 0.4 (autoplan D-I): 加購 button 從 text-xs 升到 min-h-[44px]
-                    符合 touch target；inline 大按鈕避免老闆濕手摸不到。 */}
+                {/* V3.7 Tier 0.1.D — 加購商品 redesign:
+                      老闆要求：預設展開 1 row 不要點「新增商品」
+                      UI 清楚化：標題往上、row 邊框 + label 變大 + 加大商品名 input
+                      空 row 不會送出（handleSubmit filter 過濾） */}
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider">
+                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">
                     加購商品
+                    <span className="ml-2 text-[10px] font-normal text-[var(--color-text-muted)]">
+                      未填空白會自動忽略
+                    </span>
                   </p>
-                  <button
-                    type="button"
-                    onClick={addProduct}
-                    className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-md bg-[var(--color-brand)]/10 text-[var(--color-brand)] text-sm font-semibold hover:bg-[var(--color-brand)]/20 transition-colors"
-                  >
-                    <Plus size={16} />
-                    新增商品
-                  </button>
                 </div>
-                {products.length === 0 ? (
-                  <p className="text-[11px] text-[var(--color-text-muted)] mb-5">
-                    若客人有加購商品（造型品、護髮油等）請點「新增商品」加入。
-                  </p>
-                ) : (
-                  <div className="space-y-2 mb-5">
-                    {products.map((p) => (
-                      <div
-                        key={p.id}
-                        className="flex items-center gap-2 rounded-lg border border-[var(--color-surface)] px-3 py-2"
-                      >
-                        <input
-                          value={p.name}
-                          onChange={(e) => updateProduct(p.id, { name: e.target.value })}
-                          placeholder="商品名稱"
-                          className="flex-1 min-w-0 bg-transparent text-sm text-[var(--color-text-body)] outline-none placeholder:text-[var(--color-text-disabled)]"
-                          aria-label="商品名稱"
-                        />
-                        <span className="text-xs text-[var(--color-text-muted)] shrink-0">NT$</span>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          value={p.price === "" ? "" : p.price}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            if (v === "") updateProduct(p.id, { price: "" });
-                            else {
-                              const n = Number(v);
-                              if (Number.isFinite(n) && n >= 0) updateProduct(p.id, { price: Math.floor(n) });
-                            }
-                          }}
-                          placeholder="0"
-                          className="w-20 bg-transparent text-sm text-[var(--color-text-body)] outline-none text-right placeholder:text-[var(--color-text-disabled)] tabular-nums"
-                          aria-label="商品金額"
-                        />
+                <div className="space-y-2 mb-3">
+                  {products.map((p, i) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center gap-2 rounded-lg border border-[var(--color-brand)]/15 bg-[var(--color-bg)] px-3 py-2.5"
+                    >
+                      <span className="text-xs text-[var(--color-text-muted)] shrink-0 font-mono">
+                        {i + 1}.
+                      </span>
+                      <input
+                        value={p.name}
+                        onChange={(e) => updateProduct(p.id, { name: e.target.value })}
+                        placeholder="洗髮精 / 護髮油 / 髮蠟 …"
+                        className="flex-1 min-w-0 bg-transparent text-base text-[var(--color-text-body)] outline-none placeholder:text-[var(--color-text-disabled)] placeholder:text-sm"
+                        aria-label="商品名稱"
+                      />
+                      <span className="text-xs text-[var(--color-text-muted)] shrink-0">NT$</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={p.price === "" ? "" : p.price}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v === "") updateProduct(p.id, { price: "" });
+                          else {
+                            const n = Number(v);
+                            if (Number.isFinite(n) && n >= 0) updateProduct(p.id, { price: Math.floor(n) });
+                          }
+                        }}
+                        placeholder="0"
+                        className="w-20 bg-transparent text-base font-semibold text-[var(--color-text-body)] outline-none text-right placeholder:text-[var(--color-text-disabled)] tabular-nums"
+                        aria-label="商品金額"
+                      />
                         <button
                           type="button"
                           onClick={() => removeProduct(p.id)}
@@ -452,8 +448,15 @@ export function CheckoutFullPage({ booking, open, onOpenChange, onCompleted }: P
                         </button>
                       </div>
                     ))}
-                  </div>
-                )}
+                  <button
+                    type="button"
+                    onClick={addProduct}
+                    className="inline-flex items-center gap-1 text-xs text-[var(--color-brand)] hover:opacity-80 transition-opacity mt-1"
+                  >
+                    <Plus size={14} />
+                    再加一筆
+                  </button>
+                </div>
 
                 {/* Notes */}
                 <div className="mb-6">

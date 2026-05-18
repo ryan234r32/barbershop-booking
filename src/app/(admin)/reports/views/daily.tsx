@@ -920,16 +920,22 @@ function BookingRow({
   // (LIFF/PHONE/WALK_IN/ADMIN)，只保留 payment method pill (現金/轉帳·12345)。
   // const sourceBadge = formatSourceBadge(row.bookingSource);  // disabled per
   void formatSourceBadge;  // 保留 function 但 not used，避免 TS unused warning
-  // V3.8 §3 老闆反映：要看到末 5 碼 + 現場/轉帳 分明。把付款方式做成 pill：
-  // - 現金 → 綠色 pill「現金」
-  // - 轉帳含末 5 碼 → 琥珀 pill「轉帳·12345」（強調，提醒老闆對帳）
-  // - 轉帳但無末 5 碼 → 琥珀 pill「轉帳」
+  // V3.8 §3 + V3.7 Tier 0.1.D — pill UX 升級。
+  // - 現金 → 綠 pill「現金」
+  // - 轉帳含末 5 碼 → 琥珀 pill「轉帳·12345」(可確認)
+  // - 轉帳「待五碼」→ 紅 pill「轉帳·待五碼」(老闆需主動催 LINE)
+  //   ↳ 老闆 5/18 反映兩筆 pill 不一致很困惑 — 加 "待五碼" 字樣 + 紅色突出
   const paymentPill =
     row.paymentMethod === "BANK_TRANSFER"
-      ? {
-          label: row.transferLastFive ? `轉帳·${row.transferLastFive}` : "轉帳",
-          tone: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
-        }
+      ? row.transferLastFive
+        ? {
+            label: `轉帳·${row.transferLastFive}`,
+            tone: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
+          }
+        : {
+            label: "轉帳·待五碼",
+            tone: "bg-[var(--color-danger)]/15 text-[var(--color-danger)] font-bold",
+          }
       : row.paymentMethod === "CASH"
         ? {
             label: "現金",

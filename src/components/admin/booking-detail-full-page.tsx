@@ -746,67 +746,60 @@ function DetailView({
         </div>
       )}
 
-      {/* Customer history accordion — recent bookings + full notes + violations.
-          Native <details> avoids pulling in a new component dep. The chevron
-          rotates via group-open utility. */}
-      <details className="mt-4 group rounded-lg bg-[var(--color-surface)] [&>summary]:list-none">
-        <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer">
-          <span className="text-xs font-medium text-[var(--color-text-body)]">
-            最近預約與備註
-          </span>
-          <ChevronRight
-            size={14}
-            aria-hidden
-            className="text-[var(--color-text-muted)] transition-transform group-open:rotate-90"
-          />
-        </summary>
-        <div className="px-3 pb-3 space-y-3 border-t border-[var(--color-text-muted)]/10 pt-3">
-          {(customer?.notes ?? booking.user.notes) && (
-            <div>
-              <p className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider mb-1">
-                備註
-              </p>
-              <p className="text-sm text-[var(--color-text-body)] whitespace-pre-line">
-                {customer?.notes ?? booking.user.notes}
-              </p>
-            </div>
-          )}
-          {customer && customer.violationCount > 0 && (
-            <p className="text-[11px] text-[var(--color-danger)]">
-              違規 {customer.violationCount} 次
-            </p>
-          )}
+      {/* V3.7 Tier 0.1.D — Customer history 不再用 <details> 折疊。
+          老闆反映：點不開折疊很煩、版面節省的價值小於資訊延遲。
+          直接 inline 顯示。空 state 也顯示讓老闆知道「有查過、沒紀錄」。 */}
+      <div className="mt-4 rounded-lg bg-[var(--color-surface)] px-3 py-3 space-y-3">
+        <p className="text-xs font-semibold text-[var(--color-text-body)]">
+          最近預約與備註
+        </p>
+        {(customer?.notes ?? booking.user.notes) ? (
           <div>
-            <p className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider mb-1.5">
-              最近 5 筆預約
+            <p className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider mb-1">
+              備註
             </p>
-            {customer ? (
-              recentBookings.length === 0 ? (
-                <p className="text-xs text-[var(--color-text-muted)]">無紀錄</p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {recentBookings.map((b) => (
-                    <li
-                      key={b.id}
-                      className="flex items-center justify-between gap-2 text-xs"
-                    >
-                      <span className="text-[var(--color-text-body)] truncate">
-                        {formatYMD(b.date)} · {b.service.name}
-                      </span>
-                      <span className="shrink-0 text-[var(--color-text-muted)]">
-                        {BOOKING_STATUS_LABEL[b.status] ?? b.status} · NT$
-                        {b.service.price.toLocaleString()}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )
-            ) : (
-              <p className="text-xs text-[var(--color-text-muted)]">載入中…</p>
-            )}
+            <p className="text-sm text-[var(--color-text-body)] whitespace-pre-line">
+              {customer?.notes ?? booking.user.notes}
+            </p>
           </div>
+        ) : (
+          <p className="text-[11px] text-[var(--color-text-muted)] italic">無備註</p>
+        )}
+        {customer && customer.violationCount > 0 && (
+          <p className="text-[11px] text-[var(--color-danger)]">
+            違規 {customer.violationCount} 次
+          </p>
+        )}
+        <div>
+          <p className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider mb-1.5">
+            最近 5 筆預約
+          </p>
+          {customer ? (
+            recentBookings.length === 0 ? (
+              <p className="text-xs text-[var(--color-text-muted)]">無紀錄</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {recentBookings.map((b) => (
+                  <li
+                    key={b.id}
+                    className="flex items-center justify-between gap-2 text-xs"
+                  >
+                    <span className="text-[var(--color-text-body)] truncate">
+                      {formatYMD(b.date)} · {b.service.name}
+                    </span>
+                    <span className="shrink-0 text-[var(--color-text-muted)]">
+                      {BOOKING_STATUS_LABEL[b.status] ?? b.status} · NT$
+                      {b.service.price.toLocaleString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : (
+            <p className="text-xs text-[var(--color-text-muted)]">載入中…</p>
+          )}
         </div>
-      </details>
+      </div>
     </>
   );
 }

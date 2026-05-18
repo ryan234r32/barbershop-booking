@@ -37,8 +37,14 @@ export function AdminTabBar() {
   const unread = data?.totalUnread ?? 0;
 
   return (
+    // V3.7 Tier 0.1.D — h-14 (56pt) → h-16 (64pt) + touch-manipulation + active feedback
+    // 解決使用者反映「點擊很常沒反應」+「版面太小」。
+    //   touch-manipulation = 移除 iOS 300ms 點擊延遲（瀏覽器預設等 double-tap-zoom）
+    //   active:bg-...  = 點下去有視覺回饋（之前無反饋，老闆以為沒點到）
+    //   flex-1 取代 w-full = 每個 cell 真的等寬，不會某個 tab 被擠小
+    //   <Link prefetch> 已是 Next.js default，但顯式宣告以保險
     <nav className="fixed bottom-0 left-0 right-0 z-40 lg:hidden border-t border-[var(--color-surface)] bg-[var(--color-bg)] safe-area-bottom">
-      <div className="flex items-center justify-around h-14">
+      <div className="flex items-stretch h-16">
         {TABS.map((tab) => {
           const isActive =
             pathname === tab.href || pathname.startsWith(tab.href + "/");
@@ -48,9 +54,12 @@ export function AdminTabBar() {
             <Link
               key={tab.href}
               href={tab.href}
+              prefetch
+              style={{ touchAction: "manipulation" }}
               className={`
-                flex flex-col items-center justify-center gap-0.5 w-full h-full relative
-                transition-colors duration-150
+                flex flex-col items-center justify-center gap-0.5 flex-1 relative
+                transition-colors duration-100
+                active:bg-[var(--color-surface)]/60
                 ${isActive
                   ? "text-[var(--color-brand)]"
                   : "text-[var(--color-text-muted)]"
@@ -61,14 +70,14 @@ export function AdminTabBar() {
                 <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-[var(--color-brand)] rounded-full" />
               )}
               <div className="relative">
-                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.5} />
+                <Icon size={22} strokeWidth={isActive ? 2.2 : 1.5} />
                 {tab.href === "/messages" && unread > 0 && (
                   <span className="absolute -top-1.5 -right-2 min-w-[16px] h-[16px] px-1 rounded-full bg-[var(--color-danger)] text-white text-[9px] font-bold leading-[16px] text-center">
                     {unread > 9 ? "9+" : unread}
                   </span>
                 )}
               </div>
-              <span className="text-[10px] font-medium tracking-wide">
+              <span className="text-[11px] font-medium tracking-wide">
                 {tab.label}
               </span>
             </Link>
