@@ -1103,6 +1103,157 @@ export function businessInfoMessage(params: {
   };
 }
 
+/** FAQ guide Flex Message — used by Rich Menu "常見問題". */
+export function faqGuideMessage(params: {
+  liffBaseUrl: string;
+  shopPhone?: string;
+}): FlexMessage {
+  const tel = params.shopPhone?.replace(/[^\d+]/g, "");
+  const urgentContactAction = tel
+    ? { type: "uri" as const, label: "打電話聯絡", uri: `tel:${tel}` }
+    : { type: "message" as const, label: "聯絡店家", text: "電話" };
+  const leaveMessageAction = {
+    type: "message" as const,
+    label: "留下訊息",
+    text: "我想留言給店家",
+  };
+
+  const makeBubble = (item: {
+    eyebrow: string;
+    title: string;
+    body: string;
+    primaryLabel: string;
+    action:
+      | { type: "uri"; label: string; uri: string }
+      | { type: "message"; label: string; text: string };
+    secondary?: {
+      label: string;
+      action:
+        | { type: "uri"; label: string; uri: string }
+        | { type: "message"; label: string; text: string };
+    };
+  }): FlexBubble => ({
+    type: "bubble",
+    size: "kilo",
+    body: {
+      type: "box",
+      layout: "vertical",
+      backgroundColor: "#FFF8F1",
+      paddingAll: "20px",
+      contents: [
+        {
+          type: "text",
+          text: item.eyebrow,
+          size: "xxs",
+          weight: "bold",
+          color: "#9CB1A4",
+          margin: "none",
+        },
+        {
+          type: "text",
+          text: item.title,
+          size: "xl",
+          weight: "bold",
+          color: "#003D2B",
+          margin: "sm",
+          wrap: true,
+        },
+        {
+          type: "text",
+          text: item.body,
+          size: "sm",
+          color: "#2D3A30",
+          margin: "md",
+          wrap: true,
+        },
+      ],
+    },
+    footer: {
+      type: "box",
+      layout: "vertical",
+      backgroundColor: "#FFF8F1",
+      spacing: "sm",
+      paddingAll: "12px",
+      contents: [
+        {
+          type: "button",
+          action: {
+            ...item.action,
+            label: item.primaryLabel,
+          },
+          style: "primary",
+          color: "#003D2B",
+          height: "sm",
+        },
+        ...(item.secondary
+          ? [
+              {
+                type: "button" as const,
+                action: {
+                  ...item.secondary.action,
+                  label: item.secondary.label,
+                },
+                style: "secondary" as const,
+                height: "sm" as const,
+              },
+            ]
+          : []),
+      ],
+    },
+  });
+
+  const carousel: FlexCarousel = {
+    type: "carousel",
+    contents: [
+      makeBubble({
+        eyebrow: "FAQ 01",
+        title: "想預約剪髮？",
+        body: "點立即預約，選服務、日期、時段。確認前系統會檢查資料是否完整。",
+        primaryLabel: "立即預約",
+        action: { type: "uri", label: "立即預約", uri: `${params.liffBaseUrl}/booking` },
+      }),
+      makeBubble({
+        eyebrow: "FAQ 02",
+        title: "要取消或改期？",
+        body: "到我的預約找到該筆預約，就能查看取消與改期按鈕。24 小時內請直接聯絡店家。",
+        primaryLabel: "查看我的預約",
+        action: { type: "uri", label: "查看我的預約", uri: `${params.liffBaseUrl}/my-bookings` },
+      }),
+      makeBubble({
+        eyebrow: "FAQ 03",
+        title: "想看服務和價格？",
+        body: "服務項目會列出剪髮、染髮、燙髮等項目。需要討論髮況時，系統會引導諮詢。",
+        primaryLabel: "查看服務項目",
+        action: { type: "message", label: "查看服務項目", text: "服務" },
+      }),
+      makeBubble({
+        eyebrow: "FAQ 04",
+        title: "匯款怎麼操作？",
+        body: "點匯款資訊後，系統會顯示帳號、金額與末五碼回報方式。",
+        primaryLabel: "查看匯款資訊",
+        action: { type: "message", label: "查看匯款資訊", text: "匯款" },
+      }),
+      makeBubble({
+        eyebrow: "FAQ 05",
+        title: "還是找不到答案？",
+        body: "可以先留下訊息，店家看到後會回覆你。若是當天取消、快到預約時間或其他急事，再直接打電話。",
+        primaryLabel: "先留下訊息",
+        action: leaveMessageAction,
+        secondary: {
+          label: "急事打電話",
+          action: urgentContactAction,
+        },
+      }),
+    ],
+  };
+
+  return {
+    type: "flex",
+    altText: "常見問題 — 預約、取消改期、服務項目、匯款資訊",
+    contents: carousel,
+  };
+}
+
 /** My bookings guide — used for keyword "取消" */
 export function myBookingsGuideMessage(liffBaseUrl: string): FlexMessage {
   const bubble: FlexBubble = {
@@ -2807,21 +2958,19 @@ export function birthdayMessage(params: {
 }
 
 /**
- * Service inquiry Flex card — replies to keyword 「燙」/「染」 (PRD-v3 §7).
+ * Service inquiry Flex card — replies to keyword 「燙」/「染」 (PRD-v3 §7, V3.7 audit).
  *
- * 漂髮 (bleach) is intentionally NOT routed here — it goes through the
- * consultation flow (Wave 4a) which creates a ConsultationRequest record.
- * Perm/color is lighter touch: just ask the customer for the 3 things admin
- * needs to give a quote, then admin handles via LINE chat or LIFF booking.
+ * 漂髮 (bleach) is intentionally NOT routed here. Perm/color: ask the 3 photos
+ * admin needs (A/B/C), then admin handles via LINE chat. Footer 「先預約看看」
+ * was removed (V3.7 audit) because owner wants 諮詢 → 手動排程，not self-book first.
  */
 export function serviceInquiryFlexMessage(params: {
   serviceType: "perm" | "color";
   liffBaseUrl: string;
   shopName: string;
 }): FlexMessage {
-  const { serviceType, liffBaseUrl, shopName } = params;
+  const { serviceType, shopName } = params;
   const isPerm = serviceType === "perm";
-  const serviceLabel = isPerm ? "燙髮" : "染髮";
   const verbLabel = isPerm ? "燙" : "染";
 
   const bubble: FlexBubble = {
@@ -2839,7 +2988,7 @@ export function serviceInquiryFlexMessage(params: {
         },
         {
           type: "text",
-          text: `${shopName}為您報價前，請提供 3 項資訊：`,
+          text: `${shopName}為您報價前，請傳以下照片：`,
           size: "sm",
           color: "#809A8E",
           margin: "sm",
@@ -2854,16 +3003,18 @@ export function serviceInquiryFlexMessage(params: {
       layout: "vertical",
       spacing: "md",
       contents: [
-        infoRow("A.", `上次${verbLabel}是什麼時候？（沒${verbLabel}過也告訴我）`),
-        infoRow("B.", "現在頭髮狀況的照片（自然光、後腦勺一張）"),
-        infoRow("C.", `期待的造型參考照（可截圖網路上的${serviceLabel}照）`),
+        infoRow("A.", "現況照（目前頭髮）"),
+        infoRow("B.", `目標色照（想要的成品色，可從 IG／Pinterest 找參考）`),
+        infoRow("C.", isPerm
+          ? "呈現方式照（整頭、局部、特殊造型等）"
+          : "呈現方式照（挑染、刷染、整頭染等）"),
         {
           type: "separator",
           margin: "lg",
         },
         {
           type: "text",
-          text: "📸 直接傳照片到這個對話框即可，回覆後我們會盡快給你報價與時間建議。",
+          text: "📸 直接傳照片到這個對話框，老闆收到後會親自回覆評估時數與報價，再幫您手動排程。",
           size: "xs",
           color: "#809A8E",
           wrap: true,
@@ -2872,48 +3023,29 @@ export function serviceInquiryFlexMessage(params: {
       ],
       paddingAll: "lg",
     },
-    footer: {
-      type: "box",
-      layout: "vertical",
-      spacing: "sm",
-      contents: [
-        {
-          type: "button",
-          action: {
-            type: "uri",
-            label: `先預約看看（${serviceLabel}）`,
-            uri: liffBaseUrl,
-          },
-          style: "primary",
-          color: "#003D2B",
-          height: "sm",
-        },
-      ],
-      paddingAll: "lg",
-    },
   };
 
   return {
     type: "flex",
-    altText: `想${verbLabel}嗎？請提供：上次${verbLabel}時間、現況照片、期待造型`,
+    altText: `想${verbLabel}嗎？請提供：現況照、目標色照、呈現方式照`,
     contents: bubble,
   };
 }
 
 /**
- * 漂髮諮詢 Flex card — replies to keyword 「漂」 (PRD-v3 §3, Wave 4a).
+ * 漂髮諮詢 Flex card — replies to keyword 「漂」 (PRD-v3 §3, V3.7 audit).
  *
- * Bleach is high-judgement: outcome depends on hair condition + history. We
- * route to the consultation flow (LIFF /consultation) so the customer fills a
- * structured form and admin can triage in /consultations queue, instead of
- * lossy LINE-chat back-and-forth.
+ * Bleach is high-judgement: outcome depends on hair condition + history.
+ * V3.7 audit: removed LIFF form button — owner prefers replying inline in LINE
+ * chat (matches their habit; LIFF /consultation is being deprecated). Ask the
+ * 3 photos inline and let the customer just reply with them in the chat.
  */
 export function bleachConsultationFlexMessage(params: {
   liffBaseUrl: string;
   consultationLiffUrl: string;
   shopName: string;
 }): FlexMessage {
-  const { consultationLiffUrl, shopName } = params;
+  const { shopName } = params;
 
   const bubble: FlexBubble = {
     type: "bubble",
@@ -2930,7 +3062,7 @@ export function bleachConsultationFlexMessage(params: {
         },
         {
           type: "text",
-          text: `${shopName}會先確認您的頭髮狀況再報價`,
+          text: `${shopName}會先確認髮況再報價，請傳以下照片：`,
           size: "sm",
           color: "#809A8E",
           margin: "sm",
@@ -2945,23 +3077,16 @@ export function bleachConsultationFlexMessage(params: {
       layout: "vertical",
       spacing: "md",
       contents: [
-        {
-          type: "text",
-          text: "漂髮的時間與藥水會依以下條件決定：",
-          size: "sm",
-          color: "#2D3A30",
-          wrap: true,
-        },
-        infoRow("•", "目前髮色 / 上次染燙時間"),
-        infoRow("•", "想漂到的目標度數"),
-        infoRow("•", "頭皮敏感與受損狀況"),
+        infoRow("A.", "現況照（目前頭髮）"),
+        infoRow("B.", "目標色照（想要的成品色，可從 IG／Pinterest 找參考）"),
+        infoRow("C.", "呈現方式照（挑染、刷染、整頭等）"),
         {
           type: "separator",
           margin: "lg",
         },
         {
           type: "text",
-          text: "請點下方按鈕填寫諮詢表單，我們會在 24 小時內回覆 🙏",
+          text: "📸 直接傳照片到這個對話框，老闆收到後會親自確認次數、總時數與費用，再幫您手動排程。",
           size: "xs",
           color: "#809A8E",
           wrap: true,
@@ -2970,38 +3095,11 @@ export function bleachConsultationFlexMessage(params: {
       ],
       paddingAll: "lg",
     },
-    footer: {
-      type: "box",
-      layout: "vertical",
-      spacing: "sm",
-      contents: [
-        {
-          type: "button",
-          action: {
-            type: "uri",
-            label: "填寫諮詢表單",
-            uri: consultationLiffUrl,
-          },
-          style: "primary",
-          color: "#003D2B",
-          height: "sm",
-        },
-        {
-          type: "text",
-          text: "📷 也可以直接傳照片到聊天室",
-          size: "xxs",
-          color: "#809A8E",
-          align: "center",
-          margin: "sm",
-        },
-      ],
-      paddingAll: "lg",
-    },
   };
 
   return {
     type: "flex",
-    altText: `想漂髮嗎？請點開連結填寫諮詢表單，我們會回覆您`,
+    altText: `想漂髮嗎？請傳：現況照、目標色照、呈現方式照`,
     contents: bubble,
   };
 }

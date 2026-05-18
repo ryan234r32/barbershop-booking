@@ -602,14 +602,21 @@ describe("serviceInquiryFlexMessage", () => {
     expect(msg.altText).toContain("染");
   });
 
-  it("asks for the 3 things admin needs (last service date / current photo / target style)", () => {
-    const msg = serviceInquiryFlexMessage({ ...baseParams, serviceType: "perm" });
+  it("asks for the 3 photos admin needs (現況 / 目標色 / 呈現方式) — V3.7 audit", () => {
+    const msg = serviceInquiryFlexMessage({ ...baseParams, serviceType: "color" });
     const bodyStr = JSON.stringify(msg.contents);
     expect(bodyStr).toContain("A.");
     expect(bodyStr).toContain("B.");
     expect(bodyStr).toContain("C.");
-    expect(bodyStr).toContain("照片");
-    expect(bodyStr).toContain("造型");
+    expect(bodyStr).toContain("現況照");
+    expect(bodyStr).toContain("目標色");
+    expect(bodyStr).toContain("呈現方式");
+  });
+
+  it("color variant lists 挑染／刷染／整頭染 examples for 呈現方式 — V3.7 audit", () => {
+    const msg = serviceInquiryFlexMessage({ ...baseParams, serviceType: "color" });
+    const bodyStr = JSON.stringify(msg.contents);
+    expect(bodyStr).toContain("挑染");
   });
 
   it("includes shop name in subtitle", () => {
@@ -618,9 +625,10 @@ describe("serviceInquiryFlexMessage", () => {
     expect(bodyStr).toContain("測試店");
   });
 
-  it("CTA button links to LIFF", () => {
+  it("does NOT include 先預約看看 CTA — owner wants 諮詢→手動排程 (V3.7 audit)", () => {
     const msg = serviceInquiryFlexMessage({ ...baseParams, serviceType: "perm" });
     const bodyStr = JSON.stringify(msg.contents);
-    expect(bodyStr).toContain("https://liff.line.me/test");
+    expect(bodyStr).not.toContain("先預約看看");
+    expect(bodyStr).not.toContain("https://liff.line.me/test");
   });
 });

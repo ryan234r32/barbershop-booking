@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { IconCheckCircle, IconPhone, IconCalendar, IconWarning, IconChevronRight } from "@/components/liff/icons";
+import { IconCheckCircle, IconPhone, IconCalendar, IconChevronRight } from "@/components/liff/icons";
 
 export function ConfirmStep({
   notes,
@@ -64,14 +64,20 @@ export function ConfirmStep({
         </div>
       )}
 
-      {/* Notes textarea */}
-      <label className="text-xs font-medium text-[#003D2B]/50 mb-1 block">備註（選填）</label>
+      {/* Notes textarea — V3.7 audit: bigger field + concrete placeholder examples */}
+      <label className="text-sm font-medium text-[#003D2B] mb-2 block">
+        備註<span className="text-[#003D2B]/40 font-normal ml-1">（選填）</span>
+      </label>
       <textarea
         value={notes}
         onChange={(e) => onNotesChange(e.target.value)}
-        placeholder="想告訴設計師什麼嗎？"
-        className="w-full bg-transparent border-0 border-b-[1.5px] border-[#003D2B]/20 focus:ring-0 focus:outline-none focus:border-[#003D2B] px-0 py-2 text-sm text-[#003D2B] placeholder:text-[#003D2B]/30 min-h-[60px] resize-none"
+        rows={3}
+        placeholder="例：想剪短一點留耳上、瀏海要薄、不要染太深、有過敏…"
+        className="w-full bg-white border border-[#003D2B]/15 rounded-xl px-4 py-3 text-[15px] text-[#003D2B] placeholder:text-[#003D2B]/35 focus:outline-none focus:border-[#003D2B] focus:ring-2 focus:ring-[#003D2B]/10 resize-none transition-colors"
       />
+      <p className="text-[11px] text-[#003D2B]/45 mt-1.5 leading-relaxed">
+        想跟老闆說的造型細節、過敏／頭皮狀況、上次染燙時間，都可以寫這裡。
+      </p>
 
       {/* Cancel policy — inline */}
       <div className="mt-8">
@@ -87,59 +93,40 @@ export function ConfirmStep({
         </button>
 
         {policyExpanded && (
-          <div className="mt-4 rounded-2xl bg-white border border-[#003D2B]/[0.08] overflow-hidden animate-fadeIn shadow-[0_1px_3px_rgba(0,61,43,0.04)]">
-            {/* Row 1 — 24h 前免費取消 */}
-            <div className="flex items-center gap-3.5 px-4 py-3.5">
-              <div className="w-9 h-9 rounded-full bg-[#003D2B]/[0.06] flex items-center justify-center shrink-0">
-                <IconCheckCircle className="w-[18px] h-[18px] text-[#003D2B]" />
+          <div className="mt-4 space-y-3 animate-fadeIn">
+            {/* V3.7 audit: 改期優先，主訴 3 行（24h 免費 / 24h 內致電 / 改期隨時） */}
+            <div className="rounded-2xl bg-[#003D2B] text-[#FFF8F1] px-4 py-3.5 flex items-center gap-3.5">
+              <div className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+                <IconCalendar className="w-[18px] h-[18px]" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-semibold text-[#003D2B] text-[14px] leading-tight">24 小時前取消</div>
-                <p className="text-[12px] text-[#003D2B]/55 leading-relaxed mt-0.5">可線上免費取消</p>
+                <div className="font-semibold text-[14px] leading-tight">改期免費，隨時可改</div>
+                <p className="text-[12px] text-white/70 leading-relaxed mt-0.5">不確定能不能來？建議先改期。</p>
               </div>
-              <span className="text-[11px] font-semibold text-[#003D2B]/55 tracking-[0.08em] shrink-0">免費</span>
             </div>
 
-            <div className="h-px bg-[#003D2B]/[0.06] ml-[60px] mr-4" />
+            <div className="rounded-2xl bg-white border border-[#003D2B]/[0.08] overflow-hidden shadow-[0_1px_3px_rgba(0,61,43,0.04)]">
+              <div className="flex items-center gap-3.5 px-4 py-3.5">
+                <div className="w-9 h-9 rounded-full bg-[#003D2B]/[0.06] flex items-center justify-center shrink-0">
+                  <IconCheckCircle className="w-[18px] h-[18px] text-[#003D2B]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-[#003D2B] text-[14px] leading-tight">24 小時前取消</div>
+                  <p className="text-[12px] text-[#003D2B]/55 leading-relaxed mt-0.5">可線上免費取消</p>
+                </div>
+              </div>
 
-            {/* Row 2 — 24h 內致電 */}
-            <div className="flex items-center gap-3.5 px-4 py-3.5">
-              <div className="w-9 h-9 rounded-full bg-[#003D2B]/[0.06] flex items-center justify-center shrink-0">
-                <IconPhone className="w-[16px] h-[16px] text-[#003D2B]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-[#003D2B] text-[14px] leading-tight">24 小時內取消</div>
-                <p className="text-[12px] text-[#003D2B]/55 leading-relaxed mt-0.5">請於營業時間致電店家</p>
-              </div>
-              <span className="text-[11px] font-semibold text-[#003D2B]/55 tracking-[0.08em] shrink-0">致電</span>
-            </div>
+              <div className="h-px bg-[#003D2B]/[0.06] ml-[60px] mr-4" />
 
-            <div className="h-px bg-[#003D2B]/[0.06] ml-[60px] mr-4" />
-
-            {/* Row 3 — 改期隨時 */}
-            <div className="flex items-center gap-3.5 px-4 py-3.5">
-              <div className="w-9 h-9 rounded-full bg-[#003D2B]/[0.06] flex items-center justify-center shrink-0">
-                <IconCalendar className="w-[16px] h-[16px] text-[#003D2B]" />
+              <div className="flex items-center gap-3.5 px-4 py-3.5">
+                <div className="w-9 h-9 rounded-full bg-[#003D2B]/[0.06] flex items-center justify-center shrink-0">
+                  <IconPhone className="w-[16px] h-[16px] text-[#003D2B]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-[#003D2B] text-[14px] leading-tight">24 小時內取消</div>
+                  <p className="text-[12px] text-[#003D2B]/55 leading-relaxed mt-0.5">請於營業時間致電店家</p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-[#003D2B] text-[14px] leading-tight">改期</div>
-                <p className="text-[12px] text-[#003D2B]/55 leading-relaxed mt-0.5">隨時可線上更改，建議優先選擇</p>
-              </div>
-              <span className="text-[11px] font-semibold text-[#003D2B]/55 tracking-[0.08em] shrink-0">隨時</span>
-            </div>
-
-            <div className="h-px bg-[#003D2B]/[0.06] ml-[60px] mr-4" />
-
-            {/* Row 4 — No-show（紅色 accent，克制使用） */}
-            <div className="flex items-center gap-3.5 px-4 py-3.5">
-              <div className="w-9 h-9 rounded-full bg-[#A84A3B]/[0.08] flex items-center justify-center shrink-0">
-                <IconWarning className="w-[16px] h-[16px] text-[#A84A3B]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-[#003D2B] text-[14px] leading-tight">未到店 (No-show)</div>
-                <p className="text-[12px] text-[#003D2B]/55 leading-relaxed mt-0.5">未事先通知，記違規一次</p>
-              </div>
-              <span className="text-[11px] font-semibold text-[#A84A3B] tracking-[0.08em] shrink-0">違規</span>
             </div>
           </div>
         )}

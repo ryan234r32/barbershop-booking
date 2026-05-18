@@ -126,12 +126,20 @@ export default function ConsultationPage() {
       </div>
 
       <div className="max-w-xl mx-auto px-4 py-5 space-y-4">
+        {/* V3.7 deprecation banner — consultations now happen inline in LINE chat. */}
+        <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 text-sm text-amber-900">
+          <p className="font-semibold mb-1.5">⚠️ 此表單即將停用</p>
+          <p className="text-xs leading-relaxed">
+            老闆現在習慣直接在 LINE 對話內回覆諮詢，更即時也更省事。
+            <br />
+            <strong>請直接回 LINE 聊天室</strong>並傳：A. 現況照 B. 目標色照 C. 呈現方式照（挑染／刷染／整頭等）。
+          </p>
+        </div>
+
         <div className="bg-[var(--color-brand)]/5 rounded-xl p-4 text-sm text-foreground/80">
           <p className="font-medium mb-1.5">為什麼需要諮詢？</p>
           <p className="text-xs leading-relaxed">
-            漂髮、特殊造型、第一次染燙等項目，老闆需要先了解您的頭髮狀況、上次染燙時間、想要的造型，才能評估時間與藥水。
-            <br />
-            我們會在 24 小時內回覆您 🙏
+            漂髮、特殊造型、第一次染燙等項目，老闆需要先了解您的頭髮狀況與想要的造型，才能評估時間與費用。
           </p>
         </div>
 
