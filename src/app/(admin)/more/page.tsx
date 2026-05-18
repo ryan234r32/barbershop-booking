@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Lock,
   Wallet,
+  CalendarOff,
 } from "lucide-react";
 
 // V3.8 consolidation: 老闆指定主選單 4 個（行事曆/報表/顧客/訊息）+ 更多。
@@ -20,6 +21,7 @@ import {
 // V3.7 5/18: 移除「抽獎」入口（老闆訪談 5/17 確認不用），routes + DB 暫保留
 // 待下次 session 清理（destructive 操作避免破壞既有資料）。
 const MENU_ITEMS = [
+  { href: "/closures", label: "公休管理", icon: CalendarOff },
   { href: "/expenses", label: "支出總覽", icon: Wallet },
   { href: "/campaigns", label: "行銷推播", icon: Megaphone },
   { href: "/coupons", label: "優惠券", icon: Ticket },

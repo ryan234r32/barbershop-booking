@@ -21,14 +21,20 @@ import useSWR from "swr";
 import { ChevronLeft, ChevronRight, Search, Plus } from "lucide-react";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
-import { CATEGORY_LABELS, ALL_CATEGORIES, type ExpenseCategory } from "@/lib/expenses/categories";
+import {
+  CATEGORY_LABELS,
+  ALL_CATEGORIES,
+  getCategoryLabel,
+  isPredefinedCategory,
+} from "@/lib/expenses/categories";
 import { ExpenseEntrySheet } from "@/components/admin/expense-entry-sheet";
 
 interface Expense {
   id: string;
   date: string;
   amount: number;
-  category: ExpenseCategory;
+  /** V3.7 P1-4 — free-text. Predefined enum gets Chinese label, custom shows raw. */
+  category: string;
   type: "FIXED" | "VARIABLE";
   paidMethod: "CASH" | "BANK_TRANSFER";
   notes: string | null;
@@ -61,7 +67,8 @@ export default function ExpensesPage() {
   usePageTitle("支出總覽");
   const [{ year, month }, setYM] = useState(todayMonth);
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<ExpenseCategory | "">("");
+  // V3.7 P1-4 — free-text category filter (enum + custom strings 共存).
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [entrySheetOpen, setEntrySheetOpen] = useState(false);
 
   const { from, to } = useMemo(() => monthBounds(year, month), [year, month]);
@@ -72,20 +79,30 @@ export default function ExpensesPage() {
   );
 
   // Client-side filter by search + category. Search matches notes OR Chinese
-  // category label OR English category key (老闆可能輸入「房租」也可能輸入英文).
+  // category label OR raw category key (老闆可能輸入「房租」也可能輸入英文也可能輸入自訂 label).
   const filtered = useMemo(() => {
     let rows = data?.expenses ?? [];
     if (categoryFilter) rows = rows.filter((e) => e.category === categoryFilter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       rows = rows.filter((e) => {
-        const label = CATEGORY_LABELS[e.category]?.toLowerCase() ?? "";
+        const label = getCategoryLabel(e.category).toLowerCase();
         const notes = (e.notes ?? "").toLowerCase();
-        return label.includes(q) || notes.includes(q) || e.category.includes(q);
+        return label.includes(q) || notes.includes(q) || e.category.toLowerCase().includes(q);
       });
     }
     return rows;
   }, [data, search, categoryFilter]);
+
+  // V3.7 P1-4 — distinct custom categories accumulated from the rendered month,
+  // so the owner can chip-filter their own labels (e.g. 「保時捷保養」).
+  const customCategories = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of data?.expenses ?? []) {
+      if (!isPredefinedCategory(e.category)) set.add(e.category);
+    }
+    return [...set].sort();
+  }, [data]);
 
   const monthTotal = filtered.reduce((s, e) => s + e.amount, 0);
   const monthLabel = `${year} 年 ${month} 月`;
@@ -151,6 +168,15 @@ export default function ExpensesPage() {
             key={c}
             active={categoryFilter === c}
             label={CATEGORY_LABELS[c]}
+            onClick={() => setCategoryFilter(c)}
+          />
+        ))}
+        {/* V3.7 P1-4 — owner-typed custom categories appear here. */}
+        {customCategories.map((c) => (
+          <CategoryChip
+            key={c}
+            active={categoryFilter === c}
+            label={c}
             onClick={() => setCategoryFilter(c)}
           />
         ))}
@@ -238,7 +264,7 @@ function ExpenseRow({ expense }: { expense: Expense }) {
       <div className="min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5">
           <span className="text-xs font-semibold text-[var(--color-brand)] bg-[var(--color-brand)]/10 px-1.5 py-0.5 rounded">
-            {CATEGORY_LABELS[expense.category]}
+            {getCategoryLabel(expense.category)}
           </span>
           {isRecurring && (
             <span className="text-[10px] text-[var(--color-text-muted)] bg-[var(--color-surface)] px-1.5 py-0.5 rounded">

@@ -15,13 +15,16 @@ import { prisma } from "@/lib/prisma";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
 import { errorResponse, UnauthorizedError } from "@/lib/utils/errors";
 
-import { ALL_CATEGORIES } from "@/lib/expenses/categories";
 import { invalidateReportsCache } from "@/lib/cache/invalidate";
 
 const createSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
   amount: z.number().int().positive().max(10_000_000),
-  category: z.enum(ALL_CATEGORIES),
+  // V3.7 P1-4 — hybrid categories. We accept any non-empty string so owners can
+  // accumulate their own labels (e.g. "保時捷保養"). Predefined enum values
+  // still get nice Chinese labels via getCategoryLabel(); custom strings render
+  // as-is. trim + length cap protects against accidental noise.
+  category: z.string().trim().min(1).max(40),
   type: z.enum(["FIXED", "VARIABLE"]),
   paidMethod: z.enum(["CASH", "BANK_TRANSFER"]).default("CASH"),
   notes: z.string().max(500).optional(),

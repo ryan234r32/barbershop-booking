@@ -38,7 +38,7 @@ export async function GET() {
             lte: new Date(maxDate + "T23:59:59.999Z"),
           },
         },
-        select: { date: true, reason: true },
+        select: { date: true, reason: true, startTime: true, endTime: true },
         orderBy: { date: "asc" },
       }),
     ]);
@@ -48,15 +48,30 @@ export async function GET() {
       .map((bh) => bh.dayOfWeek)
       .sort();
 
-    const holidays = holidayRows.map((h) => ({
-      date: h.date.toISOString().slice(0, 10),
-      reason: h.reason,
-    }));
+    // V3.7 P1-3: only full-day closures are returned in `holidays` (LIFF calendar
+    // disables those dates entirely). Partial-day closures live in
+    // `partialClosures` — LIFF keeps the date selectable, slot list reflects the
+    // blocked hours via /api/slots.
+    const holidays = holidayRows
+      .filter((h) => !h.startTime && !h.endTime)
+      .map((h) => ({
+        date: h.date.toISOString().slice(0, 10),
+        reason: h.reason,
+      }));
+    const partialClosures = holidayRows
+      .filter((h) => h.startTime && h.endTime)
+      .map((h) => ({
+        date: h.date.toISOString().slice(0, 10),
+        startTime: h.startTime,
+        endTime: h.endTime,
+        reason: h.reason,
+      }));
 
     return Response.json({
       maxAdvanceDays: MAX_ADVANCE_DAYS,
       closedWeekdays,
       holidays,
+      partialClosures,
     });
   } catch (error) {
     return errorResponse(error);

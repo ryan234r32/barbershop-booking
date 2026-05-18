@@ -35,13 +35,16 @@ export async function getAvailableSlots(params: {
   if (services.length !== ids.length) return [];
   const slotsNeeded = services.reduce((sum, s) => sum + s.slotsNeeded, 0);
 
-  // 2. Check if this date is a holiday
+  // 2. Check if this date is a holiday (full-day or partial closure window)
   const holiday = await prisma.holiday.findUnique({
     where: {
       tenantId_date: { tenantId, date: dateObj },
     },
+    select: { startTime: true, endTime: true },
   });
-  if (holiday) return [];
+  // V3.7 P1-3: only short-circuit when this is a FULL-day closure
+  // (both NULL). Partial closure feeds into occupiedSlots below.
+  if (holiday && !holiday.startTime && !holiday.endTime) return [];
 
   // 3. Get business hours for this day of week
   const dayOfWeek = getDayOfWeek(dateObj);
@@ -65,12 +68,20 @@ export async function getAvailableSlots(params: {
     select: { startTime: true, endTime: true, slotsOccupied: true },
   });
 
-  // 6. Mark occupied slots
+  // 6. Mark occupied slots — bookings + partial-day holiday window.
   const occupiedSlots = new Set<string>();
   for (const booking of bookings) {
     const startH = parseTimeToHour(booking.startTime);
     for (let i = 0; i < booking.slotsOccupied; i++) {
       const h = startH + i;
+      occupiedSlots.add(`${h.toString().padStart(2, "0")}:00`);
+    }
+  }
+  // V3.7 P1-3: 部分時段公休（週四 11-13 健身）以 occupiedSlots 形式扣除。
+  if (holiday && holiday.startTime && holiday.endTime) {
+    const holStart = parseTimeToHour(holiday.startTime);
+    const holEnd = parseTimeToHour(holiday.endTime);
+    for (let h = holStart; h < holEnd; h++) {
       occupiedSlots.add(`${h.toString().padStart(2, "0")}:00`);
     }
   }
@@ -129,18 +140,33 @@ export async function isSlotAvailable(params: {
   const { tenantId, date, startTime, slotsNeeded, excludeBookingId } = params;
   const startH = parseTimeToHour(startTime);
 
-  const bookings = await prisma.booking.findMany({
-    where: {
-      tenantId,
-      date,
-      status: "CONFIRMED",
-      ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
-    },
-    select: { startTime: true, slotsOccupied: true },
-  });
+  const [bookings, holiday] = await Promise.all([
+    prisma.booking.findMany({
+      where: {
+        tenantId,
+        date,
+        status: "CONFIRMED",
+        ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
+      },
+      select: { startTime: true, slotsOccupied: true },
+    }),
+    // V3.7 P1-3 — also block partial-day closure window inside the lock.
+    prisma.holiday.findUnique({
+      where: { tenantId_date: { tenantId, date } },
+      select: { startTime: true, endTime: true },
+    }),
+  ]);
+
+  // Full-day closures are caught higher up; here we only worry about partial
+  // closures (start AND end set) — those translate to blocked hours.
+  const holStart = holiday?.startTime ? parseTimeToHour(holiday.startTime) : null;
+  const holEnd = holiday?.endTime ? parseTimeToHour(holiday.endTime) : null;
 
   for (let i = 0; i < slotsNeeded; i++) {
     const targetH = startH + i;
+    if (holStart != null && holEnd != null && targetH >= holStart && targetH < holEnd) {
+      return false;
+    }
     for (const booking of bookings) {
       const bStartH = parseTimeToHour(booking.startTime);
       for (let j = 0; j < booking.slotsOccupied; j++) {

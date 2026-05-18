@@ -168,13 +168,15 @@ export async function POST(request: NextRequest) {
         }),
         prisma.holiday.findUnique({
           where: { tenantId_date: { tenantId, date: dateObj } },
-          select: { reason: true },
+          select: { reason: true, startTime: true, endTime: true },
         }),
       ]);
       if (bh && !bh.isOpen) {
         throw new AppError("本日公休，請選其他日期", 400, "CLOSED_WEEKDAY");
       }
-      if (holiday) {
+      // V3.7 P1-3 — full-day vs partial-day closure. Partial is checked later
+      // by isSlotAvailable via the occupiedSlots aggregation in availability.ts.
+      if (holiday && !holiday.startTime && !holiday.endTime) {
         throw new AppError(
           holiday.reason ? `本日公休（${holiday.reason}）` : "本日公休，請選其他日期",
           400,

@@ -265,10 +265,17 @@ model BusinessHours {
   @@map("business_hours")
 }
 
+/// V3.7 P1-3 — Holiday supports partial-day closure via optional time range.
+/// `startTime` / `endTime` are "HH:00" strings (matches BusinessHours grain).
+/// Both NULL → full-day closure (existing behaviour, no migration needed).
+/// Both set → only those slots are blocked; other slots remain bookable.
+/// Half-set is invalid: API rejects, schema kept loose so backfill stays safe.
 model Holiday {
   id        String   @id @default(uuid())
   tenantId  String   @map("tenant_id")
   date      DateTime @db.Date
+  startTime String?  @map("start_time")
+  endTime   String?  @map("end_time")
   reason    String?
   createdAt DateTime @default(now()) @map("created_at")
 

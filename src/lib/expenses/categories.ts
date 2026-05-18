@@ -83,3 +83,16 @@ export function categoriesForType(type: "FIXED" | "VARIABLE"): ExpenseCategory[]
     (c) => CATEGORY_TYPE[c] === type || CATEGORY_TYPE[c] === "EITHER",
   );
 }
+
+/**
+ * V3.7 P1-4 — hybrid free-text categories. Old enum categories still get
+ * Chinese labels; new custom categories (typed by the owner) just display as-is.
+ */
+export function isPredefinedCategory(category: string): category is ExpenseCategory {
+  return (ALL_CATEGORIES as readonly string[]).includes(category);
+}
+
+export function getCategoryLabel(category: string): string {
+  if (isPredefinedCategory(category)) return CATEGORY_LABELS[category];
+  return category; // 自訂 → 原樣顯示
+}

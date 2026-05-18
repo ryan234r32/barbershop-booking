@@ -125,11 +125,15 @@ export function ExpenseEntrySheet({
   const handleSubmit = async () => {
     if (!canSubmit || !type || !category) return;
 
-    let mergedNotes: string | undefined = notes.trim() || undefined;
-    if (category === "other") {
-      const ci = customItem.trim();
-      mergedNotes = mergedNotes ? `${ci} · ${mergedNotes}` : ci;
-    }
+    // V3.7 P1-4 — when the user picks 「其他」 and types a custom item, treat
+    // it as the category itself (free-text). Old behaviour shoved the label
+    // into notes and tagged the row as enum "other", which lost it for chip
+    // filtering. Server-side schema accepts free-text.
+    const submittedCategory =
+      category === "other" && customItem.trim()
+        ? customItem.trim().slice(0, 40)
+        : category;
+    const mergedNotes = notes.trim() || undefined;
 
     setSubmitting(true);
     try {
@@ -139,7 +143,7 @@ export function ExpenseEntrySheet({
         body: JSON.stringify({
           date,
           amount: amtNum,
-          category,
+          category: submittedCategory,
           type,
           paidMethod,
           notes: mergedNotes,
