@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAdmin } from "@/lib/admin/auth-context";
 import { NotificationToggle } from "@/components/admin/notification-toggle";
 import { ClosureReminderBanner } from "@/components/admin/closure-reminder-banner";
+import { ConsultationPendingBanner } from "@/components/admin/consultation-pending-banner";
 import {
   Scissors,
   Megaphone,
@@ -38,6 +39,10 @@ export default function MorePage() {
       <h1 className="text-xl font-bold text-[var(--color-text-primary)] mb-6 tracking-wide">
         更多
       </h1>
+
+      {/* V3.7 P2-2 — 諮詢待回 banner (one-way mirror, 訪談 §10).
+          擺在公休提醒之上，因為「客戶等回應」優先順序高於「該設下下月公休」。 */}
+      <ConsultationPendingBanner />
 
       {/* V3.7 Tier 1.3 — 公休未設提醒 (autoplan D-G dashboard banner pattern) */}
       <ClosureReminderBanner />
