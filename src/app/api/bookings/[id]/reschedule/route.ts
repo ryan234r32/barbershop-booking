@@ -14,7 +14,7 @@ import { getLineClient } from "@/lib/line/client";
 import { rescheduleConfirmationMessage } from "@/lib/line/messages";
 import { notifyAdminNewBooking } from "@/lib/notifications/admin-notify";
 import { rescheduleBookingSchema } from "@/lib/utils/validation";
-import { errorResponse, SlotUnavailableError, AppError } from "@/lib/utils/errors";
+import { errorResponse, SlotUnavailableError, AppError, StaleWriteError } from "@/lib/utils/errors";
 import { addHours, addDaysToISO, getDayOfWeek, parseTimeToHour, todayInTaipei } from "@/lib/utils/time";
 import { MAX_ADVANCE_DAYS, ADMIN_MAX_ADVANCE_DAYS, DEFAULT_BUSINESS_HOURS } from "@/lib/utils/constants";
 import { logger } from "@/lib/utils/logger";
@@ -210,8 +210,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const oldStartTime = booking.startTime;
       const oldEndTime = booking.endTime;
 
-      await prisma.booking.update({
-        where: { id },
+      // V3.7 audit (5/19): OCC fence — reject the write if the row moved
+      // between findUnique above and this update (e.g. customer cancelled
+      // while admin was dragging on the calendar). Client may pass an
+      // explicit expectedUpdatedAt; otherwise fall back to the booking row
+      // we just read inside the row-lock.
+      const updateResult = await prisma.booking.updateMany({
+        where: {
+          id,
+          tenantId: booking.tenantId,
+          status: "CONFIRMED",
+          ...(input.expectedUpdatedAt
+            ? { updatedAt: new Date(input.expectedUpdatedAt) }
+            : { updatedAt: booking.updatedAt }),
+        },
         data: {
           date: newDateObj,
           startTime: input.startTime,
@@ -221,6 +233,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           adminAcknowledgedAt: null,
         },
       });
+      if (updateResult.count === 0) {
+        const fresh = await prisma.booking.findFirst({
+          where: { id, tenantId: booking.tenantId },
+          select: { status: true, date: true, startTime: true, updatedAt: true },
+        });
+        throw new StaleWriteError(fresh);
+      }
 
       // ─── Cache writes BEFORE notifications (codex P1 + P2 fix) ───
       // The 10s row-lock lease can expire if Vercel cold-starts the LINE

@@ -89,6 +89,27 @@ export const updateProfileSchema = z.object({
 export const rescheduleBookingSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   startTime: z.string().regex(/^\d{2}:00$/),
+  /** OCC token — client passes the booking's last-seen updatedAt so the server
+   *  can reject the write if the row moved (e.g. customer cancelled while the
+   *  admin was dragging). 409 + code "stale_write" on mismatch. */
+  expectedUpdatedAt: z.string().datetime().optional(),
+});
+
+/** PATCH /api/bookings/[id] body — cancel / complete / no-show / admin_cancel.
+ *  OCC is enforced on cancel + admin_cancel (the destructive transitions); the
+ *  other actions remain idempotent state machines.
+ *  See audit script: scripts/audit-booking-validation.sh */
+export const patchBookingSchema = z.object({
+  action: z.enum(["cancel", "complete", "no_show", "admin_cancel"]),
+  reason: z.string().optional(),
+  paymentMethod: z.string().optional(),
+  /** Optional OCC fence (recommended for cancel / admin_cancel). */
+  expectedUpdatedAt: z.string().datetime().optional(),
+});
+
+/** PATCH /api/bookings/[id]/settle body — optional OCC fence. */
+export const settleBookingSchema = z.object({
+  expectedUpdatedAt: z.string().datetime().optional(),
 });
 
 export const createServiceSchema = z.object({
@@ -98,7 +119,20 @@ export const createServiceSchema = z.object({
   slotsNeeded: z.number().int().min(1).max(8),
   price: z.number().int().min(0),
   sortOrder: z.number().int().optional(),
+  // V3.7 P3 (5/19) — admin can toggle variant mode + consultation mode
+  hasVariants: z.boolean().optional(),
+  bookingMode: z.enum(["NORMAL", "CONSULTATION"]).optional(),
 });
+
+// V3.7 P3 (5/19) — ServiceVariant CRUD schemas
+export const createVariantSchema = z.object({
+  name: z.string().trim().min(1).max(20),
+  price: z.number().int().min(0).max(100000),
+  durationMin: z.number().int().min(30).max(720),
+  sortOrder: z.number().int().optional(),
+});
+
+export const updateVariantSchema = createVariantSchema.partial();
 
 export const updateSettingsSchema = z.object({
   businessName: z.string().min(1).optional(),

@@ -6,7 +6,7 @@ import { getLineClient } from "@/lib/line/client";
 import { cancellationMessage } from "@/lib/line/messages";
 import { notifyAdminCancellation } from "@/lib/notifications/admin-notify";
 import { cancelBookingSchema } from "@/lib/utils/validation";
-import { errorResponse, CancellationNotAllowedError } from "@/lib/utils/errors";
+import { errorResponse, CancellationNotAllowedError, StaleWriteError } from "@/lib/utils/errors";
 import { MAX_VIOLATIONS } from "@/lib/utils/constants";
 import { requireBookingAuth, requireBookingOwnership, requireAdmin } from "@/lib/auth/booking-auth";
 import { issueCouponForCompletedBooking } from "@/lib/coupons/issue";
@@ -76,6 +76,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const body = await request.json();
     const action = body.action as string;
+    /** Optional OCC token — when present, the cancel / admin_cancel write
+     *  is fenced on `updatedAt` matching this value. See audit script. */
+    const expectedUpdatedAtRaw = body.expectedUpdatedAt as string | undefined;
+    const expectedUpdatedAt =
+      typeof expectedUpdatedAtRaw === "string" && expectedUpdatedAtRaw.length > 0
+        ? new Date(expectedUpdatedAtRaw)
+        : undefined;
 
     const booking = await prisma.booking.findUnique({
       where: { id },
@@ -117,10 +124,24 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
       // Perform cancellation in a transaction
       const result = await prisma.$transaction(async (tx) => {
-        // Update booking status
-        const updated = await tx.booking.update({
-          where: { id },
+        // V3.7 audit (5/19): OCC fence — reject if the row moved between
+        // findUnique above and this write. status guard ensures only a
+        // still-CONFIRMED booking transitions to CANCELLED; updatedAt guard
+        // ensures we don't lose a concurrent reschedule.
+        const updateResult = await tx.booking.updateMany({
+          where: {
+            id,
+            tenantId: booking.tenantId,
+            status: "CONFIRMED",
+            ...(expectedUpdatedAt ? { updatedAt: expectedUpdatedAt } : {}),
+          },
           data: { status: "CANCELLED" },
+        });
+        if (updateResult.count === 0) {
+          throw new StaleWriteError();
+        }
+        const updated = await tx.booking.findFirstOrThrow({
+          where: { id, tenantId: booking.tenantId },
         });
 
         // Create cancellation record
@@ -352,9 +373,25 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // --- Admin cancel ---
     if (action === "admin_cancel") {
-      const updated = await prisma.booking.update({
-        where: { id },
+      // V3.7 audit (5/19): OCC fence. Admin can cancel from any non-terminal
+      // state, so no status guard — only the updatedAt fence (when supplied).
+      const updateResult = await prisma.booking.updateMany({
+        where: {
+          id,
+          tenantId: booking.tenantId,
+          ...(expectedUpdatedAt ? { updatedAt: expectedUpdatedAt } : {}),
+        },
         data: { status: "CANCELLED_BY_ADMIN" },
+      });
+      if (updateResult.count === 0) {
+        const fresh = await prisma.booking.findFirst({
+          where: { id, tenantId: booking.tenantId },
+          select: { status: true, updatedAt: true },
+        });
+        throw new StaleWriteError(fresh);
+      }
+      const updated = await prisma.booking.findFirstOrThrow({
+        where: { id, tenantId: booking.tenantId },
       });
 
       cancelBookingNotifications(id).catch(console.error);

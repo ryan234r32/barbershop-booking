@@ -15,7 +15,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
-import { errorResponse, UnauthorizedError, AppError } from "@/lib/utils/errors";
+import { errorResponse, UnauthorizedError, AppError, StaleWriteError } from "@/lib/utils/errors";
 import { addBookingServiceSchema } from "@/lib/utils/validation";
 import { invalidateReportsCache } from "@/lib/cache/invalidate";
 
@@ -36,6 +36,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         id: true,
         status: true,
         serviceId: true,
+        updatedAt: true,
         services: { select: { order: true, serviceId: true } },
       },
     });
@@ -94,11 +95,27 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           durationMin: variant?.durationMin ?? service.duration,
         },
       });
-      // OCC: bump parent updatedAt — Prisma does NOT propagate from child.
-      await tx.booking.update({
-        where: { id },
+      // V3.7 audit (5/19): OCC fence on parent updatedAt bump.
+      // BookingService is a child → Prisma doesn't propagate parent updatedAt
+      // automatically (§0a E-B). updateMany with the prior updatedAt as guard
+      // rejects writes that lost a race against reschedule / cancel / settle.
+      const updateResult = await tx.booking.updateMany({
+        where: {
+          id,
+          tenantId: admin.tenantId,
+          ...(input.expectedUpdatedAt
+            ? { updatedAt: new Date(input.expectedUpdatedAt) }
+            : { updatedAt: booking.updatedAt }),
+        },
         data: { updatedAt: new Date() },
       });
+      if (updateResult.count === 0) {
+        const fresh = await tx.booking.findFirst({
+          where: { id, tenantId: admin.tenantId },
+          select: { status: true, updatedAt: true },
+        });
+        throw new StaleWriteError(fresh);
+      }
       return row;
     });
 
@@ -149,9 +166,28 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       throw new AppError("不能刪除主服務（請改用改期/取消預約）", 400, "primary_service");
     }
 
+    // Snapshot the parent updatedAt before deletion so the OCC fence below
+    // catches a concurrent reschedule / cancel.
+    const parentBefore = await prisma.booking.findFirst({
+      where: { id, tenantId: admin.tenantId },
+      select: { updatedAt: true },
+    });
+    if (!parentBefore) {
+      return Response.json({ error: "Booking not found" }, { status: 404 });
+    }
     await prisma.$transaction(async (tx) => {
       await tx.bookingService.delete({ where: { id: bookingServiceId } });
-      await tx.booking.update({ where: { id }, data: { updatedAt: new Date() } });
+      const updateResult = await tx.booking.updateMany({
+        where: {
+          id,
+          tenantId: admin.tenantId,
+          updatedAt: parentBefore.updatedAt,
+        },
+        data: { updatedAt: new Date() },
+      });
+      if (updateResult.count === 0) {
+        throw new StaleWriteError();
+      }
     });
 
     invalidateReportsCache();

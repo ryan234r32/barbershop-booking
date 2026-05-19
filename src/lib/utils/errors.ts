@@ -38,10 +38,38 @@ export class CancellationNotAllowedError extends AppError {
   }
 }
 
+/**
+ * OCC (optimistic-concurrency) guard violation.
+ *
+ * Thrown when an `updateMany` with `updatedAt: <prev>` returns count===0,
+ * meaning the row moved underneath us between read and write. Surfaces to
+ * the client as 409 with `code: "stale_write"` so the UI can prompt a refresh.
+ *
+ * `current` (optional) is the freshly-read row state — handy for clients
+ * that want to merge instead of force-refresh.
+ *
+ * Audit reference: scripts/audit-booking-validation.sh — every booking-
+ * mutating endpoint must use this (or inline equivalent).
+ */
+export class StaleWriteError extends AppError {
+  public current?: unknown;
+
+  constructor(current?: unknown, message: string = "此預約已更新，請重新整理後再試") {
+    super(message, 409, "stale_write");
+    this.current = current;
+  }
+}
+
 export function errorResponse(error: unknown) {
   if (error instanceof CancellationNotAllowedError) {
     return Response.json(
       { error: error.message, code: error.code, phoneNumber: error.phoneNumber },
+      { status: error.statusCode }
+    );
+  }
+  if (error instanceof StaleWriteError) {
+    return Response.json(
+      { error: "stale_write", code: error.code, message: error.message, current: error.current },
       { status: error.statusCode }
     );
   }

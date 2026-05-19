@@ -27,7 +27,8 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
-import { errorResponse, UnauthorizedError, AppError } from "@/lib/utils/errors";
+import { errorResponse, UnauthorizedError, AppError, StaleWriteError } from "@/lib/utils/errors";
+import { settleBookingSchema } from "@/lib/utils/validation";
 import { getLineClient } from "@/lib/line/client";
 import { paymentReceivedMessage, paymentSettleRevokedMessage } from "@/lib/line/messages";
 import { logger } from "@/lib/utils/logger";
@@ -47,6 +48,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (!admin) throw new UnauthorizedError();
 
     const { id } = await params;
+    // V3.7 audit (5/19): optional OCC token. Body is optional (legacy clients
+    // POST with no body); parse defensively so an empty body still works.
+    const rawBody = await request.json().catch(() => null);
+    const parsedBody = rawBody ? settleBookingSchema.parse(rawBody) : undefined;
+    const expectedUpdatedAt = parsedBody?.expectedUpdatedAt;
 
     const booking = await prisma.booking.findFirst({
       where: { id, tenantId: admin.tenantId },
@@ -55,6 +61,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         status: true,
         settledAt: true,
         checkedInAt: true,
+        updatedAt: true,
         date: true,
         service: { select: { name: true, price: true } },
         user: { select: { lineUserId: true, displayName: true, segment: true } },
@@ -97,7 +104,27 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // (cash walk-in not gone through LIFF), create it on the fly.
     const paymentAmount = booking.payment?.amount ?? booking.service.price;
     await prisma.$transaction(async (tx) => {
-      await tx.booking.update({ where: { id }, data });
+      // V3.7 audit (5/19): OCC fence on the settle write. status guard avoids
+      // settling a row that was concurrently moved to NO_SHOW / CANCELLED;
+      // updatedAt guard avoids stomping on a concurrent reschedule / checkout.
+      const updateResult = await tx.booking.updateMany({
+        where: {
+          id,
+          tenantId: admin.tenantId,
+          status: booking.status, // pin to status we observed (CONFIRMED or COMPLETED)
+          ...(expectedUpdatedAt
+            ? { updatedAt: new Date(expectedUpdatedAt) }
+            : { updatedAt: booking.updatedAt }),
+        },
+        data,
+      });
+      if (updateResult.count === 0) {
+        const fresh = await tx.booking.findFirst({
+          where: { id, tenantId: admin.tenantId },
+          select: { status: true, settledAt: true, updatedAt: true },
+        });
+        throw new StaleWriteError(fresh);
+      }
       if (booking.payment) {
         if (booking.payment.status !== "RECEIVED" && booking.payment.status !== "WAIVED") {
           await tx.payment.update({

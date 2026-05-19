@@ -18,6 +18,37 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const body = await request.json();
     const input = createServiceSchema.partial().parse(body);
 
+    // Tenant isolation
+    const existing = await prisma.service.findUnique({
+      where: { id },
+      include: { variants: { where: { isActive: true } } },
+    });
+    if (!existing || existing.tenantId !== admin.tenantId) {
+      return Response.json({ error: "Not found" }, { status: 404 });
+    }
+
+    // V3.7 P3 guards on hasVariants toggle
+    const nextHasVariants =
+      input.hasVariants !== undefined ? input.hasVariants : existing.hasVariants;
+    const activeVariantCount = existing.variants.length;
+
+    if (nextHasVariants === true && activeVariantCount === 0) {
+      return Response.json(
+        { error: "啟用變異前請先新增至少一個變異" },
+        { status: 400 },
+      );
+    }
+    if (
+      input.hasVariants === false &&
+      existing.hasVariants === true &&
+      activeVariantCount > 0
+    ) {
+      return Response.json(
+        { error: "請先刪除所有變異後再關閉「有變異」" },
+        { status: 400 },
+      );
+    }
+
     const service = await prisma.service.update({
       where: { id },
       data: input,
@@ -38,6 +69,12 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params;
+
+    // Tenant isolation
+    const existing = await prisma.service.findUnique({ where: { id } });
+    if (!existing || existing.tenantId !== admin.tenantId) {
+      return Response.json({ error: "Not found" }, { status: 404 });
+    }
 
     const service = await prisma.service.update({
       where: { id },
