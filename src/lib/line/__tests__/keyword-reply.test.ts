@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   bookingGuideMessage,
   pricingCarouselMessage,
+  pricingCarouselMessages,
   businessInfoMessage,
   myBookingsGuideMessage,
   thankYouMessage,
@@ -64,6 +65,26 @@ describe("Keyword reply Flex Messages", () => {
       const msg = pricingCarouselMessage(services, LIFF_URL);
       expect(msg.altText).toBeTruthy();
       expect(msg.altText.length).toBeGreaterThan(0);
+    });
+
+    it("splits more than 12 services into multiple LINE-valid carousel messages", () => {
+      const manyServices = Array.from({ length: 14 }, (_, index) => ({
+        id: `svc-${index + 1}`,
+        name: `服務 ${index + 1}`,
+        price: 1000 + index,
+        duration: 60,
+        description: null,
+        imageUrl: null,
+      }));
+
+      const messages = pricingCarouselMessages(manyServices, LIFF_URL);
+      const bubbleCounts = messages.map((msg) => (msg.contents as FlexNode).contents.length);
+
+      expect(messages).toHaveLength(2);
+      expect(bubbleCounts).toEqual([12, 2]);
+      expect(bubbleCounts.every((count) => count <= 12)).toBe(true);
+      expect(messages[0].altText).toContain("1/2");
+      expect(messages[1].altText).toContain("2/2");
     });
   });
 

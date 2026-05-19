@@ -37,11 +37,12 @@ import { TIMEZONE } from "@/lib/utils/constants";
 import {
   welcomeMessage,
   bookingGuideMessage,
-  pricingCarouselMessage,
+  pricingCarouselMessages,
   businessInfoMessage,
   myBookingsGuideMessage,
   myBookingsFlexMessage,
   myBookingsEmptyMessage,
+  faqGuideMessage,
   paymentGuideMessage,
   transferReportedMessage,
   busyNoticeMessage,
@@ -180,12 +181,14 @@ async function handleEvent(
           await lineClient.replyMessage(event.replyToken, reply.message);
         }
         if (lineUserId) {
-          persistOutboundMessage({
-            tenantId,
-            lineUserId,
-            message: reply.message,
-            kind: MessageKind.KEYWORD_REPLY,
-          });
+          for (const message of asMessageArray(reply.message)) {
+            persistOutboundMessage({
+              tenantId,
+              lineUserId,
+              message,
+              kind: MessageKind.KEYWORD_REPLY,
+            });
+          }
         }
         break;
       }
@@ -228,8 +231,12 @@ async function handleEvent(
  * Matching: substring contains, first-match-wins, priority top to bottom.
  */
 interface KeywordReplyResult {
-  message: Message;
+  message: Message | Message[];
   usePush: boolean;
+}
+
+function asMessageArray(message: Message | Message[]): Message[] {
+  return Array.isArray(message) ? message : [message];
 }
 
 // classifyIntent / KeywordIntent moved to ./classify-intent.ts so tests and the
@@ -373,7 +380,7 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
   const intent = classifyIntent(text);
   if (intent === "none") return null;
 
-  const reply = (message: Message, usePush = false): KeywordReplyResult => ({ message, usePush });
+  const reply = (message: Message | Message[], usePush = false): KeywordReplyResult => ({ message, usePush });
 
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
@@ -391,6 +398,23 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
   const liffId = tenant?.liffId || process.env.NEXT_PUBLIC_LIFF_ID || "";
   const liffUrl = `https://liff.line.me/${liffId}`;
   const shopName = tenant?.businessName || "理髮廳";
+
+  // Priority 0.5: FAQ — action-oriented help menu from Rich Menu.
+  if (intent === "faq") {
+    return reply(faqGuideMessage({
+      liffBaseUrl: liffUrl,
+      shopPhone: tenant?.phone ?? undefined,
+    }));
+  }
+
+  if (intent === "leave-message") {
+    return reply({
+      type: "text",
+      text:
+        "可以，請直接在這裡留下你想問的問題或狀況。\n\n" +
+        "店家看到後會回覆你；如果是快到預約時間、當天取消或其他急事，請直接打電話會比較快。",
+    });
+  }
 
   // Priority 1: My bookings — dynamic query, uses pushMessage
   if (intent === "my-bookings") {
@@ -476,7 +500,7 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
       orderBy: { sortOrder: "asc" },
       select: { id: true, name: true, price: true, duration: true, description: true, imageUrl: true },
     });
-    return reply(pricingCarouselMessage(services, liffUrl));
+    return reply(pricingCarouselMessages(services, liffUrl));
   }
 
   // Priority 4: Payment / transfer
@@ -811,4 +835,3 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
   // Unreachable (classifyIntent exhausts all non-"none" cases above)
   return null;
 }
-

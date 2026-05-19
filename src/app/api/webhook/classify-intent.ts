@@ -7,6 +7,8 @@
  */
 
 export type KeywordIntent =
+  | "faq"
+  | "leave-message"
   | "my-bookings"
   | "cancel-reschedule"
   | "service-inquiry-perm"
@@ -59,6 +61,8 @@ export function classifyIntent(text: string): KeywordIntent {
   // 8+ 碼故意排除（可能是電話、地址門牌）
   if (/^\d{3,4}$/.test(trimmed) || /^\d{6,7}$/.test(trimmed)) return "payment-malformed-digits";
 
+  if (matchKeywords(t, ["常見問題", "faq", "需要協助", "幫助", "協助", "help"])) return "faq";
+  if (matchKeywords(t, ["我想留言給店家", "我要留言給店家", "留下訊息", "留言給店家"])) return "leave-message";
   if (matchKeywords(t, ["我的預約", "我預約", "我約了", "預約了什麼", "查詢", "紀錄", "記錄"])) return "my-bookings";
   if (matchKeywords(t, ["取消", "不約了", "不來了", "改時間", "更改", "改期", "換時間", "改一下", "cancel"])) return "cancel-reschedule";
 

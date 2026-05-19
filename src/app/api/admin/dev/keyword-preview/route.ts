@@ -5,9 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { formatBusinessHoursLabel } from "@/lib/utils/business-hours-label";
 import {
   bookingGuideMessage,
-  pricingCarouselMessage,
+  pricingCarouselMessages,
   businessInfoMessage,
   myBookingsGuideMessage,
+  faqGuideMessage,
   paymentGuideMessage,
   welcomeMessage,
   busyNoticeMessage,
@@ -17,6 +18,8 @@ import {
 import type { Message } from "@line/bot-sdk";
 
 const INTENT_LABELS: Record<KeywordIntent, string> = {
+  "faq": "常見問題 FAQ (Rich Menu)",
+  "leave-message": "留下訊息引導",
   "my-bookings": "我的預約 (P1)",
   "cancel-reschedule": "取消 / 改期 (P2)",
   "service-inquiry-perm": "燙髮諮詢 (P2.5)",
@@ -70,10 +73,24 @@ export async function POST(request: NextRequest) {
   const liffUrl = `https://liff.line.me/${liffId}`;
   const shopName = tenant?.businessName || "理髮廳";
 
-  let preview: Message | null = null;
+  let preview: Message | Message[] | null = null;
   let note: string | undefined;
 
   switch (intent) {
+    case "faq":
+      preview = faqGuideMessage({
+        liffBaseUrl: liffUrl,
+        shopPhone: tenant?.phone ?? undefined,
+      });
+      break;
+    case "leave-message":
+      preview = {
+        type: "text",
+        text:
+          "可以，請直接在這裡留下你想問的問題或狀況。\n\n" +
+          "店家看到後會回覆你；如果是快到預約時間、當天取消或其他急事，請直接打電話會比較快。",
+      };
+      break;
     case "my-bookings":
     case "cancel-reschedule":
       preview = myBookingsGuideMessage(liffUrl);
@@ -88,7 +105,7 @@ export async function POST(request: NextRequest) {
         orderBy: { sortOrder: "asc" },
         select: { id: true, name: true, price: true, duration: true, description: true, imageUrl: true },
       });
-      preview = pricingCarouselMessage(services, liffUrl);
+      preview = pricingCarouselMessages(services, liffUrl);
       break;
     }
     case "payment":

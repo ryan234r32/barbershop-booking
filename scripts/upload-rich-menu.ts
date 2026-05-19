@@ -80,7 +80,7 @@ Options:
 Layouts:
   image6:
     立即預約 / 取消／改期 / 我的預約
-    服務項目 / 聯絡店家 / 匯款資訊
+    服務項目 / 常見問題 / 匯款資訊
 
   handoff6:
     立即預約 / 聯絡電話 / 我的預約
@@ -226,6 +226,7 @@ function buildRichMenu(params: {
     myBookings: { type: "uri" as const, label: "我的預約", uri: `${liffBase}/my-bookings` },
     services: { type: "message" as const, label: "服務項目", text: "服務" },
     cancelReschedule: { type: "uri" as const, label: "取消／改期", uri: `${liffBase}/my-bookings` },
+    faq: { type: "message" as const, label: "常見問題", text: "常見問題" },
     payment: { type: "message" as const, label: "匯款資訊", text: "匯款" },
   };
 
@@ -344,7 +345,7 @@ function buildRichMenu(params: {
     },
     {
       bounds: { x: COLS[1].x, y: ROW_H, width: COLS[1].width, height: ROW_H },
-      action: contactStore,
+      action: common.faq,
     },
     {
       bounds: { x: COLS[2].x, y: ROW_H, width: COLS[2].width, height: ROW_H },

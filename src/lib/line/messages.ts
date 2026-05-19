@@ -891,17 +891,44 @@ export function bookingGuideMessage(liffUrl: string): FlexMessage {
   };
 }
 
+const LINE_FLEX_CAROUSEL_MAX_BUBBLES = 12;
+
+type PricingService = {
+  id: string;
+  name: string;
+  price: number;
+  duration: number;
+  description?: string | null;
+  imageUrl?: string | null;
+};
+
 /** Pricing carousel Flex Message — used for keyword "價格" */
 export function pricingCarouselMessage(
-  services: Array<{
-    id: string;
-    name: string;
-    price: number;
-    duration: number;
-    description?: string | null;
-    imageUrl?: string | null;
-  }>,
+  services: PricingService[],
   liffUrl: string
+): FlexMessage {
+  return buildPricingCarouselMessage(services.slice(0, LINE_FLEX_CAROUSEL_MAX_BUBBLES), liffUrl);
+}
+
+/** LINE caps one Flex carousel at 12 bubbles; split long service lists into multiple messages. */
+export function pricingCarouselMessages(
+  services: PricingService[],
+  liffUrl: string
+): FlexMessage[] {
+  const chunks: PricingService[][] = [];
+  for (let i = 0; i < services.length; i += LINE_FLEX_CAROUSEL_MAX_BUBBLES) {
+    chunks.push(services.slice(i, i + LINE_FLEX_CAROUSEL_MAX_BUBBLES));
+  }
+
+  const totalPages = Math.max(chunks.length, 1);
+  return chunks.map((chunk, index) => buildPricingCarouselMessage(chunk, liffUrl, index, totalPages));
+}
+
+function buildPricingCarouselMessage(
+  services: PricingService[],
+  liffUrl: string,
+  pageIndex = 0,
+  totalPages = 1
 ): FlexMessage {
   // Derive category label from service name
   function getCategoryLabel(name: string): string {
@@ -1031,7 +1058,9 @@ export function pricingCarouselMessage(
 
   return {
     type: "flex",
-    altText: "1008 Hair Studio 服務項目 — 左右滑動瀏覽",
+    altText: totalPages > 1
+      ? `1008 Hair Studio 服務項目 ${pageIndex + 1}/${totalPages} — 左右滑動瀏覽`
+      : "1008 Hair Studio 服務項目 — 左右滑動瀏覽",
     contents: carousel,
   };
 }
