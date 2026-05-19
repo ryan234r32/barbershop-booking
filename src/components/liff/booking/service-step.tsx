@@ -32,6 +32,27 @@ export interface Selection {
   variant?: ServiceVariant;
 }
 
+const treatmentTriggerTerms = ["染", "燙", "漂", "矯正"];
+
+function isTreatmentSelection(selection: Selection) {
+  const name = `${selection.service.name} ${selection.variant?.name ?? ""}`;
+  return name.includes("護髮");
+}
+
+function shouldRecommendTreatment(name: string) {
+  return !name.includes("護髮") && treatmentTriggerTerms.some((term) => name.includes(term));
+}
+
+function isDirectTreatmentAddOn(service: Service) {
+  const hasVariantChoices = !!service.hasVariants && (service.variants?.length ?? 0) > 0;
+  return (
+    service.bookingMode !== "CONSULTATION" &&
+    service.name.includes("護髮") &&
+    !service.name.includes("獨立") &&
+    !hasVariantChoices
+  );
+}
+
 /**
  * V3.7 P3 — 服務多選 + 諮詢服務 + 服務變體。
  * - NORMAL + !hasVariants: 點 tile toggle 加入/移除。
@@ -64,6 +85,15 @@ export function ServiceStep({
     0
   );
   const hasSelection = selectedSelections.length > 0;
+  const treatmentAddOn = services.find(isDirectTreatmentAddOn);
+  const shouldShowTreatmentAddOn =
+    !!treatmentAddOn &&
+    !selectedSelections.some(isTreatmentSelection) &&
+    selectedSelections.some((selection) =>
+      shouldRecommendTreatment(`${selection.service.name} ${selection.variant?.name ?? ""}`)
+    );
+  const consultationSuggestsTreatment =
+    !!consultationService && shouldRecommendTreatment(consultationService.name);
 
   const handleServiceClick = (service: Service) => {
     if (service.bookingMode === "CONSULTATION") {
@@ -141,6 +171,30 @@ export function ServiceStep({
           <div className="text-[13px]">點選下方服務開始（可複選）</div>
         )}
       </div>
+
+      {shouldShowTreatmentAddOn && treatmentAddOn && (
+        <div className="mt-4 rounded-xl border border-[#D8B46A]/35 bg-[#FFF8F1] p-4 shadow-[0_12px_28px_rgba(0,37,25,0.05)]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold tracking-[0.14em] text-[#9C6B1D] uppercase">
+                推薦加選
+              </div>
+              <div className="mt-1 text-[15px] font-bold text-[#003D2B]">
+                {treatmentAddOn.name}
+              </div>
+              <p className="mt-1 text-[12px] leading-relaxed text-[#003D2B]/60">
+                搭配染燙時一起護髮，髮況會更穩定，也比較能維持整理後的質感。
+              </p>
+            </div>
+            <button
+              onClick={() => onToggle(treatmentAddOn)}
+              className="shrink-0 whitespace-nowrap rounded-lg bg-[#003D2B] px-3 py-2 text-[12px] font-bold text-[#FFF8F1] active:scale-[0.98] transition-transform"
+            >
+              加選 NT$ {treatmentAddOn.price.toLocaleString()}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Service grid */}
       <div className="grid grid-cols-2 gap-4 mt-6">
@@ -265,6 +319,17 @@ export function ServiceStep({
           <p className="text-[13px] text-[#003D2B]/60 mt-2 leading-relaxed">
             這項服務需要老闆先評估您的髮況。請回到 LINE 對話傳以下三張照片，老闆確認後會幫您安排時段。
           </p>
+
+          {consultationSuggestsTreatment && (
+            <div className="mt-4 rounded-xl bg-[#FFF8F1] border border-[#D8B46A]/35 p-3.5">
+              <div className="text-[13px] font-bold text-[#003D2B]">
+                染燙通常會建議搭配護髮
+              </div>
+              <p className="mt-1 text-[12px] leading-relaxed text-[#003D2B]/60">
+                傳照片時可以一起告訴老闆是否想加護髮，老闆會連同時間與費用一起確認。
+              </p>
+            </div>
+          )}
 
           <div className="mt-5 space-y-3">
             {[
