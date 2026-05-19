@@ -11,11 +11,15 @@
  *   ← real bug observed 2026-04-29
  *
  * Rules:
- *   - Booking status MUST be CONFIRMED
- *   - Window: -3 days to +7 days from now (covers post-service late payment + pre-service deposit)
- *   - Payment status MUST be non-terminal (no payment, or PENDING / AWAITING_BANK)
- *     i.e. exclude VERIFYING / RECEIVED / WAIVED (already done)
- *   - Tie-break: closest endTime to "now" (just finished service > soonest upcoming)
+ *   - Booking status: CONFIRMED OR COMPLETED
+ *     (V3.7 P3 5/19 bug fix: admin checkout sets COMPLETED + payment RECEIVED
+ *      immediately even for BANK_TRANSFER without last5 → customer types 5 碼
+ *      later → lookup must still find the booking)
+ *   - Window: -3 days to +7 days from now
+ *   - Eligible when payment is null OR (method=BANK_TRANSFER AND transferLastFive=null)
+ *     i.e. waiting for the customer to report 後 5 碼; we DON'T gate on
+ *     payment.status because admin checkout flows set RECEIVED prematurely.
+ *   - Tie-break: closest endTime to "now"
  */
 
 import { prisma } from "@/lib/prisma";
@@ -31,7 +35,7 @@ export interface EligibleBooking {
   startTime: string;
   endTime: string;
   service: { name: string; price: number };
-  payment: { status: string; transferLastFive: string | null } | null;
+  payment: { status: string; transferLastFive: string | null; method: string | null } | null;
 }
 
 export interface PickResult {
@@ -62,23 +66,31 @@ export async function pickEligibleBookingForPayment(
     where: {
       userId,
       tenantId,
-      status: "CONFIRMED",
+      // V3.7 P3 (5/19) — also include COMPLETED bookings because admin checkout
+      // for BANK_TRANSFER marks booking COMPLETED + payment RECEIVED immediately
+      // (even without last5). Customer types 5 碼 later — still need to match.
+      status: { in: ["CONFIRMED", "COMPLETED"] },
       date: { gte: pastCutoff, lte: futureCutoff },
     },
     include: {
       service: { select: { name: true, price: true } },
-      payment: { select: { status: true, transferLastFive: true } },
+      payment: { select: { status: true, transferLastFive: true, method: true } },
     },
     orderBy: [{ date: "asc" }, { startTime: "asc" }],
     take: 20,
   });
 
-  const eligible = candidates.filter(
-    (b) =>
-      !b.payment ||
-      b.payment.status === "PENDING" ||
-      b.payment.status === "AWAITING_BANK",
-  );
+  // V3.7 P3 (5/19) — eligibility shifts from "payment status non-terminal" to
+  // "waiting for last5 input". Admin checkout sets RECEIVED + null transferLastFive,
+  // that's STILL waiting on the customer.
+  const eligible = candidates.filter((b) => {
+    if (!b.payment) return true; // no payment row → still need one
+    if (b.payment.transferLastFive) return false; // already reported
+    // Has payment row, no last5 → eligible IF this is a bank transfer flow.
+    // CASH with no last5 = done (admin took cash, no 5-digit step expected).
+    if (b.payment.method === "CASH") return false;
+    return true;
+  });
 
   if (eligible.length === 0) {
     return {

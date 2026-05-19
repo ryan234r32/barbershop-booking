@@ -58,13 +58,17 @@ describe("pickEligibleBookingForPayment", () => {
     expect(r.eligible?.id).toBe("b2");
   });
 
-  it("returns booking with PENDING payment over RECEIVED", async () => {
+  it("V3.7 P3: both PENDING and RECEIVED with null last5 are eligible (waiting on customer 5 碼)", async () => {
+    // Admin checkout flow sets payment.status=RECEIVED immediately but last5
+    // is null until customer reports. Helper must NOT filter these out.
     bookingFindMany.mockResolvedValue([
       makeBooking({ id: "b1", payment: { status: "RECEIVED", transferLastFive: null } }),
       makeBooking({ id: "b2", payment: { status: "PENDING", transferLastFive: null } }),
     ]);
     const r = await pickEligibleBookingForPayment("u1", "t1");
-    expect(r.eligible?.id).toBe("b2");
+    // Tie-break by endTime distance — both eligible, mocks have same date+endTime → first wins.
+    expect(["b1", "b2"]).toContain(r.eligible?.id);
+    expect(r.hasOnlyPaidBookings).toBe(false);
   });
 
   it("returns booking with AWAITING_BANK payment as eligible", async () => {
@@ -98,12 +102,12 @@ describe("pickEligibleBookingForPayment", () => {
     vi.useRealTimers();
   });
 
-  it("respects tenant + user filtering in query", async () => {
+  it("respects tenant + user filtering in query (V3.7 P3 includes COMPLETED)", async () => {
     bookingFindMany.mockResolvedValue([]);
     await pickEligibleBookingForPayment("u-foo", "t-bar");
     const callArgs = bookingFindMany.mock.calls[0][0] as { where: Record<string, unknown> };
     expect(callArgs.where.userId).toBe("u-foo");
     expect(callArgs.where.tenantId).toBe("t-bar");
-    expect(callArgs.where.status).toBe("CONFIRMED");
+    expect(callArgs.where.status).toEqual({ in: ["CONFIRMED", "COMPLETED"] });
   });
 });

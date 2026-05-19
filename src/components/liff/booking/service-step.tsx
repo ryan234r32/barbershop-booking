@@ -119,7 +119,31 @@ export function ServiceStep({
   const isServiceSelected = (serviceId: string) =>
     selectedSelections.some((s) => s.service.id === serviceId);
 
-  const handleOpenLineChat = () => {
+  /** V3.7 P3 (5/19) — push the photo-request Flex to the customer's LINE
+   *  BEFORE closing the LIFF window. Customer lands back in LINE OA with the
+   *  Flex waiting, so they immediately know which 3 photos to send. */
+  const handleOpenLineChat = async () => {
+    if (consultationService && liff) {
+      const serviceType: "perm" | "color" | "bleach" = (() => {
+        const name = consultationService.name;
+        if (name.includes("漂")) return "bleach";
+        if (name.includes("燙")) return "perm";
+        return "color"; // 補染 / 全頭染 / 挑染刷染 都走 color flex
+      })();
+      try {
+        const idToken = liff.getIDToken?.() || "";
+        await fetch("/api/consultations/push-flex", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(idToken ? { "X-LIFF-ID-Token": idToken } : {}),
+          },
+          body: JSON.stringify({ serviceType }),
+        });
+      } catch {
+        // Non-fatal — customer can still ask via keyword in LINE OA.
+      }
+    }
     setConsultationSheetOpen(false);
     if (liff) {
       liff.closeWindow();

@@ -656,15 +656,21 @@ async function buildKeywordReply(text: string, tenantId: string, lineUserId: str
     }
     const target = pick.eligible;
 
-    // Atomic transition — create or upgrade PENDING/AWAITING_BANK → VERIFYING
+    // Atomic transition — create new OR write last5 onto existing payment.
+    // V3.7 P3 (5/19) — never downgrade an already-RECEIVED payment back to
+    // VERIFYING. Admin checkout marks RECEIVED immediately; the last5 here is
+    // bookkeeping. Only flip status when the existing payment is still
+    // non-terminal (PENDING / AWAITING_BANK).
     const payment = target.payment
       ? await prisma.payment.update({
           where: { bookingId: target.id },
           data: {
             method: "BANK_TRANSFER",
-            status: "VERIFYING",
             transferLastFive,
             verifiedAt: new Date(),
+            ...(target.payment.status === "PENDING" || target.payment.status === "AWAITING_BANK"
+              ? { status: "VERIFYING" as const }
+              : {}),
           },
         })
       : await prisma.payment.create({

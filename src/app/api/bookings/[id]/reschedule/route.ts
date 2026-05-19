@@ -15,8 +15,8 @@ import { rescheduleConfirmationMessage } from "@/lib/line/messages";
 import { notifyAdminNewBooking } from "@/lib/notifications/admin-notify";
 import { rescheduleBookingSchema } from "@/lib/utils/validation";
 import { errorResponse, SlotUnavailableError, AppError } from "@/lib/utils/errors";
-import { addHours, addDaysToISO, getDayOfWeek, todayInTaipei } from "@/lib/utils/time";
-import { MAX_ADVANCE_DAYS, ADMIN_MAX_ADVANCE_DAYS } from "@/lib/utils/constants";
+import { addHours, addDaysToISO, getDayOfWeek, parseTimeToHour, todayInTaipei } from "@/lib/utils/time";
+import { MAX_ADVANCE_DAYS, ADMIN_MAX_ADVANCE_DAYS, DEFAULT_BUSINESS_HOURS } from "@/lib/utils/constants";
 import { logger } from "@/lib/utils/logger";
 import { requireBookingAuth, requireBookingOwnership } from "@/lib/auth/booking-auth";
 import { invalidateReportsCache } from "@/lib/cache/invalidate";
@@ -112,9 +112,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // LIFF 客戶改期 45 天 + 公休日限制；Admin 365 天上限。
+    // LIFF 客戶改期 45 天 + 公休日限制；Admin 365 天上限 + 公休日限制（5/19 修）。
     const newDateObj = new Date(input.date + "T00:00:00.000Z");
     const today = todayInTaipei();
+    const dayOfWeek = getDayOfWeek(newDateObj);
     if (auth.type === "liff") {
       const maxDate = addDaysToISO(today, MAX_ADVANCE_DAYS);
       if (input.date > maxDate) {
@@ -122,27 +123,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           `改期日期最多只能提前 ${MAX_ADVANCE_DAYS} 天`,
           400,
           "BEYOND_ADVANCE_WINDOW",
-        );
-      }
-      const dayOfWeek = getDayOfWeek(newDateObj);
-      const [bh, holiday] = await Promise.all([
-        prisma.businessHours.findUnique({
-          where: { tenantId_dayOfWeek: { tenantId: booking.tenantId, dayOfWeek } },
-          select: { isOpen: true },
-        }),
-        prisma.holiday.findUnique({
-          where: { tenantId_date: { tenantId: booking.tenantId, date: newDateObj } },
-          select: { reason: true },
-        }),
-      ]);
-      if (bh && !bh.isOpen) {
-        throw new AppError("本日公休，請選其他日期", 400, "CLOSED_WEEKDAY");
-      }
-      if (holiday) {
-        throw new AppError(
-          holiday.reason ? `本日公休（${holiday.reason}）` : "本日公休，請選其他日期",
-          400,
-          "HOLIDAY",
         );
       }
     } else {
@@ -156,9 +136,47 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         );
       }
     }
+    // V3.7 P3 (5/19) — admin 改期也要擋公休（之前 admin 路徑沒檢查 → 老闆 repro
+    // 排到自己已標公休的日期）+ 部分時段公休尊重（P1-3 partial closure model）。
+    const [bh, holiday] = await Promise.all([
+      prisma.businessHours.findUnique({
+        where: { tenantId_dayOfWeek: { tenantId: booking.tenantId, dayOfWeek } },
+        select: { isOpen: true },
+      }),
+      prisma.holiday.findUnique({
+        where: { tenantId_date: { tenantId: booking.tenantId, date: newDateObj } },
+        select: { reason: true, startTime: true, endTime: true },
+      }),
+    ]);
+    if (bh && !bh.isOpen) {
+      throw new AppError("本日公休，請選其他日期", 400, "CLOSED_WEEKDAY");
+    }
+    // Full-day holiday (both NULL = full closure) blocks reschedule entirely.
+    // Partial closure is handled by isSlotAvailable downstream.
+    if (holiday && !holiday.startTime && !holiday.endTime) {
+      throw new AppError(
+        holiday.reason ? `本日公休（${holiday.reason}）` : "本日公休，請選其他日期",
+        400,
+        "HOLIDAY",
+      );
+    }
+
+    // V3.7 P3 (5/19) — overtime guard. 老闆 repro：改成 19:00 + 3hr 服務 ≠ valid
+    // 因為跨過 20:00 收班。Server reject (matches POST /api/bookings rule).
+    // Multi-service booking uses booking.slotsOccupied (legacy + new dual-write).
+    const startHour = parseTimeToHour(input.startTime);
+    const closeHour = parseTimeToHour(DEFAULT_BUSINESS_HOURS.endTime);
+    const openHour = parseTimeToHour(DEFAULT_BUSINESS_HOURS.startTime);
+    if (startHour < openHour || startHour + booking.slotsOccupied > closeHour) {
+      throw new AppError(
+        `改期時段須在營業時間內（${DEFAULT_BUSINESS_HOURS.startTime}–${DEFAULT_BUSINESS_HOURS.endTime}），此服務需 ${booking.slotsOccupied} 小時`,
+        400,
+        "OUTSIDE_BUSINESS_HOURS",
+      );
+    }
 
     // Calculate new end time
-    const newEndTime = addHours(input.startTime, booking.service.slotsNeeded);
+    const newEndTime = addHours(input.startTime, booking.slotsOccupied);
 
     // Acquire locks on EVERY hour the new booking will occupy (codex P0 fix).
     // Single-startTime locking would let two 2-slot bookings race into 12:00
