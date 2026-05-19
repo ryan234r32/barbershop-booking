@@ -6,8 +6,10 @@ import { errorResponse } from "@/lib/utils/errors";
 const querySchema = z.object({
   tenantId: z.string().uuid().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
-  // V3.7 Tier 0.2 — accept either single `serviceId` (legacy) or csv `serviceIds`
-  // (multi-service path). One of them must be present.
+  // V3.7 P3 (5/19) — accept either explicit slotsNeeded (preferred when client
+  // has variant resolved already, e.g. LIFF already loaded /api/services with
+  // variants) or fall back to looking up serviceId(s).
+  slotsNeeded: z.coerce.number().int().min(1).max(12).optional(),
   serviceId: z.string().uuid("serviceId must be a valid UUID").optional(),
   serviceIds: z
     .string()
@@ -21,12 +23,13 @@ export async function GET(request: NextRequest) {
     const params = querySchema.parse({
       tenantId: searchParams.get("tenantId") || undefined,
       date: searchParams.get("date"),
+      slotsNeeded: searchParams.get("slotsNeeded") || undefined,
       serviceId: searchParams.get("serviceId") || undefined,
       serviceIds: searchParams.get("serviceIds") || undefined,
     });
-    if (!params.serviceId && !params.serviceIds) {
+    if (!params.slotsNeeded && !params.serviceId && !params.serviceIds) {
       return Response.json(
-        { error: "serviceId or serviceIds is required" },
+        { error: "slotsNeeded, serviceId, or serviceIds is required" },
         { status: 400 },
       );
     }
@@ -35,6 +38,7 @@ export async function GET(request: NextRequest) {
     const slots = await getAvailableSlots({
       tenantId,
       date: params.date,
+      slotsNeeded: params.slotsNeeded,
       serviceId: params.serviceId,
       serviceIds: params.serviceIds ? params.serviceIds.split(",") : undefined,
     });

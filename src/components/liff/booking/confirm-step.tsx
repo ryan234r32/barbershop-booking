@@ -19,8 +19,8 @@ export function ConfirmStep({
   policyAgreed: boolean;
   onPolicyAgreedChange: (v: boolean) => void;
   serviceName?: string;
-  /** V3.7 Tier 0.2 — multi-service chip display. Falls back to serviceName when absent. */
-  services?: Array<{ name: string; price: number }>;
+  /** V3.7 P3 — multi-service + variant chip display. Falls back to serviceName when absent. */
+  services?: Array<{ name: string; variantName?: string; price: number }>;
   date?: string;
   startTime?: string;
   price?: number;
@@ -40,7 +40,7 @@ export function ConfirmStep({
       {/* Booking summary card */}
       {(serviceName || (services && services.length > 0)) && (
         <div className="bg-[#E8F1EC] rounded-xl p-4 mb-6">
-          {services && services.length > 1 ? (
+          {services && services.length > 0 && (services.length > 1 || services.some((s) => s.variantName)) ? (
             <div className="space-y-2.5">
               <div className="text-sm text-[#003D2B]/60">已選服務</div>
               <div className="flex flex-wrap gap-1.5">
@@ -49,7 +49,7 @@ export function ConfirmStep({
                     key={idx}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white text-[#003D2B] text-[12px] font-medium border border-[#003D2B]/10"
                   >
-                    {s.name}
+                    {s.variantName ? `${s.name}・${s.variantName}` : s.name}
                     <span className="text-[#003D2B]/50 text-[11px]">NT${s.price.toLocaleString()}</span>
                   </span>
                 ))}

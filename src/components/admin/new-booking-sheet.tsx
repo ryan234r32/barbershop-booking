@@ -17,12 +17,54 @@ interface Props {
   onCreated: () => void;
 }
 
+interface Variant {
+  id: string;
+  name: string;
+  price: number;
+  durationMin: number;
+  slotsNeeded: number;
+  sortOrder: number;
+}
+
 interface Service {
   id: string;
   name: string;
   duration: number;
   slotsNeeded: number;
   price: number;
+  // V3.7 P3 (5/19): 服務變異 + 諮詢制
+  hasVariants?: boolean;
+  bookingMode?: "NORMAL" | "CONSULTATION";
+  variants?: Variant[];
+}
+
+interface ServiceSelection {
+  service: Service;
+  variant?: Variant;
+  /** CONSULTATION-only admin override (染漂時間每次不同) */
+  overrideDurationMin?: number;
+  /** CONSULTATION-only admin override */
+  overridePrice?: number;
+}
+
+/** Resolve effective price/slots/duration for a selection (variant > override > service default). */
+function selectionPrice(sel: ServiceSelection): number {
+  if (sel.variant) return sel.variant.price;
+  if (typeof sel.overridePrice === "number") return sel.overridePrice;
+  return sel.service.price;
+}
+function selectionDurationMin(sel: ServiceSelection): number {
+  if (sel.variant) return sel.variant.durationMin;
+  if (typeof sel.overrideDurationMin === "number") return sel.overrideDurationMin;
+  return sel.service.duration;
+}
+function selectionSlots(sel: ServiceSelection): number {
+  if (sel.variant) return sel.variant.slotsNeeded;
+  // Override durationMin → recompute slots (ceil to 1hr)
+  if (typeof sel.overrideDurationMin === "number") {
+    return Math.max(1, Math.ceil(sel.overrideDurationMin / 60));
+  }
+  return sel.service.slotsNeeded;
 }
 
 interface CustomerSuggestion {
@@ -83,7 +125,10 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
   const [phone, setPhone] = useState("");
   // V3.7 P0 multi-service (5/18 老闆反饋): admin 新增預約應該能一次選多個服務
   // (剪 + 染 + 護)，總時數 = sum slotsNeeded。不再限定 1hr。
-  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  // V3.7 P3 (5/19): selections 物件化以支援 variant 與 CONSULTATION override。
+  const [selectedSelections, setSelectedSelections] = useState<ServiceSelection[]>([]);
+  /** Service id 目前在 UI 上「展開中」(顯示 variant chips 或 consultation 輸入)。null = 全收。 */
+  const [expandedServiceId, setExpandedServiceId] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [isTest, setIsTest] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -100,21 +145,67 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
   // Show ALL services regardless of duration. Multi-select; total time auto-computed.
   const allServices: Service[] = servicesData?.services || [];
   // Stable display order = catalog order from API (already sortOrder asc server-side).
-  const selectedServices = selectedServiceIds
-    .map((id) => allServices.find((s) => s.id === id))
-    .filter((s): s is Service => !!s);
-  const totalSlots = selectedServices.reduce((sum, s) => sum + s.slotsNeeded, 0);
-  const totalPrice = selectedServices.reduce((sum, s) => sum + s.price, 0);
-  const totalDuration = selectedServices.reduce((sum, s) => sum + s.duration, 0);
+  const totalSlots = selectedSelections.reduce((sum, s) => sum + selectionSlots(s), 0);
+  const totalPrice = selectedSelections.reduce((sum, s) => sum + selectionPrice(s), 0);
+  const totalDuration = selectedSelections.reduce((sum, s) => sum + selectionDurationMin(s), 0);
 
   // Reset stale selections when sheet closes / reopens for a different slot.
   useEffect(() => {
-    if (!open) setSelectedServiceIds([]);
+    if (!open) {
+      setSelectedSelections([]);
+      setExpandedServiceId(null);
+    }
   }, [open]);
 
-  const toggleService = (id: string) => {
-    setSelectedServiceIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+  const isSelected = (serviceId: string) =>
+    selectedSelections.some((s) => s.service.id === serviceId);
+
+  const removeSelection = (serviceId: string) => {
+    setSelectedSelections((prev) => prev.filter((s) => s.service.id !== serviceId));
+  };
+
+  /** Tap on a service tile — branches by hasVariants / bookingMode. */
+  const handleServiceTileTap = (svc: Service) => {
+    // Already selected → toggle off (any branch).
+    if (isSelected(svc.id)) {
+      removeSelection(svc.id);
+      if (expandedServiceId === svc.id) setExpandedServiceId(null);
+      return;
+    }
+    if (svc.hasVariants && svc.variants && svc.variants.length > 0) {
+      // Open variant picker inline; only commit once user taps a variant chip.
+      setExpandedServiceId((cur) => (cur === svc.id ? null : svc.id));
+      return;
+    }
+    if (svc.bookingMode === "CONSULTATION") {
+      // Add with default override = service defaults; expand inline editors.
+      setSelectedSelections((prev) => [
+        ...prev,
+        { service: svc, overrideDurationMin: svc.duration, overridePrice: svc.price },
+      ]);
+      setExpandedServiceId(svc.id);
+      return;
+    }
+    // NORMAL service → plain add.
+    setSelectedSelections((prev) => [...prev, { service: svc }]);
+  };
+
+  const pickVariant = (svc: Service, variant: Variant) => {
+    setSelectedSelections((prev) => {
+      // If user re-taps a different variant for same service, replace it.
+      const without = prev.filter((s) => s.service.id !== svc.id);
+      return [...without, { service: svc, variant }];
+    });
+    setExpandedServiceId(null);
+  };
+
+  const updateOverride = (
+    serviceId: string,
+    field: "overrideDurationMin" | "overridePrice",
+    value: number,
+  ) => {
+    setSelectedSelections((prev) =>
+      prev.map((s) => (s.service.id === serviceId ? { ...s, [field]: value } : s)),
     );
   };
 
@@ -171,8 +262,19 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
   };
 
   const handleSubmit = async () => {
-    if (!customerName.trim() || selectedServiceIds.length === 0) {
+    if (!customerName.trim() || selectedSelections.length === 0) {
       toast({ type: "error", message: "請填寫客人姓名和選擇至少一個服務" });
+      return;
+    }
+    // V3.7 P3 guard: hasVariants services 必須挑 variant 才能送
+    const missingVariant = selectedSelections.find(
+      (s) => s.service.hasVariants && !s.variant,
+    );
+    if (missingVariant) {
+      toast({
+        type: "error",
+        message: `「${missingVariant.service.name}」要選一個尺寸/分類才能送出`,
+      });
       return;
     }
     /* 5/19 bug fix: 之前只靠 server 422 報「預約時段須在營業時間內」，但客戶端
@@ -195,6 +297,13 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
           ? `[TEST] ${trimmedNotes}`
           : `[TEST]`
         : trimmedNotes || undefined;
+      // V3.7 P3 (5/19): server preferred shape = `services: [{ serviceId, variantId? }]`.
+      // CONSULTATION overrides (duration/price) are NOT yet wired through the
+      // create-booking API — admin will fine-tune at checkout. Phase 5 backfills.
+      const servicesPayload = selectedSelections.map((sel) => ({
+        serviceId: sel.service.id,
+        ...(sel.variant ? { variantId: sel.variant.id } : {}),
+      }));
       const res = await fetch("/api/bookings", {
         method: "POST",
         headers: adminHeaders(),
@@ -202,8 +311,7 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
           customerId: boundCustomer?.id,
           displayName: customerName.trim(),
           phone: phone.trim() || undefined,
-          // V3.7 P0 multi-service — send full array; server sums slotsNeeded / price.
-          serviceIds: selectedServiceIds,
+          services: servicesPayload,
           date,
           startTime: time,
           source,
@@ -219,7 +327,8 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
       onCreated();
       setCustomerName("");
       setPhone("");
-      setSelectedServiceIds([]);
+      setSelectedSelections([]);
+      setExpandedServiceId(null);
       setNotes("");
       setBoundCustomer(null);
       setIsTest(false);
@@ -352,13 +461,13 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
           />
         </div>
 
-        {/* Service multi-select (V3.7 P0 — 老闆 5/18 反饋) */}
+        {/* Service multi-select (V3.7 P0 — 老闆 5/18 反饋) + P3 variants/consultation (5/19) */}
         <div className="mb-3">
           <div className="flex items-center justify-between mb-2">
             <label className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider">
               選擇服務（可複選）
             </label>
-            {selectedServiceIds.length > 0 && (() => {
+            {selectedSelections.length > 0 && (() => {
               const startH = parseInt(time.split(":")[0]);
               const overtimeHours = startH + totalSlots - 20;
               const isOvertime = overtimeHours > 0;
@@ -384,37 +493,136 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
           ) : (
             <div className="grid grid-cols-2 gap-1.5">
               {allServices.map((s) => {
-                const checked = selectedServiceIds.includes(s.id);
+                const selection = selectedSelections.find((x) => x.service.id === s.id);
+                const checked = !!selection;
+                const isExpanded = expandedServiceId === s.id;
+                const isVariant = !!s.hasVariants && (s.variants?.length ?? 0) > 0;
+                const isConsult = s.bookingMode === "CONSULTATION";
+                // Display labels — variant wins over service defaults.
+                const displayName = selection?.variant
+                  ? `${s.name}・${selection.variant.name}`
+                  : s.name;
+                const displaySlots = selection ? selectionSlots(selection) : s.slotsNeeded;
+                const displayPrice = selection ? selectionPrice(selection) : s.price;
                 return (
-                  <button
+                  <div
                     key={s.id}
-                    type="button"
-                    onClick={() => toggleService(s.id)}
-                    className={`relative text-left px-3 py-2.5 rounded-lg border-2 transition-all ${
-                      checked
-                        ? "bg-[var(--color-brand)]/10 border-[var(--color-brand)]"
-                        : "bg-white border-[var(--color-text-muted)]/15 hover:border-[var(--color-text-muted)]/30"
+                    className={`relative col-span-1 ${
+                      (isExpanded || (checked && isConsult)) ? "col-span-2" : ""
                     }`}
                   >
-                    {checked && (
-                      <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[var(--color-brand)] text-white text-[10px] inline-flex items-center justify-center font-bold">
-                        ✓
-                      </span>
+                    <button
+                      type="button"
+                      onClick={() => handleServiceTileTap(s)}
+                      className={`relative w-full text-left px-3 py-2.5 rounded-lg border-2 transition-all ${
+                        checked
+                          ? "bg-[var(--color-brand)]/10 border-[var(--color-brand)]"
+                          : "bg-white border-[var(--color-text-muted)]/15 hover:border-[var(--color-text-muted)]/30"
+                      }`}
+                    >
+                      {checked && (
+                        <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[var(--color-brand)] text-white text-[10px] inline-flex items-center justify-center font-bold">
+                          ✓
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1.5 pr-5">
+                        <span className="text-[13px] font-medium text-[var(--color-text-primary)] truncate">
+                          {displayName}
+                        </span>
+                        {isConsult && !checked && (
+                          <span className="text-[9px] font-semibold text-[var(--color-warning)] bg-[var(--color-warning)]/10 px-1 py-0.5 rounded shrink-0">
+                            諮詢制
+                          </span>
+                        )}
+                        {isVariant && !selection?.variant && (
+                          <span className="text-[9px] font-semibold text-[var(--color-brand)] bg-[var(--color-brand)]/10 px-1 py-0.5 rounded shrink-0">
+                            選尺寸
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-[var(--color-text-muted)] mt-0.5 tabular-nums">
+                        {isVariant && !selection?.variant
+                          ? `${s.variants?.length ?? 0} 種價位`
+                          : `${displaySlots} 小時 · NT$${displayPrice.toLocaleString()}`}
+                      </div>
+                    </button>
+
+                    {/* Variant chip row (inline, only when expanded + has variants) */}
+                    {isExpanded && isVariant && (
+                      <div className="mt-1.5 p-2 rounded-lg bg-[var(--color-surface)] flex flex-wrap gap-1.5">
+                        {s.variants!.map((v) => {
+                          const isPicked = selection?.variant?.id === v.id;
+                          return (
+                            <button
+                              key={v.id}
+                              type="button"
+                              onClick={() => pickVariant(s, v)}
+                              className={`text-[12px] px-2.5 py-1.5 rounded-full border transition-colors ${
+                                isPicked
+                                  ? "bg-[var(--color-brand)] text-[var(--color-bg)] border-[var(--color-brand)]"
+                                  : "bg-white text-[var(--color-text-body)] border-[var(--color-text-muted)]/25 hover:border-[var(--color-brand)]"
+                              }`}
+                            >
+                              <span className="font-medium">{v.name}</span>
+                              <span className="ml-1 tabular-nums opacity-80">
+                                NT${v.price.toLocaleString()}・{v.slotsNeeded}hr
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     )}
-                    <div className="text-[13px] font-medium text-[var(--color-text-primary)] pr-5 truncate">
-                      {s.name}
-                    </div>
-                    <div className="text-[11px] text-[var(--color-text-muted)] mt-0.5 tabular-nums">
-                      {s.slotsNeeded} 小時 · NT${s.price.toLocaleString()}
-                    </div>
-                  </button>
+
+                    {/* CONSULTATION inline override (time + price) */}
+                    {checked && isConsult && (
+                      <div className="mt-1.5 p-2.5 rounded-lg bg-[var(--color-warning)]/5 border border-[var(--color-warning)]/30">
+                        <p className="text-[10px] text-[var(--color-text-muted)] mb-1.5 leading-snug">
+                          諮詢制 — 染漂時間每次不同，請依顧客狀況調整。
+                          確認預約後可在結帳時再次微調。
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="block">
+                            <span className="text-[10px] text-[var(--color-text-muted)] tracking-wider">時數（分鐘）</span>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={30}
+                              step={30}
+                              value={selection?.overrideDurationMin ?? s.duration}
+                              onChange={(e) =>
+                                updateOverride(s.id, "overrideDurationMin", Number(e.target.value) || 0)
+                              }
+                              className="w-full mt-0.5 bg-white border border-[var(--color-text-muted)]/20 rounded px-2 py-1 text-sm tabular-nums outline-none focus:border-[var(--color-brand)]"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="text-[10px] text-[var(--color-text-muted)] tracking-wider">金額</span>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              step={100}
+                              value={selection?.overridePrice ?? s.price}
+                              onChange={(e) =>
+                                updateOverride(s.id, "overridePrice", Number(e.target.value) || 0)
+                              }
+                              className="w-full mt-0.5 bg-white border border-[var(--color-text-muted)]/20 rounded px-2 py-1 text-sm tabular-nums outline-none focus:border-[var(--color-brand)]"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
           )}
-          {selectedServices.length > 1 && (
+          {selectedSelections.length > 1 && (
             <p className="text-[11px] text-[var(--color-text-muted)] mt-2">
-              {selectedServices.map((s) => s.name).join(" + ")}（{totalDuration} 分）
+              {selectedSelections
+                .map((s) => (s.variant ? `${s.service.name}・${s.variant.name}` : s.service.name))
+                .join(" + ")}
+              （{totalDuration} 分）
             </p>
           )}
         </div>

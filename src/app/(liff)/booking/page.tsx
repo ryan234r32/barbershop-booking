@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useLiff } from "@/lib/liff/provider";
 import { useToast } from "@/components/ui/toast";
-import { ServiceStep } from "@/components/liff/booking/service-step";
+import { ServiceStep, type Selection } from "@/components/liff/booking/service-step";
 import { CalendarStep } from "@/components/liff/booking/calendar-step";
 import { ConfirmStep } from "@/components/liff/booking/confirm-step";
 import { SuccessStep } from "@/components/liff/booking/success-step";
@@ -14,6 +14,15 @@ import { IconArrowBack, IconClose } from "@/components/liff/icons";
 import { Modal } from "@/components/ui/modal";
 import { useBusinessConfig } from "@/lib/hooks/use-business-config";
 
+interface ServiceVariant {
+  id: string;
+  name: string;
+  price: number;
+  durationMin: number;
+  slotsNeeded: number;
+  sortOrder: number;
+}
+
 interface Service {
   id: string;
   name: string;
@@ -21,6 +30,9 @@ interface Service {
   duration: number;
   slotsNeeded: number;
   price: number;
+  hasVariants?: boolean;
+  bookingMode?: "NORMAL" | "CONSULTATION";
+  variants?: ServiceVariant[];
 }
 
 interface AvailableSlot {
@@ -36,13 +48,24 @@ export default function BookingPage() {
   const { toast } = useToast();
   const [step, setStep] = useState<BookingStep>("service");
   const [services, setServices] = useState<Service[]>([]);
-  // V3.7 Tier 0.2 — 服務多選。陣列順序 = BookingService.order；index 0 為主服務。
-  // 大量 derived values 用 useMemo-style inline aggregates 算出（時數/總價/slots）。
-  const [selectedServices, setSelectedServices] = useState<Service[]>([]);
-  const totalSlotsNeeded = selectedServices.reduce((sum, s) => sum + s.slotsNeeded, 0);
-  const totalDuration = selectedServices.reduce((sum, s) => sum + s.duration, 0);
-  const totalPrice = selectedServices.reduce((sum, s) => sum + s.price, 0);
-  const combinedServiceName = selectedServices.map((s) => s.name).join(" + ");
+  // V3.7 P3 — 服務多選 + 變體。陣列順序 = BookingService.order；index 0 為主服務。
+  // 每個 selection 包含 service + 可選 variant；aggregates 使用 variant 優先 fallback service。
+  const [selectedSelections, setSelectedSelections] = useState<Selection[]>([]);
+  const totalSlotsNeeded = selectedSelections.reduce(
+    (sum, s) => sum + (s.variant?.slotsNeeded ?? s.service.slotsNeeded),
+    0
+  );
+  const totalDuration = selectedSelections.reduce(
+    (sum, s) => sum + (s.variant?.durationMin ?? s.service.duration),
+    0
+  );
+  const totalPrice = selectedSelections.reduce(
+    (sum, s) => sum + (s.variant?.price ?? s.service.price),
+    0
+  );
+  const combinedServiceName = selectedSelections
+    .map((s) => (s.variant ? `${s.service.name}・${s.variant.name}` : s.service.name))
+    .join(" + ");
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
@@ -72,13 +95,13 @@ export default function BookingPage() {
       .finally(() => setLoading(false));
   }, [isReady]);
 
-  // Load available slots when date + service selected.
-  // V3.7 Tier 0.2: pass `serviceIds` csv so server sums slotsNeeded across all
-  // selected services (剪+染+護 → 1+2+1=4 consecutive slots needed).
-  const loadSlots = useCallback(async (date: string, serviceIds: string[]) => {
+  // Load available slots when date + selections set.
+  // V3.7 P3: pass `slotsNeeded` directly (LIFF has variant info → no need to
+  // hit DB to resolve). Server still falls back to summing serviceIds if absent.
+  const loadSlots = useCallback(async (date: string, slotsNeeded: number) => {
     setSlotsLoading(true);
     try {
-      const res = await fetch(`/api/slots?date=${date}&serviceIds=${serviceIds.join(",")}`);
+      const res = await fetch(`/api/slots?date=${date}&slotsNeeded=${slotsNeeded}`);
       const data = await res.json();
       setAvailableSlots(
         (data.slots || []).map((s: { startTime: string; isRecommended: boolean }) => ({
@@ -97,8 +120,8 @@ export default function BookingPage() {
   const handleDateSelect = (date: string) => {
     setSelectedDate(date);
     setSelectedTime("");
-    if (selectedServices.length > 0) {
-      loadSlots(date, selectedServices.map((s) => s.id));
+    if (selectedSelections.length > 0) {
+      loadSlots(date, totalSlotsNeeded);
     }
   };
 
@@ -106,22 +129,48 @@ export default function BookingPage() {
     setSelectedTime(time);
   };
 
-  // V3.7 Tier 0.2: toggle selection. Adding a new service after a date is
-  // picked invalidates the date/time (different total slotsNeeded → different
-  // availability). Removing the last selection clears the same way.
+  // V3.7 P3: toggle plain (no-variant) service. Adding/removing invalidates
+  // any picked date/time (different total slotsNeeded → different availability).
   const handleServiceToggle = (service: Service) => {
-    const exists = selectedServices.some((s) => s.id === service.id);
-    const next = exists
-      ? selectedServices.filter((s) => s.id !== service.id)
-      : [...selectedServices, service];
-    setSelectedServices(next);
+    const exists = selectedSelections.some((s) => s.service.id === service.id && !s.variant);
+    const next: Selection[] = exists
+      ? selectedSelections.filter((s) => !(s.service.id === service.id && !s.variant))
+      : [...selectedSelections, { service }];
+    setSelectedSelections(next);
+    setSelectedDate("");
+    setSelectedTime("");
+    setAvailableSlots([]);
+  };
+
+  // V3.7 P3: pick / swap a variant for a service with variants.
+  // Tapping the already-selected variant deselects it (toggle behaviour).
+  // Tapping a different variant on the same service swaps it.
+  const handleVariantPick = (service: Service, variant: ServiceVariant) => {
+    const existingIdx = selectedSelections.findIndex(
+      (s) => s.service.id === service.id
+    );
+    let next: Selection[];
+    if (existingIdx >= 0) {
+      const existing = selectedSelections[existingIdx];
+      if (existing.variant?.id === variant.id) {
+        // Same variant tapped → deselect entirely
+        next = selectedSelections.filter((_, i) => i !== existingIdx);
+      } else {
+        // Swap variant in place (preserve order)
+        next = [...selectedSelections];
+        next[existingIdx] = { service, variant };
+      }
+    } else {
+      next = [...selectedSelections, { service, variant }];
+    }
+    setSelectedSelections(next);
     setSelectedDate("");
     setSelectedTime("");
     setAvailableSlots([]);
   };
 
   const handleSubmit = async (infoOverride?: { name: string; phone: string; birthday?: string; gender?: "MALE" | "FEMALE" | "OTHER" | "PREFER_NOT_TO_SAY" }) => {
-    if (selectedServices.length === 0 || !selectedDate || !selectedTime || !userId) return;
+    if (selectedSelections.length === 0 || !selectedDate || !selectedTime || !userId) return;
 
     const info = infoOverride || userInfo;
 
@@ -137,9 +186,14 @@ export default function BookingPage() {
           ...(idToken ? { "X-LIFF-ID-Token": idToken } : {}),
         },
         body: JSON.stringify({
-          // V3.7 Tier 0.2: pass full multi-service array. Server upgrades any
-          // legacy single-serviceId callers into [serviceId] internally.
-          serviceIds: selectedServices.map((s) => s.id),
+          // V3.7 P3: pass `services` (preferred — includes variantId). Server
+          // resolves variant price/duration. Also send `serviceIds` for any
+          // legacy code path that still inspects the older field.
+          services: selectedSelections.map((s) => ({
+            serviceId: s.service.id,
+            variantId: s.variant?.id,
+          })),
+          serviceIds: selectedSelections.map((s) => s.service.id),
           date: selectedDate,
           startTime: selectedTime,
           notes: notes || undefined,
@@ -158,8 +212,8 @@ export default function BookingPage() {
           // availability so the just-taken slot disappears, and show a
           // blocking modal so the user definitely sees what happened.
           setSelectedTime("");
-          if (selectedServices.length && selectedDate) {
-            loadSlots(selectedDate, selectedServices.map((s) => s.id));
+          if (selectedSelections.length && selectedDate) {
+            loadSlots(selectedDate, totalSlotsNeeded);
           }
           setStep("calendar");
           setSlotConflictOpen(true);
@@ -182,7 +236,7 @@ export default function BookingPage() {
   const canProceed = (() => {
     switch (step) {
       case "service":
-        return selectedServices.length > 0;
+        return selectedSelections.length > 0;
       case "calendar":
         return !!selectedDate && !!selectedTime;
       case "confirm":
@@ -195,7 +249,7 @@ export default function BookingPage() {
   const handleNext = () => {
     switch (step) {
       case "service":
-        if (selectedServices.length > 0) setStep("calendar");
+        if (selectedSelections.length > 0) setStep("calendar");
         break;
       case "calendar":
         if (selectedDate && selectedTime) setStep("confirm");
@@ -278,18 +332,22 @@ export default function BookingPage() {
   }
 
   // Success step — full page, no bottom bar
-  if (step === "success" && bookingResult && selectedServices.length > 0) {
+  if (step === "success" && bookingResult && selectedSelections.length > 0) {
     return (
       <div className="max-w-md mx-auto px-6">
         <SuccessStep
           bookingId={bookingResult.id}
-          // Aggregate view: name joined, total duration + total price.
-          // Keeps SuccessStep API stable (single `service` prop).
+          // Aggregate view: combined name + chip-list for variants/multi-service.
           service={{
             name: combinedServiceName,
             slotsNeeded: totalSlotsNeeded,
             price: totalPrice,
           }}
+          services={selectedSelections.map((s) => ({
+            name: s.service.name,
+            variantName: s.variant?.name,
+            price: s.variant?.price ?? s.service.price,
+          }))}
           date={selectedDate}
           time={selectedTime}
         />
@@ -346,12 +404,13 @@ export default function BookingPage() {
           {step === "service" && (
             <ServiceStep
               services={services}
-              selectedServices={selectedServices}
+              selectedSelections={selectedSelections}
               onToggle={handleServiceToggle}
+              onPickVariant={handleVariantPick}
             />
           )}
 
-          {step === "calendar" && selectedServices.length > 0 && (
+          {step === "calendar" && selectedSelections.length > 0 && (
             <CalendarStep
               selectedDate={selectedDate}
               selectedTime={selectedTime}
@@ -367,14 +426,18 @@ export default function BookingPage() {
             />
           )}
 
-          {step === "confirm" && selectedServices.length > 0 && (
+          {step === "confirm" && selectedSelections.length > 0 && (
             <ConfirmStep
               notes={notes}
               onNotesChange={setNotes}
               policyAgreed={policyAgreed}
               onPolicyAgreedChange={setPolicyAgreed}
               serviceName={combinedServiceName}
-              services={selectedServices.map((s) => ({ name: s.name, price: s.price }))}
+              services={selectedSelections.map((s) => ({
+                name: s.service.name,
+                variantName: s.variant?.name,
+                price: s.variant?.price ?? s.service.price,
+              }))}
               date={selectedDate}
               startTime={selectedTime}
               price={totalPrice}

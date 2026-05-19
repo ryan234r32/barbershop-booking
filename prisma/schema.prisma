@@ -223,17 +223,31 @@ enum Gender {
 // SERVICES
 // ============================================
 
+/// V3.7 P3 (5/19) — Service-level shell. `price` / `duration` / `slotsNeeded`
+/// remain as **default values** used when the service has no variants
+/// (固定服務 like 修瀏海、冷燙、護髮綁定). Services with `hasVariants=true`
+/// (e.g. 剪髮 has 男/女/小/國/高, 全頭染 has 基本/過胸/過腰) get their actual
+/// price + duration from the chosen `ServiceVariant` row.
+///
+/// `bookingMode`：
+///   - "NORMAL"      → LIFF 直接預約 (剪燙護等)
+///   - "CONSULTATION" → 染漂類，LIFF 點下去引導 LINE OA 傳照片，老闆後台手動排程
+///                       (訪談 §12 line 872 老闆原話「跟染漂有關的一定都會先傳這個自動訊息」)
 model Service {
   id          String   @id @default(uuid())
   tenantId    String   @map("tenant_id")
   name        String
   description String?
   imageUrl    String?  @map("image_url")
-  duration    Int
-  slotsNeeded Int      @map("slots_needed")
-  price       Int
+  duration    Int      /// default duration for non-variant services
+  slotsNeeded Int      @map("slots_needed") /// default slotsNeeded for non-variant services
+  price       Int      /// default price for non-variant services
   sortOrder   Int      @default(0) @map("sort_order")
   isActive    Boolean  @default(true) @map("is_active")
+  /// V3.7 P3 — 是否有變異子項 (false = 固定服務，true = 走 ServiceVariant)
+  hasVariants Boolean  @default(false) @map("has_variants")
+  /// V3.7 P3 — "NORMAL" | "CONSULTATION"
+  bookingMode String   @default("NORMAL") @map("booking_mode")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -241,10 +255,39 @@ model Service {
   bookings             Booking[]
   bookingServices      BookingService[]      /// V3.7 Tier 0.2 multi-service reverse relation
   consultationRequests ConsultationRequest[]
+  variants             ServiceVariant[]      /// V3.7 P3 variant rows
 
   @@unique([tenantId, name], name: "tenantId_name")
   @@index([tenantId, isActive])
   @@map("services")
+}
+
+/// V3.7 P3 (5/19) — variant pricing tier under a Service.
+/// 用途：
+///   - 剪髮 → 男1100 / 女1200 / 小700 / 國800 / 高900
+///   - 全頭染 → 基本2600 / 過胸3000 / 過腰3200
+///   - 溫塑燙 → 基本4200 / 過胸4600 / 過腰4800
+///   - 縮毛矯正 → 基本4600 / 過胸5000 / 過腰5200
+///   - 護髮（獨立）→ 基本2200 / 過胸2600 / 過腰2800
+///
+/// slotsNeeded = ceil(durationMin / 60), pre-computed for fast availability check.
+/// 0.5hr 多出來的時間自動 buffer (例：2.5hr 冷燙佔 3 slots, 末段 0.5hr 是緩衝).
+model ServiceVariant {
+  id          String   @id @default(uuid())
+  serviceId   String   @map("service_id")
+  name        String   /// "基本" / "過胸" / "過腰" / "男" / "女" / "小學" / "國中" / "高中"
+  price       Int
+  durationMin Int      @map("duration_min")
+  slotsNeeded Int      @map("slots_needed")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  service         Service          @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  bookingServices BookingService[]
+
+  @@index([serviceId, isActive, sortOrder])
+  @@map("service_variants")
 }
 
 // ============================================
@@ -374,19 +417,25 @@ model BookingService {
   id          String   @id @default(uuid())
   bookingId   String   @map("booking_id")
   serviceId   String   @map("service_id")
+  /// V3.7 P3 — variant picked for this booking. NULL = service has no variants
+  /// (固定服務) OR admin manual override for CONSULTATION services where time +
+  /// price came from owner judgement (not a fixed variant).
+  variantId   String?  @map("variant_id")
   /// 服務順序（0 = 主服務、對應 legacy Booking.serviceId）
   order       Int      @default(0)
-  /// 該服務當下價格（snapshot — 服務原價 if not overridden）
+  /// 該服務當下價格（snapshot — variant.price OR service.price OR admin override）
   price       Int
-  /// 該服務時數（HH grain；0.5hr 拆分待 Tier 1.4 admin-only support）
+  /// 該服務時數（snapshot — variant.durationMin OR service.duration OR admin override）
   durationMin Int      @map("duration_min")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  service Service @relation(fields: [serviceId], references: [id])
+  booking Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  service Service         @relation(fields: [serviceId], references: [id])
+  variant ServiceVariant? @relation(fields: [variantId], references: [id])
 
   @@index([bookingId])
   @@index([serviceId])
+  @@index([variantId])
   @@map("booking_services")
 }
 

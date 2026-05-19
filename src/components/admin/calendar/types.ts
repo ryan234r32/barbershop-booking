@@ -17,7 +17,10 @@ export interface BookingServiceItem {
   price: number;
   durationMin: number;
   serviceId: string;
-  service: { id: string; name: string };
+  service: { id: string; name: string; bookingMode?: string };
+  /** V3.7 P3 — ServiceVariant 多版本（男/女/過胸 etc）。NULL = service 沒分版或單版 service。 */
+  variantId: string | null;
+  variant: { id: string; name: string } | null;
 }
 
 export interface Booking {

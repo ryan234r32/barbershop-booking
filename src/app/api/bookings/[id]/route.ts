@@ -30,11 +30,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       where: { id },
       include: {
         service: true,
-        // V3.7 Tier 0.2 — surface BookingService[] so admin UI can render chip list
-        // and 加服務 button. Sorted by order asc (primary = 0, additions = 1,2,...).
+        // V3.7 Tier 0.2 / P3 — surface BookingService[] with variant info so admin
+        // UI can render chip list + variant name. Sorted by order asc.
         services: {
           orderBy: { order: "asc" },
-          include: { service: { select: { id: true, name: true } } },
+          include: {
+            service: { select: { id: true, name: true, bookingMode: true } },
+            variant: { select: { id: true, name: true } },
+          },
         },
         // V3.7 Tier 1.8 — 加 id + defaultDiscount → CheckoutFullPage 自動帶熟客折扣
         user: { select: { id: true, displayName: true, lineUserId: true, phone: true, realName: true, defaultDiscount: true } },

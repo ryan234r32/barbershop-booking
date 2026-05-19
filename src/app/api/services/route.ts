@@ -4,7 +4,10 @@ import { createServiceSchema } from "@/lib/utils/validation";
 import { errorResponse } from "@/lib/utils/errors";
 import { getAdminFromCookie } from "@/lib/auth/jwt";
 
-/** GET /api/services — list services for a tenant */
+/** GET /api/services — list services for a tenant, with variant rows nested.
+ *  V3.7 P3 (5/19): each Service now has `hasVariants` + `bookingMode` + an
+ *  optional `variants[]` (variant pricing tiers). LIFF + admin both consume
+ *  this shape. */
 export async function GET(request: NextRequest) {
   try {
     const tenantId = request.nextUrl.searchParams.get("tenantId") || process.env.DEFAULT_TENANT_ID!;
@@ -12,6 +15,20 @@ export async function GET(request: NextRequest) {
     const services = await prisma.service.findMany({
       where: { tenantId, isActive: true },
       orderBy: { sortOrder: "asc" },
+      include: {
+        variants: {
+          where: { isActive: true },
+          orderBy: { sortOrder: "asc" },
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            durationMin: true,
+            slotsNeeded: true,
+            sortOrder: true,
+          },
+        },
+      },
     });
 
     return Response.json({ services });

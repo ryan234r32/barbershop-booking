@@ -1,123 +1,293 @@
-import "dotenv/config";
+/**
+ * V3.7 P3 (5/19) — 1008 Hair Studio seed data.
+ *
+ * Aligns with Google Sheets price list:
+ *   https://docs.google.com/spreadsheets/d/1Zp_syxF_-C2gSXdYTVD-7ZkpskFFNF8bgrBXXv7h14Y
+ *
+ * Service structure:
+ *   - 14 services, 14 variants
+ *   - Cut/perm/treatment with length-based pricing → ServiceVariant rows
+ *   - Dye/bleach → bookingMode = "CONSULTATION" (LIFF 引導 LINE OA, 老闆後台手動排程)
+ *
+ * For prod data migration (fresh prod has no real bookings yet), use:
+ *   npx tsx scripts/migrate-services-v3.7-p3.ts
+ */
+
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import bcrypt from "bcryptjs";
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
-const prisma = new PrismaClient({ adapter });
+const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error("DIRECT_URL or DATABASE_URL must be set");
+}
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString }),
+});
 
-const appBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://barbershop-booking-swart.vercel.app";
-const serviceImageUrl = (filename: string) =>
-  new URL(`/service-images/${filename}`, appBaseUrl).toString();
+function serviceImageUrl(filename: string): string {
+  const base = process.env.NEXT_PUBLIC_BASE_URL ?? "";
+  return `${base}/service-images/${filename}`;
+}
+
+function slotsNeeded(durationMin: number): number {
+  return Math.ceil(durationMin / 60);
+}
+
+interface VariantSpec {
+  name: string;
+  price: number;
+  durationMin: number;
+  sortOrder: number;
+}
+
+interface ServiceSpec {
+  name: string;
+  description: string;
+  defaultDurationMin: number;
+  defaultPrice: number;
+  sortOrder: number;
+  bookingMode: "NORMAL" | "CONSULTATION";
+  imageFile?: string;
+  variants: VariantSpec[];
+}
+
+const SERVICES: ServiceSpec[] = [
+  {
+    name: "剪髮",
+    description: "洗 + 剪 + 吹整。男女學齡分價。",
+    defaultDurationMin: 60,
+    defaultPrice: 1100,
+    sortOrder: 1,
+    bookingMode: "NORMAL",
+    imageFile: "mens-haircut.jpg",
+    variants: [
+      { name: "男", price: 1100, durationMin: 60, sortOrder: 1 },
+      { name: "女", price: 1200, durationMin: 60, sortOrder: 2 },
+      { name: "小學", price: 700, durationMin: 60, sortOrder: 3 },
+      { name: "國中", price: 800, durationMin: 60, sortOrder: 4 },
+      { name: "高中", price: 900, durationMin: 60, sortOrder: 5 },
+    ],
+  },
+  {
+    name: "補染",
+    description: "髮根 4cm 內補色。諮詢制。",
+    defaultDurationMin: 120,
+    defaultPrice: 2200,
+    sortOrder: 2,
+    bookingMode: "CONSULTATION",
+    imageFile: "root-touch-up.jpg",
+    variants: [],
+  },
+  {
+    name: "全頭染",
+    description: "全頭染色（基本/過胸/過腰）。諮詢制。",
+    defaultDurationMin: 120,
+    defaultPrice: 2600,
+    sortOrder: 3,
+    bookingMode: "CONSULTATION",
+    imageFile: "hair-color.jpg",
+    variants: [],
+  },
+  {
+    name: "挑染／刷染",
+    description: "特殊呈現方式。諮詢制。",
+    defaultDurationMin: 180,
+    defaultPrice: 3500,
+    sortOrder: 4,
+    bookingMode: "CONSULTATION",
+    variants: [],
+  },
+  {
+    name: "漂髮",
+    description: "純漂退色，常需 2-3 次。諮詢制。",
+    defaultDurationMin: 180,
+    defaultPrice: 1200,
+    sortOrder: 5,
+    bookingMode: "CONSULTATION",
+    imageFile: "bleach.jpg",
+    variants: [],
+  },
+  {
+    name: "漂+染",
+    description: "漂後再染（淺色／特殊色），6hr 起跳。諮詢制。",
+    defaultDurationMin: 360,
+    defaultPrice: 5000,
+    sortOrder: 6,
+    bookingMode: "CONSULTATION",
+    variants: [],
+  },
+  {
+    name: "溫塑燙",
+    description: "溫感塑型。長度加價。",
+    defaultDurationMin: 240,
+    defaultPrice: 4200,
+    sortOrder: 7,
+    bookingMode: "NORMAL",
+    imageFile: "digital-perm.jpg",
+    variants: [
+      { name: "基本", price: 4200, durationMin: 240, sortOrder: 1 },
+      { name: "過胸", price: 4600, durationMin: 240, sortOrder: 2 },
+      { name: "過腰", price: 4800, durationMin: 240, sortOrder: 3 },
+    ],
+  },
+  {
+    name: "縮毛矯正",
+    description: "日式結構矯正。長度加價。",
+    defaultDurationMin: 270,
+    defaultPrice: 4600,
+    sortOrder: 8,
+    bookingMode: "NORMAL",
+    imageFile: "straightening.jpg",
+    variants: [
+      { name: "基本", price: 4600, durationMin: 270, sortOrder: 1 },
+      { name: "過胸", price: 5000, durationMin: 270, sortOrder: 2 },
+      { name: "過腰", price: 5200, durationMin: 270, sortOrder: 3 },
+    ],
+  },
+  {
+    name: "冷燙",
+    description: "短髮為主，不分長短。",
+    defaultDurationMin: 150,
+    defaultPrice: 4200,
+    sortOrder: 9,
+    bookingMode: "NORMAL",
+    variants: [],
+  },
+  {
+    name: "局部燙-瀏海",
+    description: "瀏海局部捲度。",
+    defaultDurationMin: 120,
+    defaultPrice: 1600,
+    sortOrder: 10,
+    bookingMode: "NORMAL",
+    variants: [],
+  },
+  {
+    name: "局部燙-髮根",
+    description: "髮根燙讓頭髮蓬鬆。",
+    defaultDurationMin: 120,
+    defaultPrice: 2200,
+    sortOrder: 11,
+    bookingMode: "NORMAL",
+    variants: [],
+  },
+  {
+    name: "護髮（綁定）",
+    description: "搭配染或燙的優惠價，不分長度。",
+    defaultDurationMin: 60,
+    defaultPrice: 1600,
+    sortOrder: 12,
+    bookingMode: "NORMAL",
+    imageFile: "hair-treatment.jpg",
+    variants: [],
+  },
+  {
+    name: "護髮（獨立）",
+    description: "獨立護髮，長度加價。",
+    defaultDurationMin: 120,
+    defaultPrice: 2200,
+    sortOrder: 13,
+    bookingMode: "NORMAL",
+    variants: [
+      { name: "基本", price: 2200, durationMin: 120, sortOrder: 1 },
+      { name: "過胸", price: 2600, durationMin: 120, sortOrder: 2 },
+      { name: "過腰", price: 2800, durationMin: 120, sortOrder: 3 },
+    ],
+  },
+  {
+    name: "修瀏海",
+    description: "30 分快速修剪，無洗。",
+    defaultDurationMin: 30,
+    defaultPrice: 300,
+    sortOrder: 14,
+    bookingMode: "NORMAL",
+    variants: [],
+  },
+];
 
 async function main() {
-  console.log("🌱 Seeding database...");
-
-  // Clean existing data (re-seed safe)
-  await prisma.notification.deleteMany();
-  await prisma.cancellationRecord.deleteMany();
-  await prisma.payment.deleteMany();
-  await prisma.booking.deleteMany();
-  await prisma.businessHours.deleteMany();
-  await prisma.holiday.deleteMany();
-  await prisma.service.deleteMany();
-  await prisma.user.deleteMany();
-  await prisma.adminUser.deleteMany();
-  await prisma.tenant.deleteMany();
-  console.log("🧹 Cleaned existing data");
-
-  // 1. Create tenant — 1008 Hair Studio
-  const tenant = await prisma.tenant.create({
-    data: {
+  // 1. Create demo tenant
+  const tenant = await prisma.tenant.upsert({
+    where: { id: "39662028-4caf-4149-9b2a-bc37087c0272" },
+    update: {},
+    create: {
+      id: "39662028-4caf-4149-9b2a-bc37087c0272",
       name: "1008 Hair Studio",
       slug: "1008-hair-studio",
-      lineChannelId: process.env.LINE_CHANNEL_ID || "placeholder",
-      lineChannelSecret: process.env.LINE_CHANNEL_SECRET || "placeholder",
-      lineAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || "placeholder",
-      liffId: process.env.NEXT_PUBLIC_LIFF_ID || "placeholder",
       businessName: "1008 Hair Studio",
       phone: "02-2396-2306",
       address: "台北市中正區新生南路一段144-10號",
-      bankInfo: "待設定",
-      bankAccountName: "待設定",
-      bankAccountNumber: "待設定",
+      lineChannelId: "demo-channel-id",
+      lineChannelSecret: "demo-secret",
+      lineAccessToken: "demo-token",
+      liffId: "demo-liff",
     },
   });
-  console.log("✅ Tenant created:", tenant.id);
+  console.log("✅ Tenant ready:", tenant.businessName);
 
-  // 2. Create admin user
-  const hashedPassword = await bcrypt.hash("admin123", 10);
-  const admin = await prisma.adminUser.create({
-    data: {
-      tenantId: tenant.id,
-      email: "admin@1008hair.com",
-      password: hashedPassword,
-      name: "店長",
-      role: "OWNER",
-    },
-  });
-  console.log("✅ Admin created:", admin.email);
-
-  // 3. Create services — 對齊 1008 Hair Studio Google Sheets 價目表
-  //    Source of truth: https://docs.google.com/spreadsheets/d/1Zp_syxF_-C2gSXdYTVD-7ZkpskFFNF8bgrBXXv7h14Y
-  //    5/18 老闆 audit：男 1100、女 1200、護髮（不要寫「結構式」）綁定 1600。
-  //    Slot model 仍 1hr = 1 slot（V3.7 Tier 1.4 admin 0.5hr 是 start-time offset，
-  //    不動 slot model），所以 2.5hr 冷燙等需走 admin 後台手動排程。
-  const services = [
-    // 剪髮（含洗）
-    { name: "男性剪髮", description: "洗髮 · 精修剪裁 · 造型完成", duration: 60, slotsNeeded: 1, price: 1100, sortOrder: 1, imageUrl: serviceImageUrl("mens-haircut.jpg") },
-    { name: "女性剪髮", description: "洗髮 · 剪裁設計 · 吹整造型", duration: 60, slotsNeeded: 1, price: 1200, sortOrder: 2, imageUrl: serviceImageUrl("womens-haircut.jpg") },
-    // 染髮
-    { name: "補染", description: "髮根 4cm 內補色", duration: 120, slotsNeeded: 2, price: 2200, sortOrder: 3, imageUrl: serviceImageUrl("root-touch-up.jpg") },
-    { name: "染髮", description: "全頭染色（過胸 / 過腰加價，現場確認）", duration: 120, slotsNeeded: 2, price: 2600, sortOrder: 4, imageUrl: serviceImageUrl("hair-color.jpg") },
-    // 燙髮
-    { name: "溫塑燙", description: "溫感塑型（過胸 / 過腰加價，現場確認）", duration: 240, slotsNeeded: 4, price: 4200, sortOrder: 5, imageUrl: serviceImageUrl("digital-perm.jpg") },
-    { name: "縮毛矯正", description: "日式結構矯正，根除毛躁", duration: 270, slotsNeeded: 4, price: 4600, sortOrder: 6, imageUrl: serviceImageUrl("straightening.jpg") },
-    // 漂髮（諮詢制，價目用單次起跳）
-    { name: "漂髮", description: "單次起跳，染漂組合需先諮詢", duration: 180, slotsNeeded: 3, price: 1200, sortOrder: 7, imageUrl: serviceImageUrl("bleach.jpg") },
-    // 護髮（綁定優惠：染或燙搭配只要 1600，獨立 2200 起）
-    { name: "護髮", description: "綁定染或燙的優惠價（獨立護髮 2200 起）", duration: 60, slotsNeeded: 1, price: 1600, sortOrder: 8, imageUrl: serviceImageUrl("hair-treatment.jpg") },
-    // 修瀏海
-    { name: "修瀏海", description: "30 分快速修剪", duration: 30, slotsNeeded: 1, price: 300, sortOrder: 9 },
-  ];
-
-  for (const s of services) {
-    await prisma.service.create({
-      data: { tenantId: tenant.id, ...s },
+  // 2. Business hours (Mon-Sun 11:00-20:00, all open by default)
+  for (let dow = 0; dow < 7; dow++) {
+    await prisma.businessHours.upsert({
+      where: { tenantId_dayOfWeek: { tenantId: tenant.id, dayOfWeek: dow } },
+      update: { startTime: "11:00", endTime: "20:00", isOpen: true },
+      create: {
+        tenantId: tenant.id,
+        dayOfWeek: dow,
+        startTime: "11:00",
+        endTime: "20:00",
+        isOpen: true,
+      },
     });
   }
-  console.log("✅ Services created:", services.length);
+  console.log("✅ Business hours seeded (7 days, 11:00-20:00)");
 
-  // 4. Create business hours (週一公休，週二到週日 11:00-20:00)
-  const days = [
-    { dayOfWeek: 0, isOpen: true, startTime: "11:00", endTime: "20:00" },  // 週日
-    { dayOfWeek: 1, isOpen: false, startTime: "11:00", endTime: "20:00" }, // 週一公休
-    { dayOfWeek: 2, isOpen: true, startTime: "11:00", endTime: "20:00" },  // 週二
-    { dayOfWeek: 3, isOpen: true, startTime: "11:00", endTime: "20:00" },  // 週三
-    { dayOfWeek: 4, isOpen: true, startTime: "11:00", endTime: "20:00" },  // 週四
-    { dayOfWeek: 5, isOpen: true, startTime: "11:00", endTime: "20:00" },  // 週五
-    { dayOfWeek: 6, isOpen: true, startTime: "11:00", endTime: "20:00" },  // 週六
-  ];
-
-  for (const d of days) {
-    await prisma.businessHours.create({
-      data: { tenantId: tenant.id, ...d },
+  // 3. Create services + variants per Google Sheets.
+  // Idempotent: re-running drops + recreates by name.
+  for (const spec of SERVICES) {
+    const existing = await prisma.service.findUnique({
+      where: { tenantId_name: { tenantId: tenant.id, name: spec.name } },
     });
+    if (existing) {
+      await prisma.serviceVariant.deleteMany({ where: { serviceId: existing.id } });
+      await prisma.service.delete({ where: { id: existing.id } });
+    }
+    const service = await prisma.service.create({
+      data: {
+        tenantId: tenant.id,
+        name: spec.name,
+        description: spec.description,
+        duration: spec.defaultDurationMin,
+        slotsNeeded: slotsNeeded(spec.defaultDurationMin),
+        price: spec.defaultPrice,
+        sortOrder: spec.sortOrder,
+        isActive: true,
+        hasVariants: spec.variants.length > 0,
+        bookingMode: spec.bookingMode,
+        imageUrl: spec.imageFile ? serviceImageUrl(spec.imageFile) : null,
+      },
+    });
+    for (const v of spec.variants) {
+      await prisma.serviceVariant.create({
+        data: {
+          serviceId: service.id,
+          name: v.name,
+          price: v.price,
+          durationMin: v.durationMin,
+          slotsNeeded: slotsNeeded(v.durationMin),
+          sortOrder: v.sortOrder,
+          isActive: true,
+        },
+      });
+    }
   }
-  console.log("✅ Business hours created");
+  console.log(`✅ Services seeded: ${SERVICES.length} services, ${SERVICES.reduce((n, s) => n + s.variants.length, 0)} variants`);
 
-  console.log("\n🎉 Seed complete!");
-  console.log(`\n📋 Important IDs:`);
-  console.log(`  Tenant ID: ${tenant.id}`);
-  console.log(`  Admin: ${admin.email} / admin123`);
-  console.log(`\n⚠️  請將 Tenant ID 填入 .env 的 DEFAULT_TENANT_ID`);
+  console.log("\n🎉 Seed complete.");
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
+  .catch((err) => {
+    console.error("Seed failed:", err);
+    process.exitCode = 1;
   })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .finally(() => prisma.$disconnect());

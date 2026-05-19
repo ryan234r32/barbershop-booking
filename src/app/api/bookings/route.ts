@@ -69,8 +69,8 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           service: { select: { name: true, duration: true, price: true, slotsNeeded: true } },
-          // V3.7 Tier 0.2 — multi-service expansion. 老闆行事曆要看到完整服務組合
-          // (剪+染+護)，不能只顯示 primary。orderBy 確保顯示順序一致。
+          // V3.7 Tier 0.2 / P3 — multi-service + variant. 老闆行事曆要看到完整服務組合
+          // (剪+染+護) + variant 名稱（「剪・男」「全頭染・過胸」）。
           services: {
             orderBy: { order: "asc" },
             select: {
@@ -79,7 +79,9 @@ export async function GET(request: NextRequest) {
               price: true,
               durationMin: true,
               serviceId: true,
-              service: { select: { id: true, name: true } },
+              variantId: true,
+              service: { select: { id: true, name: true, bookingMode: true } },
+              variant: { select: { id: true, name: true } },
             },
           },
           // V3.7 Tier 1.8 — defaultDiscount 加進 list → CheckoutFullPage 開時自動帶熟客折扣
@@ -123,35 +125,68 @@ export async function POST(request: NextRequest) {
         ? `manual-${auth.adminId}-${randomUUID()}`
         : auth.lineUserId;
 
-    // 1. Resolve service(s). V3.7 Tier 0.2 — accept either `serviceIds` (multi)
-    // or legacy `serviceId` (single, upgraded to a 1-element array). The first
-    // entry is the "primary" service that maps to legacy `Booking.serviceId`
-    // for dual-write compatibility. Aggregate slotsNeeded / duration / price
-    // come from summing across the picked services.
-    const serviceIds: string[] =
-      input.serviceIds && input.serviceIds.length
-        ? input.serviceIds
+    // 1. Resolve services + variants (V3.7 P3 — 5/19).
+    //    Accept 3 input shapes (normalize to `selections: [{serviceId, variantId?}]`):
+    //      - `services: [{serviceId, variantId?}]` ← new, preferred
+    //      - `serviceIds: uuid[]` ← legacy multi (no variants)
+    //      - `serviceId: uuid` ← legacy single
+    //    Order matters: index 0 = primary service (legacy `Booking.serviceId`).
+    type Selection = { serviceId: string; variantId?: string };
+    const selections: Selection[] =
+      input.services && input.services.length
+        ? input.services
+        : input.serviceIds && input.serviceIds.length
+        ? input.serviceIds.map((id) => ({ serviceId: id }))
         : input.serviceId
-        ? [input.serviceId]
+        ? [{ serviceId: input.serviceId }]
         : [];
-    if (!serviceIds.length) {
-      return Response.json({ error: "serviceId or serviceIds is required" }, { status: 400 });
+    if (!selections.length) {
+      return Response.json({ error: "service is required" }, { status: 400 });
     }
-    const serviceRows = await prisma.service.findMany({
-      where: { id: { in: serviceIds }, tenantId },
-    });
-    if (serviceRows.length !== serviceIds.length) {
+    const serviceIds = selections.map((s) => s.serviceId);
+    const variantIds = selections
+      .map((s) => s.variantId)
+      .filter((id): id is string => !!id);
+    const [serviceRows, variantRows] = await Promise.all([
+      prisma.service.findMany({ where: { id: { in: serviceIds }, tenantId } }),
+      variantIds.length
+        ? prisma.serviceVariant.findMany({
+            where: { id: { in: variantIds }, service: { tenantId } },
+          })
+        : Promise.resolve([] as Array<{ id: string; serviceId: string; price: number; durationMin: number; slotsNeeded: number; name: string }>),
+    ]);
+    if (serviceRows.length !== new Set(serviceIds).size) {
       return Response.json({ error: "Service not found" }, { status: 404 });
     }
-    // Preserve client-supplied order (matters for BookingService.order + 主服務 selection).
+    if (variantRows.length !== new Set(variantIds).size) {
+      return Response.json({ error: "Service variant not found" }, { status: 404 });
+    }
     const serviceById = new Map(serviceRows.map((s) => [s.id, s]));
-    const services = serviceIds.map((id) => serviceById.get(id)!);
-    const primaryService = services[0];
-    const totalSlots = services.reduce((sum, s) => sum + s.slotsNeeded, 0);
-    const totalPrice = services.reduce((sum, s) => sum + s.price, 0);
-    const combinedName = services.length > 1
-      ? services.map((s) => s.name).join(" + ")
-      : primaryService.name;
+    const variantById = new Map(variantRows.map((v) => [v.id, v]));
+    // Resolve each selection to its effective values (variant > service default).
+    // Variant must belong to its service (sanity check; UI shouldn't allow it).
+    const resolved = selections.map((sel) => {
+      const service = serviceById.get(sel.serviceId)!;
+      const variant = sel.variantId ? variantById.get(sel.variantId) : null;
+      if (variant && variant.serviceId !== service.id) {
+        throw new AppError(`variant ${variant.id} does not belong to service ${service.name}`, 400, "variant_service_mismatch");
+      }
+      return {
+        service,
+        variant: variant ?? null,
+        // Resolved values: variant overrides service default when present.
+        price: variant?.price ?? service.price,
+        durationMin: variant?.durationMin ?? service.duration,
+        slotsNeeded: variant?.slotsNeeded ?? service.slotsNeeded,
+        displayName: variant ? `${service.name}・${variant.name}` : service.name,
+      };
+    });
+    const primaryService = resolved[0].service;
+    const totalSlots = resolved.reduce((sum, r) => sum + r.slotsNeeded, 0);
+    const totalPrice = resolved.reduce((sum, r) => sum + r.price, 0);
+    const combinedName = resolved.length > 1
+      ? resolved.map((r) => r.displayName).join(" + ")
+      : resolved[0].displayName;
 
     // 1b. Validate date is not in the past (Taipei timezone).
     // Uses todayInTaipei() — direct Date → toLocaleDateString — instead of
@@ -332,11 +367,12 @@ export async function POST(request: NextRequest) {
           endTime,
           slotsOccupied: totalSlots,
           services: {
-            create: services.map((s, idx) => ({
-              serviceId: s.id,
+            create: resolved.map((r, idx) => ({
+              serviceId: r.service.id,
+              variantId: r.variant?.id ?? null,
               order: idx,
-              price: s.price,
-              durationMin: s.duration,
+              price: r.price,
+              durationMin: r.durationMin,
             })),
           },
           // LIFF calls are always "LIFF" regardless of what client sends; admin may

@@ -30,14 +30,19 @@ interface Service {
 
 export function SuccessStep({
   service,
+  services,
   date,
   time,
 }: {
   bookingId: string;
   service: Service;
+  /** V3.7 P3 — chip-list view when present (multi-service or variant). */
+  services?: Array<{ name: string; variantName?: string; price: number }>;
   date: string;
   time: string;
 }) {
+  const useChipList =
+    !!services && services.length > 0 && (services.length > 1 || services.some((s) => s.variantName));
   const { liff } = useLiff();
   const endHour = parseInt(time.split(":")[0]) + service.slotsNeeded;
   const endTime = `${endHour.toString().padStart(2, "0")}:00`;
@@ -85,23 +90,52 @@ export function SuccessStep({
 
       {/* Summary card */}
       <div className="bg-[#f4ede5] rounded-xl p-6 flex flex-col gap-4 w-full mt-8">
-        {/* Top row: service + price */}
-        <div className="flex justify-between items-start pb-4 border-b border-[#003D2B]/10">
-          <div>
-            <span className="text-xs font-bold tracking-widest text-[#003D2B]/40 uppercase mb-1 block">
-              SERVICE
-            </span>
-            <span className="text-[#003D2B] font-semibold">{service.name}</span>
+        {/* Top section: service(s) + total price */}
+        {useChipList && services ? (
+          <div className="pb-4 border-b border-[#003D2B]/10">
+            <div className="flex items-start justify-between">
+              <span className="text-xs font-bold tracking-widest text-[#003D2B]/40 uppercase block">
+                SERVICE
+              </span>
+              <div className="text-right">
+                <span className="text-xs font-bold tracking-widest text-[#003D2B]/40 uppercase mb-1 block">
+                  PRICE
+                </span>
+                <span className="text-[#003D2B] font-semibold">
+                  NT$ {service.price.toLocaleString()}
+                </span>
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {services.map((s, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white text-[#003D2B] text-[12px] font-medium border border-[#003D2B]/10"
+                >
+                  {s.variantName ? `${s.name}・${s.variantName}` : s.name}
+                  <span className="text-[#003D2B]/50 text-[11px]">NT${s.price.toLocaleString()}</span>
+                </span>
+              ))}
+            </div>
           </div>
-          <div className="text-right">
-            <span className="text-xs font-bold tracking-widest text-[#003D2B]/40 uppercase mb-1 block">
-              PRICE
-            </span>
-            <span className="text-[#003D2B] font-semibold">
-              NT$ {service.price.toLocaleString()}
-            </span>
+        ) : (
+          <div className="flex justify-between items-start pb-4 border-b border-[#003D2B]/10">
+            <div>
+              <span className="text-xs font-bold tracking-widest text-[#003D2B]/40 uppercase mb-1 block">
+                SERVICE
+              </span>
+              <span className="text-[#003D2B] font-semibold">{service.name}</span>
+            </div>
+            <div className="text-right">
+              <span className="text-xs font-bold tracking-widest text-[#003D2B]/40 uppercase mb-1 block">
+                PRICE
+              </span>
+              <span className="text-[#003D2B] font-semibold">
+                NT$ {service.price.toLocaleString()}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Bottom row: date + time */}
         <div className="flex justify-between items-start">

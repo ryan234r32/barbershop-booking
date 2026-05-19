@@ -60,10 +60,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const service = await prisma.service.findFirst({
       where: { id: input.serviceId, tenantId: admin.tenantId },
-      select: { id: true, name: true, price: true, duration: true },
+      select: { id: true, name: true, price: true, duration: true, hasVariants: true },
     });
     if (!service) {
       return Response.json({ error: "Service not found" }, { status: 404 });
+    }
+
+    // V3.7 P3 — if service has variants, variantId is required + must belong to this service.
+    let variant: { id: string; price: number; durationMin: number } | null = null;
+    if (input.variantId) {
+      const v = await prisma.serviceVariant.findFirst({
+        where: { id: input.variantId, serviceId: service.id },
+        select: { id: true, price: true, durationMin: true },
+      });
+      if (!v) {
+        return Response.json({ error: "Variant not found or does not belong to this service" }, { status: 400 });
+      }
+      variant = v;
+    } else if (service.hasVariants) {
+      return Response.json({ error: "Service has variants; variantId is required" }, { status: 400 });
     }
 
     const nextOrder = (booking.services.reduce((max, s) => Math.max(max, s.order), -1) + 1) || 1;
@@ -73,9 +88,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         data: {
           bookingId: id,
           serviceId: service.id,
+          variantId: variant?.id ?? null,
           order: nextOrder,
-          price: service.price,
-          durationMin: service.duration,
+          price: variant?.price ?? service.price,
+          durationMin: variant?.durationMin ?? service.duration,
         },
       });
       // OCC: bump parent updatedAt — Prisma does NOT propagate from child.

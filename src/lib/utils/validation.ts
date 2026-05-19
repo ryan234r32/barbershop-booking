@@ -2,12 +2,23 @@ import { z } from "zod";
 
 export const createBookingSchema = z.object({
   tenantId: z.string().uuid().optional(),
-  // V3.7 Tier 0.2 — 服務多選：客戶可一次選 剪+染+護 等組合。
-  // 後端規範：`serviceIds` 為主路徑（陣列，順序即是 BookingService.order）；
-  // legacy 單一 `serviceId` 仍接受，server 會把它升格為 `[serviceId]`。
+  // V3.7 P3 (5/19) — 服務多選 + variant 支援。三個 input shapes，server 自動 normalize:
+  //   1. `services: [{ serviceId, variantId? }]` ← preferred, new code path
+  //   2. `serviceIds: uuid[]` ← legacy multi-service (no variants)
+  //   3. `serviceId: uuid` ← legacy single
   // primary 服務（陣列第 0 個）寫到 legacy `Booking.serviceId` 維持 dual-write。
   serviceId: z.string().uuid().optional(),
   serviceIds: z.array(z.string().uuid()).min(1).max(8).optional(),
+  services: z
+    .array(
+      z.object({
+        serviceId: z.string().uuid(),
+        variantId: z.string().uuid().optional(),
+      }),
+    )
+    .min(1)
+    .max(8)
+    .optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   // V3.7 Tier 1.4 §0a E-E: admin 手動預約可用 HH:30（染燙漂常需 2.5/4.5hr），
   // 顧客 LIFF 仍維持 HH:00。Server-side 路徑 check auth.type === "admin"
@@ -31,14 +42,22 @@ export const createBookingSchema = z.object({
   birthday: z.string().optional(), // "YYYY-MM-DD" format from LIFF/admin profile gate
   gender: z.enum(["MALE", "FEMALE", "OTHER", "PREFER_NOT_TO_SAY"]).optional(),
   source: z.enum(["LIFF", "PHONE", "WALK_IN"]).optional(),
-}).refine((data) => !!data.serviceId || !!(data.serviceIds && data.serviceIds.length), {
-  message: "serviceId or serviceIds is required",
-  path: ["serviceId"],
-});
+}).refine(
+  (data) =>
+    !!data.serviceId ||
+    !!(data.serviceIds && data.serviceIds.length) ||
+    !!(data.services && data.services.length),
+  {
+    message: "serviceId, serviceIds, or services is required",
+    path: ["services"],
+  },
+);
 
-/** V3.7 Tier 0.2 — Admin manual add-service after booking created. */
+/** V3.7 Tier 0.2 — Admin manual add-service after booking created.
+ *  V3.7 P3 (5/19): variantId optional for services with variants. */
 export const addBookingServiceSchema = z.object({
   serviceId: z.string().uuid(),
+  variantId: z.string().uuid().optional(),
   expectedUpdatedAt: z.string().datetime().optional(),
 });
 

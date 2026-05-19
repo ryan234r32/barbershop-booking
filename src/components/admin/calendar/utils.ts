@@ -173,15 +173,20 @@ export function abbreviateService(name: string): string {
  * V3.7 Tier 0.2 — preferred display label for a booking's services.
  *
  * Prefers `services[]` (the new dual-write source of truth, sorted by order):
- *   - 1 service  → "男性剪髮"
- *   - 2 services → "男性剪髮 + 補染"
- *   - 3+ services → "男性剪髮 + 補染 + 染髮" (joined with separator)
+ *   - 1 service  → "剪髮・男"
+ *   - 2 services → "剪髮・男 + 補染・過胸"
+ *   - 3+ services → "剪髮・男 + 補染・過胸 + 染髮" (joined with separator)
+ *
+ * V3.7 P3 — when a row has `variant.name` (e.g.「男」、「過胸」、「基本」), it is
+ * appended after the service name with middle-dot 「・」separator. Cleaner than
+ * 「剪髮 (男)」.
  *
  * Falls back to legacy `service.name` when services[] is empty (pre-backfill
  * bookings imported before V3.7 Tier 0.2 backfill ran).
  *
  * The compact form (`compact: true`) uses abbreviations + "/": "剪/染/護" — good
- * for tight calendar cells (week/day view). Default = full names.
+ * for tight calendar cells (week/day view). Variant name is omitted in compact
+ * mode (too long for 9pt chips). Default = full names + variant.
  */
 export function getBookingServicesLabel(
   booking: Pick<Booking, "service" | "services">,
@@ -190,9 +195,10 @@ export function getBookingServicesLabel(
   const sep = opts.separator ?? " + ";
   const rows = booking.services && booking.services.length > 0 ? booking.services : null;
   if (rows) {
-    const names = rows.map((r) => r.service.name);
-    if (opts.compact) return names.map(abbreviateService).join("/");
-    return names.join(sep);
+    if (opts.compact) return rows.map((r) => abbreviateService(r.service.name)).join("/");
+    return rows
+      .map((r) => (r.variant?.name ? `${r.service.name}・${r.variant.name}` : r.service.name))
+      .join(sep);
   }
   // Legacy fallback — pre-backfill booking without BookingService rows.
   return opts.compact ? abbreviateService(booking.service.name) : booking.service.name;

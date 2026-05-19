@@ -17,7 +17,11 @@ export interface AvailableSlot {
 export async function getAvailableSlots(params: {
   tenantId: string;
   date: string; // "YYYY-MM-DD"
-  /** Single-service path (legacy). One of serviceId / serviceIds must be set. */
+  /** V3.7 P3 (5/19) — preferred: client already knows total slots (variant
+   *  resolved on client side). Skips DB roundtrip for service lookup. */
+  slotsNeeded?: number;
+  /** Single-service path (legacy). One of serviceId / serviceIds must be set
+   *  when slotsNeeded is not provided. */
   serviceId?: string;
   /** V3.7 Tier 0.2 multi-service path: slotsNeeded = sum across all services. */
   serviceIds?: string[];
@@ -25,15 +29,21 @@ export async function getAvailableSlots(params: {
   const { tenantId, date } = params;
   const dateObj = new Date(date + "T00:00:00.000Z");
 
-  // 1. Resolve total slotsNeeded across one or more services.
-  const ids = params.serviceIds && params.serviceIds.length ? params.serviceIds : params.serviceId ? [params.serviceId] : [];
-  if (!ids.length) return [];
-  const services = await prisma.service.findMany({
-    where: { id: { in: ids } },
-    select: { id: true, slotsNeeded: true },
-  });
-  if (services.length !== ids.length) return [];
-  const slotsNeeded = services.reduce((sum, s) => sum + s.slotsNeeded, 0);
+  // 1. Resolve total slotsNeeded. Prefer explicit `slotsNeeded` from caller
+  //    (variant-aware); fall back to service lookup for legacy callers.
+  let slotsNeeded: number;
+  if (params.slotsNeeded && params.slotsNeeded > 0) {
+    slotsNeeded = params.slotsNeeded;
+  } else {
+    const ids = params.serviceIds && params.serviceIds.length ? params.serviceIds : params.serviceId ? [params.serviceId] : [];
+    if (!ids.length) return [];
+    const services = await prisma.service.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, slotsNeeded: true },
+    });
+    if (services.length !== ids.length) return [];
+    slotsNeeded = services.reduce((sum, s) => sum + s.slotsNeeded, 0);
+  }
 
   // 2. Check if this date is a holiday (full-day or partial closure window)
   const holiday = await prisma.holiday.findUnique({

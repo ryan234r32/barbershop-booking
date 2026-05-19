@@ -69,7 +69,10 @@ export interface BookingDetail {
     price: number;
     durationMin: number;
     serviceId: string;
-    service: { id: string; name: string };
+    service: { id: string; name: string; bookingMode?: string };
+    /** V3.7 P3 — ServiceVariant 多版本（男/女/過胸 etc）。NULL = service 沒分版。 */
+    variantId: string | null;
+    variant: { id: string; name: string } | null;
   }>;
   user: BookingUser;
 }
@@ -606,7 +609,7 @@ function DetailView({
                 組合（剪+染+護），不能只顯示 primary。 */}
             <p className="text-sm text-[var(--color-text-body)]">
               {booking.services && booking.services.length > 0
-                ? `${booking.services.map((r) => r.service.name).join(" + ")} · NT$${booking.services.reduce((sum, r) => sum + r.price, 0).toLocaleString()}`
+                ? `${booking.services.map((r) => (r.variant ? `${r.service.name}・${r.variant.name}` : r.service.name)).join(" + ")} · NT$${booking.services.reduce((sum, r) => sum + r.price, 0).toLocaleString()}`
                 : `${booking.service.name} · NT$${booking.service.price.toLocaleString()}`}
             </p>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
@@ -860,7 +863,7 @@ function NotesView({
         <h2 className="text-base font-bold text-[var(--color-text-primary)]">預約已完成！</h2>
         <p className="text-sm text-[var(--color-text-body)]">
           {booking.user.displayName} — {booking.services && booking.services.length > 0
-            ? booking.services.map((r) => r.service.name).join(" + ")
+            ? booking.services.map((r) => (r.variant ? `${r.service.name}・${r.variant.name}` : r.service.name)).join(" + ")
             : booking.service.name}
         </p>
       </div>
@@ -922,7 +925,7 @@ function RescheduleView({
     <>
       <p className="text-xs text-[var(--color-text-muted)] mb-4">
         {booking.user.displayName} · {booking.services && booking.services.length > 0
-          ? booking.services.map((r) => r.service.name).join(" + ")
+          ? booking.services.map((r) => (r.variant ? `${r.service.name}・${r.variant.name}` : r.service.name)).join(" + ")
           : booking.service.name} · {booking.service.slotsNeeded} 小時
       </p>
 
