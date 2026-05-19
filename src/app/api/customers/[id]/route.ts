@@ -24,6 +24,21 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         bookings: {
           include: {
             service: { select: { name: true, price: true } },
+            // V3.7 P3 (5/19) — include services[] + variant so 「最近 5 筆預約」
+            // 顯示完整「剪髮・男」+ 多服務合計，不只 primary service。
+            services: {
+              orderBy: { order: "asc" },
+              select: {
+                id: true,
+                order: true,
+                price: true,
+                durationMin: true,
+                serviceId: true,
+                variantId: true,
+                service: { select: { id: true, name: true } },
+                variant: { select: { id: true, name: true } },
+              },
+            },
             // V3.x — 整合付款記錄到預約 timeline，需要付款全欄位
             payment: {
               select: {

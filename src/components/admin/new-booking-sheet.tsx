@@ -297,13 +297,24 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
           ? `[TEST] ${trimmedNotes}`
           : `[TEST]`
         : trimmedNotes || undefined;
-      // V3.7 P3 (5/19): server preferred shape = `services: [{ serviceId, variantId? }]`.
-      // CONSULTATION overrides (duration/price) are NOT yet wired through the
-      // create-booking API — admin will fine-tune at checkout. Phase 5 backfills.
-      const servicesPayload = selectedSelections.map((sel) => ({
-        serviceId: sel.service.id,
-        ...(sel.variant ? { variantId: sel.variant.id } : {}),
-      }));
+      // V3.7 P3 (5/19): server shape `services: [{ serviceId, variantId?, overridePrice?, overrideDurationMin? }]`.
+      // override 路徑用於 CONSULTATION 服務（染漂老闆現場決定）+ 任何想 ad-hoc
+      // 調金額/時數的情況。Server 規則：override > variant > service default.
+      // 只送跟 default 不同的 override 值（避免無謂寫入）。
+      const servicesPayload = selectedSelections.map((sel) => {
+        const defaultPrice = sel.variant?.price ?? sel.service.price;
+        const defaultDuration = sel.variant?.durationMin ?? sel.service.duration;
+        return {
+          serviceId: sel.service.id,
+          ...(sel.variant ? { variantId: sel.variant.id } : {}),
+          ...(typeof sel.overridePrice === "number" && sel.overridePrice !== defaultPrice
+            ? { overridePrice: sel.overridePrice }
+            : {}),
+          ...(typeof sel.overrideDurationMin === "number" && sel.overrideDurationMin !== defaultDuration
+            ? { overrideDurationMin: sel.overrideDurationMin }
+            : {}),
+        };
+      });
       const res = await fetch("/api/bookings", {
         method: "POST",
         headers: adminHeaders(),

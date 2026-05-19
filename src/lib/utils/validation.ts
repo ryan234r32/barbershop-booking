@@ -14,6 +14,10 @@ export const createBookingSchema = z.object({
       z.object({
         serviceId: z.string().uuid(),
         variantId: z.string().uuid().optional(),
+        /** V3.7 P3 (5/19) — 老闆現場決定的價錢/時數 override，特別給染漂諮詢制。
+         *  不提供時 server 用 variant > service default 解析。允許任何服務使用。 */
+        overridePrice: z.number().int().min(0).max(100000).optional(),
+        overrideDurationMin: z.number().int().min(15).max(720).optional(),
       }),
     )
     .min(1)

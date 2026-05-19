@@ -107,15 +107,7 @@ const SERVICES: ServiceSpec[] = [
     imageFile: "bleach.jpg",
     variants: [],
   },
-  {
-    name: "漂+染",
-    description: "漂後再染（淺色／特殊色），6hr 起跳。諮詢制。",
-    defaultDurationMin: 360,
-    defaultPrice: 5000,
-    sortOrder: 6,
-    bookingMode: "CONSULTATION",
-    variants: [],
-  },
+  // 5/19 老闆：「漂+染」可多選達成，不獨立 service.
   {
     name: "溫塑燙",
     description: "溫感塑型。長度加價。",

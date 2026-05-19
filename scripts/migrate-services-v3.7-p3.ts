@@ -109,15 +109,7 @@ const SERVICES: ServiceSpec[] = [
     bookingMode: "CONSULTATION",
     variants: [],
   },
-  {
-    name: "漂+染",
-    description: "漂後再染（淺色／特殊色），長流程 6hr 起跳。諮詢制。",
-    defaultDurationMin: 360,
-    defaultPrice: 5000,
-    sortOrder: 6,
-    bookingMode: "CONSULTATION",
-    variants: [],
-  },
+  // 5/19 老闆說：「漂+染」可以多選達成，不需要獨立服務 → 移除
   // ─── 燙髮 — 時數相對固定，走 variant pattern ───
   {
     name: "溫塑燙",
@@ -173,34 +165,26 @@ const SERVICES: ServiceSpec[] = [
     variants: [],
   },
   // ─── 護髮 ───
+  // 5/19 老闆說：「護髮」不要寫「綁定」二字，UI 上展示成 upsell 推薦即可。
+  // 仍保留 1600 優惠價作為服務本身的價錢；upsell logic 在 LIFF/admin UI 展示。
   {
-    name: "護髮（綁定）",
-    description: "搭配染或燙才有此優惠價，不分長度。",
+    name: "護髮",
+    description: "深層修護。建議在染／燙／漂後加做，效果最佳。",
     defaultDurationMin: 60,
     defaultPrice: 1600,
-    sortOrder: 12,
+    sortOrder: 11,
     bookingMode: "NORMAL",
     variants: [],
   },
-  {
-    name: "護髮（獨立）",
-    description: "獨立護髮，長度加價。",
-    defaultDurationMin: 120,
-    defaultPrice: 2200,
-    sortOrder: 13,
-    bookingMode: "NORMAL",
-    variants: [
-      { name: "基本", price: 2200, durationMin: 120, sortOrder: 1 },
-      { name: "過胸", price: 2600, durationMin: 120, sortOrder: 2 },
-      { name: "過腰", price: 2800, durationMin: 120, sortOrder: 3 },
-    ],
-  },
+  // 5/19 老闆同意 「護髮（綁定）」「護髮（獨立）」合併成單一「護髮」。
+  // 護髮獨立深層修護 2200/2600/2800 的長度變異 → 不在 catalog 顯示為單獨服務（避免混淆）。
+  // 如果客戶要獨立護髮（不搭配染燙），老闆現場以「護髮 +override 價」處理即可。
   {
     name: "修瀏海",
     description: "30 分快速修剪，無洗。",
     defaultDurationMin: 30,
     defaultPrice: 300,
-    sortOrder: 14,
+    sortOrder: 12,
     bookingMode: "NORMAL",
     variants: [],
   },

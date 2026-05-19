@@ -131,7 +131,12 @@ export async function POST(request: NextRequest) {
     //      - `serviceIds: uuid[]` ← legacy multi (no variants)
     //      - `serviceId: uuid` ← legacy single
     //    Order matters: index 0 = primary service (legacy `Booking.serviceId`).
-    type Selection = { serviceId: string; variantId?: string };
+    type Selection = {
+      serviceId: string;
+      variantId?: string;
+      overridePrice?: number;
+      overrideDurationMin?: number;
+    };
     const selections: Selection[] =
       input.services && input.services.length
         ? input.services
@@ -163,21 +168,30 @@ export async function POST(request: NextRequest) {
     }
     const serviceById = new Map(serviceRows.map((s) => [s.id, s]));
     const variantById = new Map(variantRows.map((v) => [v.id, v]));
-    // Resolve each selection to its effective values (variant > service default).
-    // Variant must belong to its service (sanity check; UI shouldn't allow it).
+    // Resolve each selection to its effective values.
+    // V3.7 P3 (5/19) — precedence: admin override > variant > service default.
+    // 老闆訪談 §12: 染漂時數每次不固定，現場決定，需要 override path.
     const resolved = selections.map((sel) => {
       const service = serviceById.get(sel.serviceId)!;
       const variant = sel.variantId ? variantById.get(sel.variantId) : null;
       if (variant && variant.serviceId !== service.id) {
         throw new AppError(`variant ${variant.id} does not belong to service ${service.name}`, 400, "variant_service_mismatch");
       }
+      const basePrice = variant?.price ?? service.price;
+      const baseDurationMin = variant?.durationMin ?? service.duration;
+      // Apply admin overrides if provided. slotsNeeded recomputed from override duration
+      // to stay consistent with calendar slot model (1hr granularity, 0.5hr round up).
+      const finalPrice = sel.overridePrice ?? basePrice;
+      const finalDurationMin = sel.overrideDurationMin ?? baseDurationMin;
+      const finalSlots = sel.overrideDurationMin
+        ? Math.ceil(sel.overrideDurationMin / 60)
+        : variant?.slotsNeeded ?? service.slotsNeeded;
       return {
         service,
         variant: variant ?? null,
-        // Resolved values: variant overrides service default when present.
-        price: variant?.price ?? service.price,
-        durationMin: variant?.durationMin ?? service.duration,
-        slotsNeeded: variant?.slotsNeeded ?? service.slotsNeeded,
+        price: finalPrice,
+        durationMin: finalDurationMin,
+        slotsNeeded: finalSlots,
         displayName: variant ? `${service.name}・${variant.name}` : service.name,
       };
     });

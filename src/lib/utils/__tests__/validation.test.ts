@@ -5,6 +5,7 @@ import {
   createServiceSchema,
   adminLoginSchema,
   updateSettingsSchema,
+  addBookingServiceSchema,
 } from "@/lib/utils/validation";
 
 describe("createBookingSchema", () => {
@@ -101,6 +102,150 @@ describe("createBookingSchema", () => {
 
   it("rejects missing required fields", () => {
     const result = createBookingSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+});
+
+// V3.7 P3 (5/19) — Service+Variant + 諮詢制 input shapes
+describe("createBookingSchema — V3.7 P3 services[] + variants", () => {
+  const baseInput = {
+    tenantId: "39662028-4caf-4149-9b2a-bc37087c0272",
+    date: "2026-06-01",
+    startTime: "14:00",
+    lineUserId: "U1234567890abcdef",
+  };
+
+  const serviceId = "7859e438-2adf-4a96-93b8-7d15d9377ec8";
+  const variantId = "11111111-2222-4222-8333-555555555555";
+  const otherServiceId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+
+  it("parses preferred shape: services: [{ serviceId }]", () => {
+    const result = createBookingSchema.safeParse({
+      ...baseInput,
+      services: [{ serviceId }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("parses services with variantId", () => {
+    const result = createBookingSchema.safeParse({
+      ...baseInput,
+      services: [{ serviceId, variantId }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("parses legacy shape: serviceIds: [uuid]", () => {
+    const result = createBookingSchema.safeParse({
+      ...baseInput,
+      serviceIds: [serviceId, otherServiceId],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("parses legacy shape: serviceId: uuid", () => {
+    const result = createBookingSchema.safeParse({
+      ...baseInput,
+      serviceId,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects when none of serviceId / serviceIds / services is provided", () => {
+    const result = createBookingSchema.safeParse(baseInput);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      // refine() error should point at services
+      expect(result.error.issues.some((i) => i.path.includes("services"))).toBe(true);
+    }
+  });
+
+  it("rejects empty services array", () => {
+    const result = createBookingSchema.safeParse({
+      ...baseInput,
+      services: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects services array with more than 8 entries", () => {
+    const tooMany = Array.from({ length: 9 }, () => ({ serviceId }));
+    const result = createBookingSchema.safeParse({
+      ...baseInput,
+      services: tooMany,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts services array with exactly 8 entries", () => {
+    const eight = Array.from({ length: 8 }, () => ({ serviceId }));
+    const result = createBookingSchema.safeParse({
+      ...baseInput,
+      services: eight,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects services entry with non-uuid serviceId", () => {
+    const result = createBookingSchema.safeParse({
+      ...baseInput,
+      services: [{ serviceId: "not-a-uuid" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects services entry with non-uuid variantId", () => {
+    const result = createBookingSchema.safeParse({
+      ...baseInput,
+      services: [{ serviceId, variantId: "not-a-uuid" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects serviceIds empty array", () => {
+    const result = createBookingSchema.safeParse({
+      ...baseInput,
+      serviceIds: [],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("addBookingServiceSchema — V3.7 P3", () => {
+  const serviceId = "7859e438-2adf-4a96-93b8-7d15d9377ec8";
+  const variantId = "11111111-2222-4222-8333-555555555555";
+
+  it("parses serviceId without variantId", () => {
+    const result = addBookingServiceSchema.safeParse({ serviceId });
+    expect(result.success).toBe(true);
+  });
+
+  it("parses serviceId + variantId", () => {
+    const result = addBookingServiceSchema.safeParse({ serviceId, variantId });
+    expect(result.success).toBe(true);
+  });
+
+  it("parses with optional expectedUpdatedAt (ISO datetime)", () => {
+    const result = addBookingServiceSchema.safeParse({
+      serviceId,
+      variantId,
+      expectedUpdatedAt: "2026-05-19T10:00:00.000Z",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects missing serviceId", () => {
+    const result = addBookingServiceSchema.safeParse({ variantId });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects non-uuid serviceId", () => {
+    const result = addBookingServiceSchema.safeParse({ serviceId: "nope" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects non-uuid variantId", () => {
+    const result = addBookingServiceSchema.safeParse({ serviceId, variantId: "nope" });
     expect(result.success).toBe(false);
   });
 });

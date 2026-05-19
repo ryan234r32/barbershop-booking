@@ -155,6 +155,17 @@ interface CustomerSummary {
       startTime: string;
       status: string;
       service: { name: string; price: number };
+      // V3.7 P3 (5/19) — multi-service + variant for "最近 5 筆預約" display
+      services?: Array<{
+        id: string;
+        order: number;
+        price: number;
+        durationMin: number;
+        serviceId: string;
+        variantId: string | null;
+        service: { id: string; name: string };
+        variant: { id: string; name: string } | null;
+      }>;
     }>;
   };
   stats: {
@@ -801,27 +812,40 @@ function DetailView({
         )}
         <div>
           <p className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider mb-1.5">
-            最近 5 筆預約
+            {recentBookings.length === 0
+              ? "預約紀錄"
+              : `最近 ${recentBookings.length} 筆預約`}
           </p>
           {customer ? (
             recentBookings.length === 0 ? (
               <p className="text-xs text-[var(--color-text-muted)]">無紀錄</p>
             ) : (
               <ul className="space-y-1.5">
-                {recentBookings.map((b) => (
-                  <li
-                    key={b.id}
-                    className="flex items-center justify-between gap-2 text-xs"
-                  >
-                    <span className="text-[var(--color-text-body)] truncate">
-                      {formatYMD(b.date)} · {b.service.name}
-                    </span>
-                    <span className="shrink-0 text-[var(--color-text-muted)]">
-                      {BOOKING_STATUS_LABEL[b.status] ?? b.status} · NT$
-                      {b.service.price.toLocaleString()}
-                    </span>
-                  </li>
-                ))}
+                {recentBookings.map((b) => {
+                  // V3.7 P3 — variant-aware label + total when services[] present.
+                  const label = b.services && b.services.length > 0
+                    ? b.services
+                        .map((r) => (r.variant ? `${r.service.name}・${r.variant.name}` : r.service.name))
+                        .join(" + ")
+                    : b.service.name;
+                  const total = b.services && b.services.length > 0
+                    ? b.services.reduce((sum, r) => sum + r.price, 0)
+                    : b.service.price;
+                  return (
+                    <li
+                      key={b.id}
+                      className="flex items-center justify-between gap-2 text-xs"
+                    >
+                      <span className="text-[var(--color-text-body)] truncate">
+                        {formatYMD(b.date)} · {label}
+                      </span>
+                      <span className="shrink-0 text-[var(--color-text-muted)]">
+                        {BOOKING_STATUS_LABEL[b.status] ?? b.status} · NT$
+                        {total.toLocaleString()}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             )
           ) : (

@@ -91,3 +91,118 @@ describe("getAvailableSlots — past-hour filter (today only)", () => {
     expect(startTimes).toContain("17:00");
   });
 });
+
+// V3.7 P3 (5/19) — variant-aware caller path: client resolves variant.slotsNeeded
+// itself and passes the resolved total to getAvailableSlots, skipping service DB.
+describe("getAvailableSlots — V3.7 P3 direct slotsNeeded path", () => {
+  beforeEach(() => {
+    // Full mock reset — previous describe blocks' calls don't leak into our
+    // `not.toHaveBeenCalled()` assertions. clearAllMocks() resets ALL vi.fn()
+    // call history at once.
+    vi.clearAllMocks();
+    serviceFindUnique.mockResolvedValue({ slotsNeeded: 1 });
+    serviceFindMany.mockResolvedValue([{ id: "s-haircut", slotsNeeded: 1 }]);
+    holidayFindUnique.mockResolvedValue(null);
+    businessHoursFindUnique.mockResolvedValue({
+      isOpen: true,
+      startTime: "11:00",
+      endTime: "20:00",
+    });
+    bookingFindMany.mockResolvedValue([]);
+  });
+
+  it("slotsNeeded=1 directly → skips service.findMany lookup, returns all slots", async () => {
+    const slots = await getAvailableSlots({
+      tenantId: "t1",
+      date: "2026-05-01", // tomorrow → past-hour filter inactive
+      slotsNeeded: 1,
+    });
+    expect(serviceFindMany).not.toHaveBeenCalled();
+    const startTimes = slots.map((s) => s.startTime);
+    expect(startTimes).toContain("11:00");
+    expect(startTimes).toContain("19:00");
+    // 11..19 = 9 starts when slotsNeeded=1 and shop is 11-20
+    expect(startTimes.length).toBe(9);
+  });
+
+  it("slotsNeeded=3 (perm) directly → returns starts with 3-consec free window", async () => {
+    const slots = await getAvailableSlots({
+      tenantId: "t1",
+      date: "2026-05-01",
+      slotsNeeded: 3,
+    });
+    expect(serviceFindMany).not.toHaveBeenCalled();
+    const startTimes = slots.map((s) => s.startTime);
+    // 11..17 valid starts (17 + 3 = 20 = endTime). 18 + 3 = 21 > 20.
+    expect(startTimes).toContain("11:00");
+    expect(startTimes).toContain("17:00");
+    expect(startTimes).not.toContain("18:00");
+    expect(startTimes).not.toContain("19:00");
+  });
+
+  it("slotsNeeded=0 → falls through to legacy serviceId lookup", async () => {
+    // 0 is falsy → caller path drops through; with no serviceId/serviceIds
+    // it should return [].
+    const slots = await getAvailableSlots({
+      tenantId: "t1",
+      date: "2026-05-01",
+      slotsNeeded: 0,
+    });
+    expect(slots).toEqual([]);
+    expect(serviceFindMany).not.toHaveBeenCalled();
+  });
+
+  it("slotsNeeded ignored when explicit serviceIds also passed? prefers slotsNeeded", async () => {
+    // Implementation: if slotsNeeded > 0, it wins — no DB hit at all.
+    const slots = await getAvailableSlots({
+      tenantId: "t1",
+      date: "2026-05-01",
+      slotsNeeded: 2,
+      serviceIds: ["s-haircut"],
+    });
+    expect(serviceFindMany).not.toHaveBeenCalled();
+    const startTimes = slots.map((s) => s.startTime);
+    // 2-slot service: 11..18 valid starts (18 + 2 = 20).
+    expect(startTimes).toContain("11:00");
+    expect(startTimes).toContain("18:00");
+    expect(startTimes).not.toContain("19:00");
+  });
+
+  it("legacy serviceIds path (multi-service) still works — sums slotsNeeded", async () => {
+    serviceFindMany.mockResolvedValue([
+      { id: "s-haircut", slotsNeeded: 1 },
+      { id: "s-perm", slotsNeeded: 3 },
+    ]);
+    const slots = await getAvailableSlots({
+      tenantId: "t1",
+      date: "2026-05-01",
+      serviceIds: ["s-haircut", "s-perm"],
+    });
+    expect(serviceFindMany).toHaveBeenCalled();
+    // Total slotsNeeded = 4 → 11..16 valid starts.
+    const startTimes = slots.map((s) => s.startTime);
+    expect(startTimes).toContain("11:00");
+    expect(startTimes).toContain("16:00");
+    expect(startTimes).not.toContain("17:00");
+  });
+
+  it("legacy serviceIds with one service missing in DB → returns []", async () => {
+    // Asked for 2, DB returns 1 → mismatched → caller treats as invalid input.
+    serviceFindMany.mockResolvedValue([{ id: "s-haircut", slotsNeeded: 1 }]);
+    const slots = await getAvailableSlots({
+      tenantId: "t1",
+      date: "2026-05-01",
+      serviceIds: ["s-haircut", "s-missing"],
+    });
+    expect(slots).toEqual([]);
+  });
+
+  it("no slotsNeeded + no serviceId + no serviceIds → returns []", async () => {
+    const slots = await getAvailableSlots({
+      tenantId: "t1",
+      date: "2026-05-01",
+    });
+    expect(slots).toEqual([]);
+    expect(serviceFindMany).not.toHaveBeenCalled();
+  });
+});
