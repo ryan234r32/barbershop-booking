@@ -175,6 +175,18 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
       toast({ type: "error", message: "請填寫客人姓名和選擇至少一個服務" });
       return;
     }
+    /* 5/19 bug fix: 之前只靠 server 422 報「預約時段須在營業時間內」，但客戶端
+       已經知道 startTime + totalSlots，應該本地擋下避免送單失敗。
+       規則：startHour + totalSlots <= 20 (DEFAULT_BUSINESS_HOURS.endTime). */
+    const startH = parseInt(time.split(":")[0]);
+    if (startH + totalSlots > 20) {
+      const overtimeHours = (startH + totalSlots) - 20;
+      toast({
+        type: "error",
+        message: `這組服務共 ${totalSlots} 小時，會超過 20:00 收班 ${overtimeHours} 小時。請改開始時間，或移除部分服務。`,
+      });
+      return;
+    }
     setLoading(true);
     try {
       const trimmedNotes = notes.trim();
@@ -346,11 +358,24 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
             <label className="text-[10px] font-medium text-[var(--color-text-muted)] tracking-wider">
               選擇服務（可複選）
             </label>
-            {selectedServiceIds.length > 0 && (
-              <span className="text-[11px] font-semibold text-[var(--color-brand)] tabular-nums">
-                共 {totalSlots} 小時 · NT${totalPrice.toLocaleString()}
-              </span>
-            )}
+            {selectedServiceIds.length > 0 && (() => {
+              const startH = parseInt(time.split(":")[0]);
+              const overtimeHours = startH + totalSlots - 20;
+              const isOvertime = overtimeHours > 0;
+              return (
+                <span
+                  className={`text-[11px] font-semibold tabular-nums ${
+                    isOvertime
+                      ? "text-[var(--color-danger)]"
+                      : "text-[var(--color-brand)]"
+                  }`}
+                >
+                  {isOvertime
+                    ? `⚠️ 超過 ${overtimeHours} 小時收班`
+                    : `共 ${totalSlots} 小時 · NT$${totalPrice.toLocaleString()}`}
+                </span>
+              );
+            })()}
           </div>
           {allServices.length === 0 ? (
             <p className="text-xs text-[var(--color-text-muted)] py-2">

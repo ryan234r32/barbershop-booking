@@ -103,8 +103,10 @@ export function ClosureReminderBanner() {
               </span>
             )}
           </p>
+          {/* 5/19 bug fix: 之前連到 /settings，但 V3.7 P1-3 把公休管理移到 /closures
+              calendar-first 頁面。/settings 沒有月底公休的設定 UI。 */}
           <Link
-            href="/settings"
+            href="/closures"
             className="inline-flex items-center mt-2 px-3 py-1.5 rounded-md bg-[var(--color-brand)] text-[var(--color-bg)] text-xs font-semibold hover:opacity-90"
           >
             前往設定公休
