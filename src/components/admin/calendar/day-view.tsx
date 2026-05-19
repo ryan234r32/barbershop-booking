@@ -13,11 +13,13 @@
  */
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Ban, Lock } from "lucide-react";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import { useToast } from "@/components/ui/toast";
 import { SegmentBadge } from "./segment-badge";
 import { HorizontalDateStrip } from "./horizontal-date-strip";
 import { useAutoFit } from "./use-auto-fit";
+import type { HolidayInfo } from "./date-time-picker-sheet";
 import {
   HOURS,
   buildBookingIndex,
@@ -42,6 +44,8 @@ interface Props {
   onOpenBookingDetail: (b: Booking) => void;
   onOpenNewBooking: (date: string, time: string, duration?: number) => void;
   holidayDates: Set<string>;
+  /** 5/19 反饋：完整 holiday 資訊（含 partial closure 時段）。 */
+  holidayMap?: Map<string, HolidayInfo>;
   mutateBookings: () => void;
   /** Notifies parent of a successful drag-reschedule so the undo toast can show. */
   onRescheduled: (r: RescheduleResult) => void;
@@ -63,6 +67,7 @@ function DayViewBase({
   onOpenBookingDetail,
   onOpenNewBooking,
   holidayDates,
+  holidayMap,
   mutateBookings,
   onRescheduled,
 }: Props) {
@@ -139,6 +144,19 @@ function DayViewBase({
   const bookingIndex = useMemo(() => buildBookingIndex(bookings), [bookings]);
   const todayBookings = indexBookingsForDate(bookingIndex, formatDate(currentDate));
   const todayRevenue = todayBookings.reduce((sum, b) => sum + (b.service?.price || 0), 0);
+
+  // 5/19 反饋：在公休日進來時頂部顯示橫幅 + 格內視覺提示。
+  const currentDateStr = formatDate(currentDate);
+  const isFullDayClosed = holidayDates.has(currentDateStr);
+  const dayHoliday = holidayMap?.get(currentDateStr);
+  const partialClosureStart =
+    dayHoliday && !dayHoliday.fullDay && dayHoliday.startTime
+      ? parseInt(dayHoliday.startTime.slice(0, 2), 10)
+      : null;
+  const partialClosureEnd =
+    dayHoliday && !dayHoliday.fullDay && dayHoliday.endTime
+      ? parseInt(dayHoliday.endTime.slice(0, 2), 10)
+      : null;
 
   const timeIndicatorTop = useMemo(() => {
     const h = now.getHours();
@@ -371,6 +389,39 @@ function DayViewBase({
       {/* Horizontal date strip — smooth scroll, tap to select */}
       <HorizontalDateStrip currentDate={currentDate} onSelect={setCurrentDate} />
 
+      {/* 5/19 反饋：公休日進來時頂部顯示明顯橫幅 */}
+      {isFullDayClosed && (
+        <div
+          className="mb-2 px-3 py-2.5 rounded-lg bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/30 flex items-center gap-2"
+          role="status"
+          aria-label="此日為公休"
+        >
+          <Ban size={18} className="text-[var(--color-danger)] shrink-0" strokeWidth={2.5} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-[var(--color-danger)] leading-tight">
+              此日為公休
+            </p>
+            {dayHoliday?.reason && (
+              <p className="text-[12px] text-[var(--color-text-body)] truncate">
+                原因：{dayHoliday.reason}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+      {!isFullDayClosed && partialClosureStart !== null && partialClosureEnd !== null && (
+        <div
+          className="mb-2 px-3 py-2 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30 flex items-center gap-2"
+          role="status"
+        >
+          <Lock size={14} className="text-[var(--color-warning)] shrink-0" strokeWidth={2.5} />
+          <p className="text-[12px] font-medium text-[var(--color-text-body)] leading-tight">
+            部分公休 {dayHoliday?.startTime}-{dayHoliday?.endTime}
+            {dayHoliday?.reason ? `（${dayHoliday.reason}）` : ""}
+          </p>
+        </div>
+      )}
+
       {/* Near-End Banner */}
       {(() => {
         const nearEndList = todayBookings.filter(
@@ -424,10 +475,19 @@ function DayViewBase({
 
           if (isMultiSlotContinuation) return null;
 
+          // 5/19 反饋：partial closure 範圍內 + 全日公休 → 灰底+鎖 icon。
+          const hourNum = parseInt(hour.slice(0, 2), 10);
+          const isHourClosed =
+            isFullDayClosed ||
+            (partialClosureStart !== null &&
+              partialClosureEnd !== null &&
+              hourNum >= partialClosureStart &&
+              hourNum < partialClosureEnd);
+
           return (
             <div
               key={hour}
-              className="flex"
+              className={`flex ${isHourClosed && !booking ? "bg-[var(--color-text-muted)]/8" : ""}`}
               style={{
                 height: booking && booking.slotsOccupied > 1
                   ? slotHeight * booking.slotsOccupied
@@ -435,7 +495,7 @@ function DayViewBase({
               }}
             >
               <div className="w-14 shrink-0 pr-2 pt-2 text-right">
-                <span className="text-xs text-[var(--color-text-muted)] font-mono">{hour}</span>
+                <span className={`text-xs font-mono ${isHourClosed ? "text-[var(--color-danger)]/60 line-through" : "text-[var(--color-text-muted)]"}`}>{hour}</span>
               </div>
               <div className="flex-1 border-t border-[var(--color-surface)] px-1 pt-1">
                 {booking ? (

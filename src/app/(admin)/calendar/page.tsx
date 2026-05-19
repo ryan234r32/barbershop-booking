@@ -41,8 +41,10 @@ const MonthView = dynamic(
 );
 import { ViewToggle } from "@/components/admin/calendar/view-toggle";
 import { CalendarFab } from "@/components/admin/calendar/calendar-fab";
+import { DateTimePickerSheet, type HolidayInfo } from "@/components/admin/calendar/date-time-picker-sheet";
 import { useViewPersistence } from "@/components/admin/calendar/use-view-persistence";
 import { useCalendarShortcuts } from "@/components/admin/calendar/use-calendar-shortcuts";
+import { useBusinessConfig } from "@/lib/hooks/use-business-config";
 import {
   RescheduleUndoToast,
   type RescheduleResult,
@@ -92,6 +94,9 @@ export default function CalendarPage() {
   const [newBookingTime, setNewBookingTime] = useState("");
   const [newBookingDuration, setNewBookingDuration] = useState(1);
   const [newSheetOpen, setNewSheetOpen] = useState(false);
+
+  // FAB → 老闆挑日期/時間 mini-sheet（5/19 反饋）
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const openBookingDetail = useCallback((b: Booking) => {
     setSelectedBooking(b);
@@ -148,20 +153,43 @@ export default function CalendarPage() {
   }, [searchParams, router, pathname, openBookingDetail, setView]);
 
   // ─── Holidays ───
-  const { data: holidaysData } = useSWR(
+  // 5/19 老闆反饋：日曆要顯示公休（整天 + 部分時段）。改抓更完整的 holiday 結構
+  // 而非只有 dateString set。partial closure (startTime/endTime) 由 V3.7 P1-3 加入 schema。
+  const { data: holidaysData } = useSWR<{
+    holidays: Array<{ date: string; startTime: string | null; endTime: string | null; reason: string | null }>;
+  }>(
     "/api/admin/holidays",
     (url: string) =>
       fetch(url, { headers: adminHeaders() }).then((r) => (r.ok ? r.json() : { holidays: [] })),
     { revalidateOnFocus: false, dedupingInterval: 5 * 60_000 },
   );
-  const holidayDates = useMemo(() => {
-    const set = new Set<string>();
+  const holidayMap = useMemo(() => {
+    const map = new Map<string, HolidayInfo>();
     for (const h of holidaysData?.holidays || []) {
       const d = String(h.date).slice(0, 10);
-      set.add(d);
+      const fullDay = !h.startTime && !h.endTime;
+      map.set(d, {
+        fullDay,
+        startTime: h.startTime,
+        endTime: h.endTime,
+        reason: h.reason,
+      });
+    }
+    return map;
+  }, [holidaysData]);
+  const holidayDates = useMemo(() => {
+    // 維持舊 API：只當 fullDay 才算「整天公休」 — 部分公休不阻擋新預約，
+    // 但會在格內顯示視覺提示（views 端負責渲染）。
+    const set = new Set<string>();
+    for (const [d, info] of holidayMap) {
+      if (info.fullDay) set.add(d);
     }
     return set;
-  }, [holidaysData]);
+  }, [holidayMap]);
+
+  // closedWeekdays — 每週固定公休的星期數（0=Sun..6=Sat）。供 picker 提醒老闆。
+  const { config: businessConfig } = useBusinessConfig();
+  const closedWeekdays = businessConfig.closedWeekdays;
 
   const { toast } = useToast();
 
@@ -293,16 +321,28 @@ export default function CalendarPage() {
   }, [view, currentDate, weekDates]);
 
   // ─── FAB handler — quick create ───
+  // 5/19 老闆反饋：原本直接用 currentDate + nextSlotForFab default 開新預約 sheet
+  // 不夠合理。改為先彈一個 mini-sheet 讓老闆挑日期 / 時間 / 時長 → 確認後才進入
+  // NewBookingSheet。openNewBooking 由 DateTimePickerSheet.onConfirm 觸發。
   const handleFabClick = useCallback(() => {
-    const { date, time } = nextSlotForFab(currentDate);
-    openNewBooking(date, time, 1);
-  }, [currentDate, openNewBooking]);
+    setPickerOpen(true);
+  }, []);
+
+  const pickerDefault = useMemo(() => nextSlotForFab(currentDate), [currentDate]);
+
+  const handlePickerConfirm = useCallback(
+    (date: string, time: string, duration: number) => {
+      setPickerOpen(false);
+      openNewBooking(date, time, duration);
+    },
+    [openNewBooking],
+  );
 
   // ─── Keyboard shortcuts (PRD-v3 D-12) ───
   // Disabled while a sheet/modal is open so escape goes to those handlers,
   // not the global D/W/M switch.
   const sheetOrModalOpen =
-    detailSheetOpen || newSheetOpen || unackBookings.length > 0;
+    detailSheetOpen || newSheetOpen || pickerOpen || unackBookings.length > 0;
   useCalendarShortcuts({
     enabled: !sheetOrModalOpen,
     setView,
@@ -364,6 +404,7 @@ export default function CalendarPage() {
           onOpenBookingDetail={openBookingDetail}
           onOpenNewBooking={openNewBooking}
           holidayDates={holidayDates}
+          holidayMap={holidayMap}
           mutateBookings={mutateBookings}
           onRescheduled={setLastReschedule}
         />
@@ -375,6 +416,7 @@ export default function CalendarPage() {
           now={now}
           isToday={isToday}
           holidayDates={holidayDates}
+          holidayMap={holidayMap}
           setCurrentDate={setCurrentDate}
           setView={setView}
           onOpenBookingDetail={openBookingDetail}
@@ -389,6 +431,7 @@ export default function CalendarPage() {
           bookings={bookings}
           monthlySummary={monthlySummary}
           holidayDates={holidayDates}
+          holidayMap={holidayMap}
           todayStr={todayStr}
           setCurrentDate={setCurrentDate}
           setView={setView}
@@ -408,7 +451,19 @@ export default function CalendarPage() {
       {/* FAB: quick new booking. Hidden when any sheet/modal is open. */}
       <CalendarFab
         onClick={handleFabClick}
-        hidden={detailSheetOpen || newSheetOpen || unackBookings.length > 0}
+        hidden={detailSheetOpen || newSheetOpen || pickerOpen || unackBookings.length > 0}
+      />
+
+      {/* FAB → 老闆挑日期/時間 mini-sheet（5/19 反饋） */}
+      <DateTimePickerSheet
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        defaultDate={pickerDefault.date}
+        defaultTime={pickerDefault.time}
+        defaultDuration={1}
+        holidayMap={holidayMap}
+        closedWeekdays={closedWeekdays}
+        onConfirm={handlePickerConfirm}
       />
 
       {/* Bottom Sheets — V3.5 夯客 full-page detail behind a flag.

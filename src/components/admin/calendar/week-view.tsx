@@ -31,6 +31,7 @@ import {
 import type { Booking } from "./types";
 
 import type { RescheduleResult } from "./reschedule-undo-toast";
+import type { HolidayInfo } from "./date-time-picker-sheet";
 
 interface Props {
   weekDates: Date[];
@@ -38,12 +39,23 @@ interface Props {
   now: Date;
   isToday: (d: Date) => boolean;
   holidayDates: Set<string>;
+  /** 5/19 反饋：完整 holiday 資訊（含 partial closure 時段）。 */
+  holidayMap?: Map<string, HolidayInfo>;
   setCurrentDate: (d: Date) => void;
   setView: (v: "day" | "week" | "month") => void;
   onOpenBookingDetail: (b: Booking) => void;
   mutateBookings: () => void;
   /** Notifies parent of a successful drag-reschedule so the undo toast can show. */
   onRescheduled: (r: RescheduleResult) => void;
+}
+
+/** True if "HH:00" hour falls inside [startTime, endTime) of a partial closure. */
+function isHourInPartialClosure(hour: string, info: HolidayInfo | undefined): boolean {
+  if (!info || info.fullDay || !info.startTime || !info.endTime) return false;
+  const h = parseInt(hour.slice(0, 2), 10);
+  const s = parseInt(info.startTime.slice(0, 2), 10);
+  const e = parseInt(info.endTime.slice(0, 2), 10);
+  return h >= s && h < e;
 }
 
 const WEEK_THEAD_HEIGHT = 34;
@@ -56,6 +68,7 @@ function WeekViewBase({
   now,
   isToday,
   holidayDates,
+  holidayMap,
   setCurrentDate,
   setView,
   onOpenBookingDetail,
@@ -192,27 +205,59 @@ function WeekViewBase({
                 const today = isToday(d);
                 const wdIndex = d.getDay();
                 const isWeekend = wdIndex === 0 || wdIndex === 6;
+                const colDateStr = formatDate(d);
+                const colHoliday = holidayMap?.get(colDateStr);
+                const colIsHoliday = holidayDates.has(colDateStr);
+                const colIsPartial = !!colHoliday && !colHoliday.fullDay && !!colHoliday.startTime && !!colHoliday.endTime;
+                const colTitle = colIsHoliday
+                  ? `公休${colHoliday?.reason ? `（${colHoliday.reason}）` : ""}`
+                  : colIsPartial
+                    ? `部分公休 ${colHoliday?.startTime}-${colHoliday?.endTime}`
+                    : undefined;
                 return (
-                  <th key={formatDate(d)} className="p-1 pb-1.5 text-center">
+                  <th key={colDateStr} className="p-1 pb-1.5 text-center relative">
+                    {/* 5/19 反饋：公休那一欄頂部加一條細紅條 */}
+                    {colIsHoliday && (
+                      <div
+                        className="absolute top-0 left-0.5 right-0.5 h-[3px] rounded-b-full bg-[var(--color-danger)]"
+                        aria-hidden="true"
+                      />
+                    )}
+                    {colIsPartial && !colIsHoliday && (
+                      <div
+                        className="absolute top-0 left-0.5 right-0.5 h-[3px] rounded-b-full bg-[var(--color-warning)]"
+                        aria-hidden="true"
+                      />
+                    )}
                     <button
                       onClick={() => {
                         setCurrentDate(d);
                         setView("day");
                       }}
                       className="flex flex-col items-center gap-0.5 w-full"
+                      title={colTitle}
+                      aria-label={colTitle}
                     >
                       <span
-                        className={`text-[11px] leading-none ${isWeekend ? "text-[var(--color-danger)]" : "text-[var(--color-text-muted)]"}`}
+                        className={`text-[11px] leading-none ${
+                          colIsHoliday
+                            ? "text-[var(--color-danger)] font-semibold"
+                            : isWeekend
+                              ? "text-[var(--color-danger)]"
+                              : "text-[var(--color-text-muted)]"
+                        }`}
                       >
-                        {WEEKDAYS[wdIndex]}
+                        {colIsHoliday ? "公休" : WEEKDAYS[wdIndex]}
                       </span>
                       <span
                         className={`text-[12px] font-semibold w-6 h-6 rounded-full inline-flex items-center justify-center transition-colors ${
                           today
                             ? "bg-[var(--color-brand)] text-[var(--color-bg)]"
-                            : isWeekend
+                            : colIsHoliday
                               ? "text-[var(--color-danger)]"
-                              : "text-[var(--color-text-primary)]"
+                              : isWeekend
+                                ? "text-[var(--color-danger)]"
+                                : "text-[var(--color-text-primary)]"
                         }`}
                       >
                         {d.getDate()}
@@ -238,6 +283,9 @@ function WeekViewBase({
                   if (isContinuation) return null;
 
                   const isHoliday = holidayDates.has(dateStr);
+                  const partialInfo = holidayMap?.get(dateStr);
+                  const isPartialHourClosed =
+                    !isHoliday && isHourInPartialClosure(hour, partialInfo);
 
                   if (booking) {
                     const paid = isPaid(booking);
@@ -316,20 +364,32 @@ function WeekViewBase({
                     <td
                       key={dateStr + hour}
                       className={`p-0.5 border-t border-[var(--color-surface)]/60 ${
-                        isHoliday ? "bg-[var(--color-text-muted)]/8" : ""
+                        isHoliday
+                          ? "bg-[var(--color-danger)]/8"
+                          : isPartialHourClosed
+                            ? "bg-[var(--color-text-muted)]/10"
+                            : ""
                       }`}
                     >
                       <div
                         className={`w-full h-full rounded transition-colors ${
                           isHoliday
-                            ? "cursor-not-allowed bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,var(--color-text-muted)_4px,var(--color-text-muted)_5px)] opacity-30"
-                            : isDropTarget
-                              ? "bg-[var(--color-brand)]/30 ring-2 ring-[var(--color-brand)] cursor-pointer"
-                              : draggedBooking
-                                ? "hover:bg-[var(--color-brand)]/15 cursor-pointer"
-                                : "hover:bg-[var(--color-surface)]/50 cursor-pointer"
+                            ? "cursor-not-allowed bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,var(--color-danger)_4px,var(--color-danger)_5px)] opacity-25"
+                            : isPartialHourClosed
+                              ? "cursor-pointer bg-[repeating-linear-gradient(45deg,transparent,transparent_3px,var(--color-text-muted)_3px,var(--color-text-muted)_4px)] opacity-30 hover:opacity-50"
+                              : isDropTarget
+                                ? "bg-[var(--color-brand)]/30 ring-2 ring-[var(--color-brand)] cursor-pointer"
+                                : draggedBooking
+                                  ? "hover:bg-[var(--color-brand)]/15 cursor-pointer"
+                                  : "hover:bg-[var(--color-surface)]/50 cursor-pointer"
                         }`}
-                        title={isHoliday ? "公休日 — 不可預約" : undefined}
+                        title={
+                          isHoliday
+                            ? "公休日 — 不可預約"
+                            : isPartialHourClosed
+                              ? `部分公休 ${partialInfo?.startTime}-${partialInfo?.endTime}`
+                              : undefined
+                        }
                         aria-disabled={isHoliday}
                         onClick={() => {
                           if (draggedBooking) return;

@@ -47,6 +47,31 @@ interface ServiceSelection {
   overridePrice?: number;
 }
 
+/** V3.7 (5/19) — 服務分類用於 admin tile 色彩分組 + 護髮 upsell 判定。 */
+type ServiceCategory = "cut" | "dye" | "perm" | "treatment" | "other";
+
+function categorizeService(service: { name: string }): ServiceCategory {
+  const n = service.name;
+  if (n.includes("護髮")) return "treatment";
+  if (n.includes("染") || n.includes("漂")) return "dye";
+  if (n.includes("燙") || n.includes("矯正")) return "perm";
+  if (n.includes("剪") || n.includes("瀏海")) return "cut";
+  return "other";
+}
+
+const ADMIN_CATEGORY_META: Record<
+  ServiceCategory,
+  { label: string; accent: string; chipBg: string; chipText: string; order: number }
+> = {
+  cut: { label: "剪髮類", accent: "#003D2B", chipBg: "rgba(0,61,43,0.10)", chipText: "#003D2B", order: 1 },
+  dye: { label: "染髮類", accent: "#7C5BA8", chipBg: "rgba(124,91,168,0.12)", chipText: "#4F3578", order: 2 },
+  perm: { label: "燙髮類", accent: "#D97D3A", chipBg: "rgba(217,125,58,0.12)", chipText: "#8A4416", order: 3 },
+  treatment: { label: "護髮", accent: "#C9A961", chipBg: "rgba(201,169,97,0.14)", chipText: "#7A6420", order: 4 },
+  other: { label: "其他", accent: "#73A891", chipBg: "rgba(115,168,145,0.14)", chipText: "#2F5E4B", order: 5 },
+};
+
+const ADMIN_UPSELL_TRIGGER_TERMS = ["染", "燙", "漂", "矯正"];
+
 /** Resolve effective price/slots/duration for a selection (variant > override > service default). */
 function selectionPrice(sel: ServiceSelection): number {
   if (sel.variant) return sel.variant.price;
@@ -497,13 +522,91 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
               );
             })()}
           </div>
+          {/* V3.7 (5/19) — 護髮 upsell banner: 染/燙/漂 selected but 護髮 not. */}
+          {(() => {
+            const treatmentSvc = allServices.find(
+              (svc) =>
+                svc.name.includes("護髮") &&
+                svc.bookingMode !== "CONSULTATION" &&
+                !svc.hasVariants,
+            );
+            const hasTreatment = selectedSelections.some((sel) =>
+              `${sel.service.name} ${sel.variant?.name ?? ""}`.includes("護髮"),
+            );
+            const triggers = selectedSelections.some((sel) => {
+              const name = `${sel.service.name} ${sel.variant?.name ?? ""}`;
+              return (
+                !name.includes("護髮") &&
+                ADMIN_UPSELL_TRIGGER_TERMS.some((t) => name.includes(t))
+              );
+            });
+            if (!treatmentSvc || hasTreatment || !triggers) return null;
+            return (
+              <div
+                className="mb-3 rounded-lg p-3 flex items-center justify-between gap-3"
+                style={{
+                  background: "linear-gradient(135deg, rgba(201,169,97,0.18) 0%, rgba(212,165,71,0.10) 100%)",
+                  border: "1px solid rgba(201,169,97,0.45)",
+                }}
+              >
+                <div className="min-w-0">
+                  <div className="text-[11px] font-bold tracking-wider" style={{ color: "#7A6420" }}>
+                    💧 建議加購
+                  </div>
+                  <div className="text-[13px] font-semibold text-[var(--color-text-primary)] mt-0.5">
+                    護髮（NT$ {treatmentSvc.price.toLocaleString()}）效果更佳
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleServiceTileTap(treatmentSvc)}
+                  className="shrink-0 px-3 py-2 rounded-md text-[12px] font-bold text-white whitespace-nowrap"
+                  style={{ background: "#C9A961" }}
+                >
+                  加入
+                </button>
+              </div>
+            );
+          })()}
           {allServices.length === 0 ? (
             <p className="text-xs text-[var(--color-text-muted)] py-2">
               載入服務中…
             </p>
-          ) : (
-            <div className="grid grid-cols-2 gap-1.5">
-              {allServices.map((s) => {
+          ) : (() => {
+            // Group by category, preserve original order within each.
+            const groups = new Map<ServiceCategory, Service[]>();
+            for (const svc of allServices) {
+              const cat = categorizeService(svc);
+              if (!groups.has(cat)) groups.set(cat, []);
+              groups.get(cat)!.push(svc);
+            }
+            const orderedCats = Array.from(groups.keys()).sort(
+              (a, b) => ADMIN_CATEGORY_META[a].order - ADMIN_CATEGORY_META[b].order,
+            );
+            return (
+              <div className="space-y-3">
+                {orderedCats.map((cat) => {
+                  const meta = ADMIN_CATEGORY_META[cat];
+                  const list = groups.get(cat)!;
+                  return (
+                    <div key={cat}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider"
+                          style={{ background: meta.chipBg, color: meta.chipText }}
+                        >
+                          {meta.label}
+                        </span>
+                        <span
+                          className="flex-1 h-px"
+                          style={{ background: `${meta.accent}33` }}
+                        />
+                        <span className="text-[10px] text-[var(--color-text-muted)] tabular-nums">
+                          {list.length}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+              {list.map((s) => {
                 const selection = selectedSelections.find((x) => x.service.id === s.id);
                 const checked = !!selection;
                 const isExpanded = expandedServiceId === s.id;
@@ -525,12 +628,18 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
                     <button
                       type="button"
                       onClick={() => handleServiceTileTap(s)}
-                      className={`relative w-full text-left px-3 py-2.5 rounded-lg border-2 transition-all ${
+                      className={`relative w-full text-left px-3 py-2.5 rounded-lg border-2 transition-all overflow-hidden ${
                         checked
                           ? "bg-[var(--color-brand)]/10 border-[var(--color-brand)]"
                           : "bg-white border-[var(--color-text-muted)]/15 hover:border-[var(--color-text-muted)]/30"
                       }`}
                     >
+                      {/* Category accent rail */}
+                      <span
+                        aria-hidden
+                        className="absolute top-0 left-0 right-0 h-[2px]"
+                        style={{ background: meta.accent }}
+                      />
                       {checked && (
                         <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[var(--color-brand)] text-white text-[10px] inline-flex items-center justify-center font-bold">
                           ✓
@@ -626,8 +735,13 @@ export function NewBookingSheet({ date, time, duration = 1, open, onOpenChange, 
                   </div>
                 );
               })}
-            </div>
-          )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
           {selectedSelections.length > 1 && (
             <p className="text-[11px] text-[var(--color-text-muted)] mt-2">
               {selectedSelections

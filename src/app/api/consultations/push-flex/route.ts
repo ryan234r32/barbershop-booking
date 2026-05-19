@@ -14,6 +14,7 @@
 
 import { NextRequest } from "next/server";
 import { z } from "zod";
+import { Redis } from "@upstash/redis";
 import { prisma } from "@/lib/prisma";
 import { requireBookingAuth } from "@/lib/auth/booking-auth";
 import { getLineClient } from "@/lib/line/client";
@@ -23,6 +24,21 @@ import {
 } from "@/lib/line/messages";
 import { errorResponse, AppError } from "@/lib/utils/errors";
 import { logger } from "@/lib/utils/logger";
+
+/** 5/19 bug fix: 客戶連點多次「打開 LINE 對話」會收到一堆 Flex 騷擾。
+ *  Redis SET NX EX 5min — 同 lineUserId + serviceType 在 cooldown 內僅推一次。
+ *  Redis 不可用 (local dev) 時 silently skip dedup，functional fallback。 */
+const DEDUPE_TTL_SECONDS = 300;
+
+function getRedisOrNull(): Redis | null {
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    return null;
+  }
+  return new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+  });
+}
 
 const bodySchema = z.object({
   serviceType: z.enum(["perm", "color", "bleach"]),
@@ -58,15 +74,26 @@ export async function POST(request: NextRequest) {
             shopName: tenant.businessName,
           });
 
-    try {
-      const client = getLineClient();
-      await client.pushMessage(auth.lineUserId, flex);
-    } catch (lineErr) {
-      // Don't break the LIFF flow on LINE failures — log + return 200.
-      logger.error("push-flex push failed", lineErr, "consultations");
+    // 5/19 dedup: 5 分鐘 cooldown 內同 user+type 不重複推。SET NX EX 是原子操作。
+    const redis = getRedisOrNull();
+    let shouldPush = true;
+    if (redis) {
+      const key = `flex-pushed:${auth.lineUserId}:${input.serviceType}`;
+      const result = await redis.set(key, "1", { nx: true, ex: DEDUPE_TTL_SECONDS });
+      shouldPush = result === "OK"; // null = key already exists → skip
     }
 
-    return Response.json({ ok: true });
+    if (shouldPush) {
+      try {
+        const client = getLineClient();
+        await client.pushMessage(auth.lineUserId, flex);
+      } catch (lineErr) {
+        // Don't break the LIFF flow on LINE failures — log + return 200.
+        logger.error("push-flex push failed", lineErr, "consultations");
+      }
+    }
+
+    return Response.json({ ok: true, deduped: !shouldPush });
   } catch (err) {
     return errorResponse(err);
   }

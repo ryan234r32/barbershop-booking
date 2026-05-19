@@ -9,14 +9,18 @@
  */
 
 import React, { memo } from "react";
+import { Ban } from "lucide-react";
 import { WEEKDAYS, chipClassForStatus, getBookingServicesLabel } from "./utils";
 import type { Booking, MonthlySummary } from "./types";
+import type { HolidayInfo } from "./date-time-picker-sheet";
 
 interface Props {
   monthYear: { year: number; month: number };
   bookings: Booking[];
   monthlySummary: MonthlySummary;
   holidayDates: Set<string>;
+  /** 5/19 反饋：包含整天 + 部分時段公休的完整資訊，視覺化用。 */
+  holidayMap?: Map<string, HolidayInfo>;
   todayStr: string;
   setCurrentDate: (d: Date) => void;
   setView: (v: "day" | "week" | "month") => void;
@@ -27,6 +31,7 @@ function MonthViewBase({
   bookings,
   monthlySummary,
   holidayDates,
+  holidayMap,
   todayStr,
   setCurrentDate,
   setView,
@@ -75,6 +80,8 @@ function MonthViewBase({
                 .sort((a, b) => a.startTime.localeCompare(b.startTime))
                 .slice(0, 3);
               const isHoliday = holidayDates.has(dateStr);
+              const holidayInfo = holidayMap?.get(dateStr);
+              const isPartialClosure = !!holidayInfo && !holidayInfo.fullDay && !!holidayInfo.startTime && !!holidayInfo.endTime;
 
               // Density bar (B4 designer review): width = bookings / capacity (9).
               // Color shifts green → amber → red as the day fills up. A full
@@ -93,6 +100,12 @@ function MonthViewBase({
               const visibleChips = dayBookings.slice(0, 2);
               const overflow = count - visibleChips.length;
 
+              const cellTitle = isHoliday
+                ? `公休${holidayInfo?.reason ? `（${holidayInfo.reason}）` : ""}`
+                : isPartialClosure
+                  ? `部分公休 ${holidayInfo?.startTime}-${holidayInfo?.endTime}${holidayInfo?.reason ? `（${holidayInfo.reason}）` : ""}`
+                  : undefined;
+
               cells.push(
                 <button
                   key={day}
@@ -100,10 +113,13 @@ function MonthViewBase({
                     setCurrentDate(new Date(year, month, day));
                     setView("day");
                   }}
-                  className={`h-[108px] rounded-lg flex flex-col items-stretch p-1.5 relative transition-colors hover:bg-[var(--color-surface)] ${
-                    isHoliday ? "bg-[var(--color-text-muted)]/10 opacity-70" : ""
+                  className={`h-[108px] rounded-lg flex flex-col items-stretch p-1.5 relative transition-colors ${
+                    isHoliday
+                      ? "bg-[var(--color-danger)]/8 hover:bg-[var(--color-danger)]/12 ring-1 ring-[var(--color-danger)]/25"
+                      : "hover:bg-[var(--color-surface)]"
                   }`}
-                  title={isHoliday ? "公休日" : undefined}
+                  title={cellTitle}
+                  aria-label={cellTitle}
                 >
                   {/* Unack: 8px dot in top-right (B4 — designer prefers dot over numeric badge at this size) */}
                   {unackCount > 0 && (
@@ -115,17 +131,31 @@ function MonthViewBase({
                   )}
 
                   {/* Date row: today gets a filled brand-color circle (B4 — replaces ring outline) */}
-                  <div className="flex items-center mb-1">
+                  <div className="flex items-center gap-1 mb-1">
                     {today ? (
                       <span className="w-5 h-5 rounded-full bg-[var(--color-brand)] text-[var(--color-bg)] text-[12px] font-semibold leading-none inline-flex items-center justify-center">
                         {day}
                       </span>
                     ) : (
-                      <span className="text-[13px] font-semibold leading-none text-[var(--color-text-primary)]">
+                      <span className={`text-[13px] font-semibold leading-none ${isHoliday ? "text-[var(--color-danger)]" : "text-[var(--color-text-primary)]"}`}>
                         {day}
                       </span>
                     )}
+                    {/* 5/19 反饋：整天公休 → 紅底 + 「公休」chip 在格內。
+                        部分公休 → 不染紅底，僅小字提示（下方）。 */}
+                    {isHoliday && (
+                      <span className="inline-flex items-center gap-0.5 px-1 rounded text-[9px] font-semibold leading-none py-0.5 bg-[var(--color-danger)]/15 text-[var(--color-danger)]">
+                        <Ban size={8} strokeWidth={3} />
+                        公休
+                      </span>
+                    )}
                   </div>
+
+                  {isPartialClosure && (
+                    <p className="text-[9px] font-medium text-[var(--color-warning)] leading-none mb-1 truncate">
+                      部分公休 {holidayInfo?.startTime?.slice(0, 5)}-{holidayInfo?.endTime?.slice(0, 5)}
+                    </p>
+                  )}
 
                   {/* Density bar (B4 — replaces "合計 N" text label).
                       1.5px tall coloured strip; width scales with count/9. */}

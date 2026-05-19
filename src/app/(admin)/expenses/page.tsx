@@ -18,7 +18,8 @@
 
 import { useMemo, useState } from "react";
 import useSWR from "swr";
-import { ChevronLeft, ChevronRight, Search, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Plus, Trash2 } from "lucide-react";
+import { useToast } from "@/components/ui/toast";
 import { usePageTitle } from "@/lib/hooks/use-page-title";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
 import {
@@ -65,6 +66,7 @@ function todayMonth(): { year: number; month: number } {
 
 export default function ExpensesPage() {
   usePageTitle("支出總覽");
+  const { toast } = useToast();
   const [{ year, month }, setYM] = useState(todayMonth);
   const [search, setSearch] = useState("");
   // V3.7 P1-4 — free-text category filter (enum + custom strings 共存).
@@ -106,6 +108,29 @@ export default function ExpensesPage() {
 
   const monthTotal = filtered.reduce((s, e) => s + e.amount, 0);
   const monthLabel = `${year} 年 ${month} 月`;
+
+  // V3.7 5/19 reflect — owner asked for a delete button on this page (was only
+  // on /reports daily view). DELETE /api/expenses/[id] already exists; recurring
+  // rows are skipped (they'd regenerate from the cron rule anyway).
+  const handleDelete = async (e: Expense) => {
+    if (e.recurringRuleId) return;
+    if (!confirm(`確定刪除這筆支出 NT$${e.amount.toLocaleString()}？`)) return;
+    try {
+      const res = await fetch(`/api/expenses/${e.id}`, {
+        method: "DELETE",
+        headers: adminHeaders(),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast({ type: "success", message: "已刪除" });
+      mutate();
+    } catch (err) {
+      toast({
+        type: "error",
+        message:
+          "刪除失敗：" + (err instanceof Error ? err.message : String(err)),
+      });
+    }
+  };
 
   const prevMonth = () => {
     setYM(({ year, month }) =>
@@ -202,7 +227,7 @@ export default function ExpensesPage() {
       ) : (
         <div className="space-y-1.5">
           {filtered.map((e) => (
-            <ExpenseRow key={e.id} expense={e} />
+            <ExpenseRow key={e.id} expense={e} onDelete={() => handleDelete(e)} />
           ))}
         </div>
       )}
@@ -253,11 +278,17 @@ function CategoryChip({
   );
 }
 
-function ExpenseRow({ expense }: { expense: Expense }) {
+function ExpenseRow({
+  expense,
+  onDelete,
+}: {
+  expense: Expense;
+  onDelete: () => void;
+}) {
   const dateLabel = expense.date.slice(5).replace("-", "/"); // MM/DD
   const isRecurring = !!expense.recurringRuleId;
   return (
-    <div className="grid grid-cols-[3rem_1fr_auto] items-center gap-3 px-3 py-3 rounded-lg bg-[var(--color-bg)] border border-[var(--color-surface)]">
+    <div className="grid grid-cols-[3rem_1fr_auto_auto] items-center gap-3 px-3 py-3 rounded-lg bg-[var(--color-bg)] border border-[var(--color-surface)]">
       <span className="font-mono tabular-nums text-sm text-[var(--color-text-muted)]">
         {dateLabel}
       </span>
@@ -284,6 +315,26 @@ function ExpenseRow({ expense }: { expense: Expense }) {
       <span className="font-mono tabular-nums text-base font-bold text-[var(--color-text-primary)] whitespace-nowrap">
         NT${expense.amount.toLocaleString()}
       </span>
+      {isRecurring ? (
+        <button
+          type="button"
+          disabled
+          aria-label="週期支出無法在此刪除"
+          title="週期支出請從 設定→週期規則 移除"
+          className="w-8 h-8 flex items-center justify-center text-[var(--color-text-disabled)] cursor-not-allowed"
+        >
+          <Trash2 size={14} aria-hidden />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onDelete}
+          aria-label="刪除這筆支出"
+          className="w-8 h-8 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-danger)] active:text-[var(--color-danger)] rounded-md hover:bg-[var(--color-surface)] transition-colors"
+        >
+          <Trash2 size={16} aria-hidden />
+        </button>
+      )}
     </div>
   );
 }

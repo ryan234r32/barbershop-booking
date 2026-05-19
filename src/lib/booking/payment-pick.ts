@@ -35,7 +35,12 @@ export interface EligibleBooking {
   startTime: string;
   endTime: string;
   service: { name: string; price: number };
-  payment: { status: string; transferLastFive: string | null; method: string | null } | null;
+  payment: {
+    status: string;
+    transferLastFive: string | null;
+    method: string | null;
+    createdAt: Date;
+  } | null;
 }
 
 export interface PickResult {
@@ -74,7 +79,7 @@ export async function pickEligibleBookingForPayment(
     },
     include: {
       service: { select: { name: true, price: true } },
-      payment: { select: { status: true, transferLastFive: true, method: true } },
+      payment: { select: { status: true, transferLastFive: true, method: true, createdAt: true } },
     },
     orderBy: [{ date: "asc" }, { startTime: "asc" }],
     take: 20,
@@ -100,8 +105,12 @@ export async function pickEligibleBookingForPayment(
     };
   }
 
-  // Score each by abs distance from now (using endTime in Taipei).
-  // Closest = picked. Just-finished service usually wins over far-future booking.
+  // V3.7 P3 (5/19) — Tie-break: Payment.createdAt DESC FIRST, then end-time distance.
+  // 5/19 老闆 repro：客戶 A 有兩筆 booking (5/20 染 / 5/23 剪)，admin 結帳剪
+  // (push 剪的 Flex 給客戶)，客戶傳後 5 碼 → 原邏輯選「距 now 最近」→ 染 (5/20)
+  // → 5 碼被寫到染！客戶以為付剪，系統以為付染，老闆收到的金額也錯。
+  // 修法：admin 剛 createPayment 那筆 (createdAt 最新) 一定是「正在付的這筆」，
+  // tie-break 走 createdAt DESC，符合「admin Flex 內容 = 後續 5 碼寫入位置」。
   const scored = eligible.map((b) => {
     const dStr = b.date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
     const [y, m, d] = dStr.split("-").map(Number);
@@ -109,7 +118,21 @@ export async function pickEligibleBookingForPayment(
     const endUtcMs = Date.UTC(y, m - 1, d, eH - 8, 0, 0);
     return { booking: b, distance: Math.abs(endUtcMs - now.getTime()) };
   });
-  scored.sort((a, b) => a.distance - b.distance);
+  scored.sort((a, b) => {
+    // 兩個都有 payment → 比 createdAt（admin 剛建的那筆 wins）
+    const aP = a.booking.payment;
+    const bP = b.booking.payment;
+    if (aP && bP) {
+      const diff = bP.createdAt.getTime() - aP.createdAt.getTime();
+      if (diff !== 0) return diff;
+    } else if (aP && !bP) {
+      return -1; // 有 payment 的優先（admin 剛 push Flex）
+    } else if (!aP && bP) {
+      return 1;
+    }
+    // 都沒 payment OR 同 createdAt → 老 fallback：距 now 最近
+    return a.distance - b.distance;
+  });
 
   return {
     eligible: scored[0].booking,

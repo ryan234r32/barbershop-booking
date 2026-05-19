@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import useSWR from "swr";
 import { Banknote, Landmark } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { adminHeaders } from "@/lib/auth/admin-fetch";
@@ -24,6 +25,7 @@ import {
   CATEGORY_LABELS,
   CATEGORY_TYPE,
   categoriesForType,
+  isPredefinedCategory,
   type ExpenseCategory,
 } from "@/lib/expenses/categories";
 
@@ -46,6 +48,9 @@ export function ExpenseEntrySheet({
   const [type, setType] = useState<"VARIABLE" | "FIXED" | null>(null);
   const [category, setCategory] = useState<ExpenseCategory | null>(null);
   const [customItem, setCustomItem] = useState("");
+  /** V3.7 5/19 reflect — when picking a "最近用過" custom chip, skip the
+   * 「其他」 + customItem flow; this string becomes the submitted category. */
+  const [recentPick, setRecentPick] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [paidMethod, setPaidMethod] = useState<"CASH" | "BANK_TRANSFER">("CASH");
   const [notes, setNotes] = useState("");
@@ -62,6 +67,7 @@ export function ExpenseEntrySheet({
       setType(null);
       setCategory(null);
       setCustomItem("");
+      setRecentPick(null);
       setAmount("");
       setPaidMethod("CASH");
       setNotes("");
@@ -80,15 +86,58 @@ export function ExpenseEntrySheet({
     [type],
   );
 
+  // V3.7 5/19 reflect — fetch last 90d of expenses (only when sheet open) to
+  // surface 「最近用過」 custom labels (e.g. "保時捷保養") so the owner can
+  // reuse them without retyping. Client-side dedupe; cheaper than a new API.
+  const recentRange = useMemo(() => {
+    const today = new Date();
+    const from = new Date(today);
+    from.setUTCDate(from.getUTCDate() - 90);
+    return {
+      from: from.toISOString().slice(0, 10),
+      to: today.toISOString().slice(0, 10),
+    };
+  }, []);
+  interface RecentExpense {
+    category: string;
+    createdAt: string;
+  }
+  const { data: recentData } = useSWR<{ expenses: RecentExpense[] }>(
+    open ? `/api/expenses?from=${recentRange.from}&to=${recentRange.to}` : null,
+    async (url: string) => {
+      const r = await fetch(url, { headers: adminHeaders() });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    },
+  );
+  /** Distinct custom (non-enum) categories from the last 90d, most-recent first. */
+  const recentCustomCategories = useMemo(() => {
+    const rows = recentData?.expenses ?? [];
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const e of rows) {
+      // recentData is already ordered date desc, createdAt desc by the API.
+      if (isPredefinedCategory(e.category)) continue;
+      if (seen.has(e.category)) continue;
+      seen.add(e.category);
+      ordered.push(e.category);
+    }
+    return ordered.slice(0, 20);
+  }, [recentData]);
+
   const showCategoryRow = type !== null;
-  const showAmountRow =
-    category !== null && (category !== "other" || customItem.trim().length > 0);
-  const showOtherInput = category === "other";
+  // category fully chosen if: enum non-other, OR enum "other" + customItem,
+  // OR a custom-recent chip picked.
+  const categoryComplete =
+    recentPick !== null ||
+    (category !== null && category !== "other") ||
+    (category === "other" && customItem.trim().length > 0);
+  const showAmountRow = categoryComplete;
+  const showOtherInput = category === "other" && recentPick === null;
   const amtNum = parseInt(amount.replace(/,/g, ""), 10);
   const canSubmit =
     type !== null &&
-    category !== null &&
-    (category !== "other" || customItem.trim().length > 0) &&
+    categoryComplete &&
     Number.isFinite(amtNum) &&
     amtNum > 0;
 
@@ -123,16 +172,21 @@ export function ExpenseEntrySheet({
   }, [showOtherInput]);
 
   const handleSubmit = async () => {
-    if (!canSubmit || !type || !category) return;
+    if (!canSubmit || !type) return;
+    if (recentPick === null && category === null) return;
 
     // V3.7 P1-4 — when the user picks 「其他」 and types a custom item, treat
     // it as the category itself (free-text). Old behaviour shoved the label
     // into notes and tagged the row as enum "other", which lost it for chip
     // filtering. Server-side schema accepts free-text.
+    // V3.7 5/19 reflect — `recentPick` takes priority: chosen from
+    // 「最近用過」 row → submit that string directly.
     const submittedCategory =
-      category === "other" && customItem.trim()
-        ? customItem.trim().slice(0, 40)
-        : category;
+      recentPick !== null
+        ? recentPick
+        : category === "other" && customItem.trim()
+          ? customItem.trim().slice(0, 40)
+          : (category as ExpenseCategory);
     const mergedNotes = notes.trim() || undefined;
 
     setSubmitting(true);
@@ -246,13 +300,7 @@ export function ExpenseEntrySheet({
 
         {/* (c) 分類 chips — appears once type chosen */}
         {showCategoryRow && (
-          <Section
-            label="分類"
-            complete={
-              category !== null &&
-              (category !== "other" || customItem.trim().length > 0)
-            }
-          >
+          <Section label="分類" complete={categoryComplete}>
             <div className="grid grid-cols-3 gap-2">
               {chips.map((c) => (
                 <button
@@ -260,10 +308,11 @@ export function ExpenseEntrySheet({
                   type="button"
                   onClick={() => {
                     setCategory(c);
+                    setRecentPick(null);
                     if (c !== "other") setCustomItem("");
                   }}
                   className={`py-3 rounded-lg text-sm font-medium transition-colors ${
-                    category === c
+                    category === c && recentPick === null
                       ? "bg-[var(--color-brand)] text-[var(--color-bg)]"
                       : "bg-[var(--color-surface)] text-[var(--color-text-body)]"
                   }`}
@@ -288,6 +337,47 @@ export function ExpenseEntrySheet({
                 <p className="text-[10px] text-[var(--color-text-muted)] mt-1">
                   這個品項會直接顯示在支出列表上
                 </p>
+              </div>
+            )}
+
+            {/* V3.7 5/19 reflect — 「最近用過」 custom chip row. Horizontally
+                scrollable when there are many. Tap → use that string as the
+                submitted category directly (skips the 其他 + customItem flow).
+                Hidden when empty so we don't waste vertical space. */}
+            {recentCustomCategories.length > 0 && (
+              <div className="mt-4">
+                <div className="text-[11px] text-[var(--color-text-muted)] mb-1.5">
+                  最近用過
+                </div>
+                <div
+                  className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1"
+                  style={{ WebkitOverflowScrolling: "touch" }}
+                >
+                  {recentCustomCategories.map((c) => {
+                    const active = recentPick === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => {
+                          setRecentPick(c);
+                          // Clear enum-side selection so visual state is
+                          // unambiguous. Keep `category` null so the 其他
+                          // input doesn't render.
+                          setCategory(null);
+                          setCustomItem("");
+                        }}
+                        className={`flex-shrink-0 px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                          active
+                            ? "bg-[var(--color-brand)] text-[var(--color-bg)]"
+                            : "bg-[var(--color-surface)] text-[var(--color-text-body)] hover:bg-[var(--color-brand)]/15"
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </Section>
@@ -379,7 +469,7 @@ export function ExpenseEntrySheet({
           <p className="text-center text-[11px] text-[var(--color-text-muted)] mt-3">
             {!type
               ? "請先選擇變動或固定"
-              : !category
+              : !categoryComplete && !category
                 ? "請選擇分類"
                 : category === "other" && customItem.trim().length === 0
                   ? "請輸入「其他」的支出品項"

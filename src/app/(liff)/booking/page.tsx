@@ -81,6 +81,11 @@ export default function BookingPage() {
   // server returns code=SLOT_UNAVAILABLE. Show a blocking modal, bounce back
   // to calendar, and refresh availability so the taken slot greys out.
   const [slotConflictOpen, setSlotConflictOpen] = useState(false);
+  // V3.7 (5/19) — sticky 護髮 upsell dismissal (session-scoped).
+  const [upsellDismissed, setUpsellDismissed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return sessionStorage.getItem("upsell_treatment_dismissed") === "1";
+  });
 
   // 公休 / 預約窗口設定（從 /api/business-config 讀，取代寫死的 30 天 + 週一）
   const { config: businessConfig } = useBusinessConfig();
@@ -399,7 +404,7 @@ export default function BookingPage() {
       </header>
 
       {/* Step content */}
-      <div className="flex-1 px-6 pt-6 pb-32">
+      <div className="flex-1 px-6 pt-6 pb-40">
         <div key={step} className="animate-fadeIn">
           {step === "service" && (
             <ServiceStep
@@ -446,9 +451,66 @@ export default function BookingPage() {
         </div>
       </div>
 
-      {/* Sticky bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#FFF8F1] border-t border-[#003D2B]/5 px-6 py-4 z-50">
-        <div className="max-w-md mx-auto">
+      {/* Sticky bottom bar — V3.7 (5/19): may include 護髮 upsell row above CTA */}
+      <div
+        className="fixed bottom-0 left-0 right-0 bg-[#FFF8F1] border-t border-[#003D2B]/5 z-50"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="max-w-md mx-auto px-6 py-4">
+          {step === "service" && (() => {
+            const treatmentSvc = services.find(
+              (svc) =>
+                svc.name.includes("護髮") &&
+                svc.bookingMode !== "CONSULTATION" &&
+                !svc.hasVariants,
+            );
+            const hasTreatment = selectedSelections.some((sel) =>
+              `${sel.service.name} ${sel.variant?.name ?? ""}`.includes("護髮"),
+            );
+            const triggers = selectedSelections.some((sel) => {
+              const name = `${sel.service.name} ${sel.variant?.name ?? ""}`;
+              return (
+                !name.includes("護髮") &&
+                ["染", "燙", "漂", "矯正"].some((t) => name.includes(t))
+              );
+            });
+            if (!treatmentSvc || hasTreatment || !triggers || upsellDismissed) return null;
+            return (
+              <div
+                className="mb-2 rounded-lg px-3 py-2 flex items-center gap-2 text-[12px]"
+                style={{
+                  background: "linear-gradient(135deg, rgba(201,169,97,0.20) 0%, rgba(212,165,71,0.10) 100%)",
+                  border: "1px solid rgba(201,169,97,0.45)",
+                }}
+              >
+                <span className="flex-1 min-w-0 truncate text-[#003D2B]">
+                  <span className="font-bold" style={{ color: "#7A6420" }}>💧</span>{" "}
+                  建議加購護髮（NT$ {treatmentSvc.price.toLocaleString()}）
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleServiceToggle(treatmentSvc)}
+                  className="shrink-0 px-3 py-1.5 rounded-md text-[12px] font-bold text-white whitespace-nowrap"
+                  style={{ background: "#C9A961" }}
+                >
+                  + 加入
+                </button>
+                <button
+                  type="button"
+                  aria-label="關閉建議"
+                  onClick={() => {
+                    sessionStorage.setItem("upsell_treatment_dismissed", "1");
+                    setUpsellDismissed(true);
+                  }}
+                  className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[#7A6420]/70"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                    <path d="M6 6l12 12M6 18L18 6" />
+                  </svg>
+                </button>
+              </div>
+            );
+          })()}
           <button
             onClick={handleNext}
             disabled={!canProceed}

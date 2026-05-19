@@ -61,22 +61,56 @@ describe("pickEligibleBookingForPayment", () => {
   it("V3.7 P3: both PENDING and RECEIVED with null last5 are eligible (waiting on customer 5 碼)", async () => {
     // Admin checkout flow sets payment.status=RECEIVED immediately but last5
     // is null until customer reports. Helper must NOT filter these out.
+    // 5/19: payment.createdAt is required for the tie-break logic.
     bookingFindMany.mockResolvedValue([
-      makeBooking({ id: "b1", payment: { status: "RECEIVED", transferLastFive: null } }),
-      makeBooking({ id: "b2", payment: { status: "PENDING", transferLastFive: null } }),
+      makeBooking({ id: "b1", payment: { status: "RECEIVED", transferLastFive: null, method: "BANK_TRANSFER", createdAt: new Date("2026-05-19T10:00:00Z") } }),
+      makeBooking({ id: "b2", payment: { status: "PENDING", transferLastFive: null, method: "BANK_TRANSFER", createdAt: new Date("2026-05-19T10:05:00Z") } }),
     ]);
     const r = await pickEligibleBookingForPayment("u1", "t1");
-    // Tie-break by endTime distance — both eligible, mocks have same date+endTime → first wins.
-    expect(["b1", "b2"]).toContain(r.eligible?.id);
+    // V3.7 P3 tie-break: payment.createdAt DESC → b2 (later) wins.
+    expect(r.eligible?.id).toBe("b2");
     expect(r.hasOnlyPaidBookings).toBe(false);
   });
 
   it("returns booking with AWAITING_BANK payment as eligible", async () => {
     bookingFindMany.mockResolvedValue([
-      makeBooking({ id: "b1", payment: { status: "AWAITING_BANK", transferLastFive: null } }),
+      makeBooking({ id: "b1", payment: { status: "AWAITING_BANK", transferLastFive: null, method: "BANK_TRANSFER", createdAt: new Date("2026-05-19T10:00:00Z") } }),
     ]);
     const r = await pickEligibleBookingForPayment("u1", "t1");
     expect(r.eligible?.id).toBe("b1");
+  });
+
+  it("V3.7 P3: tie-break by Payment.createdAt DESC (admin 剛建那筆 wins, not 距 now 最近)", async () => {
+    // Repro 5/19 bug: customer has booking A (closer date) + booking B (further).
+    // Admin checks out B → creates Payment for B (newer createdAt).
+    // Customer types 5 碼 → should write to B (matches the Flex admin pushed).
+    vi.setSystemTime(new Date("2026-05-19T14:00:00Z"));
+    const bookingA = makeBooking({
+      id: "a-染-tomorrow",
+      date: new Date("2026-05-20"),
+      endTime: "12:00",
+      payment: {
+        status: "RECEIVED",
+        transferLastFive: null,
+        method: "BANK_TRANSFER",
+        createdAt: new Date("2026-05-18T10:00:00Z"), // older
+      },
+    });
+    const bookingB = makeBooking({
+      id: "b-剪-4-days-out",
+      date: new Date("2026-05-23"),
+      endTime: "12:00",
+      payment: {
+        status: "RECEIVED",
+        transferLastFive: null,
+        method: "BANK_TRANSFER",
+        createdAt: new Date("2026-05-19T13:55:00Z"), // newer (admin 剛 checkout)
+      },
+    });
+    bookingFindMany.mockResolvedValue([bookingA, bookingB]);
+    const r = await pickEligibleBookingForPayment("u1", "t1");
+    expect(r.eligible?.id).toBe("b-剪-4-days-out");
+    vi.useRealTimers();
   });
 
   it("among multiple eligible, picks closest endTime to now", async () => {
